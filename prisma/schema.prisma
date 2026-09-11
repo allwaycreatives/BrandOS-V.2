@@ -1,0 +1,200 @@
+// BrandOS — MVP data model (Sprint 1-2 scope)
+// See Technical-Architecture-MVP.md Section 2 for the full rationale.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrgType {
+  solo
+  agency
+}
+
+enum MembershipRole {
+  owner
+  admin
+  team_member
+}
+
+enum BrandSpaceRole {
+  owner
+  admin
+  team_member
+  client
+  guest
+}
+
+model Organization {
+  id          String        @id @default(cuid())
+  name        String
+  type        OrgType
+  createdAt   DateTime      @default(now())
+  memberships Membership[]
+  brandSpaces BrandSpace[]
+}
+
+model User {
+  id             String              @id @default(cuid())
+  email          String              @unique
+  name           String?
+  authProviderId String?             @unique
+  createdAt      DateTime            @default(now())
+  memberships    Membership[]
+  brandAccess    BrandSpaceAccess[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole
+  createdAt      DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+model BrandSpace {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  access               BrandSpaceAccess[]
+  discoveryTemplates   DiscoveryTemplate[]
+  discoveryResponses   DiscoveryResponse[]
+  brandProfile         BrandProfile?
+  brandKitItems        BrandKitItem[]
+  projects             Project[]
+  calendarItems        CalendarItem[]
+  tasks                Task[]
+}
+
+model BrandSpaceAccess {
+  id           String         @id @default(cuid())
+  brandSpaceId String
+  userId       String
+  role         BrandSpaceRole
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([brandSpaceId, userId])
+}
+
+// --- Discovery (editable + versioned per Decisions 1, 7, 8) ---
+
+model DiscoveryTemplate {
+  id           String   @id @default(cuid())
+  brandSpaceId String
+  name         String
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  brandSpace BrandSpace                 @relation(fields: [brandSpaceId], references: [id])
+  versions   DiscoveryTemplateVersion[]
+}
+
+model DiscoveryTemplateVersion {
+  id             String   @id @default(cuid())
+  templateId     String
+  questionsJson  Json
+  versionNumber  Int
+  createdAt      DateTime @default(now())
+
+  template  DiscoveryTemplate    @relation(fields: [templateId], references: [id])
+  responses DiscoveryResponse[]
+}
+
+model DiscoveryResponse {
+  id              String   @id @default(cuid())
+  brandSpaceId    String
+  templateVersionId String
+  answersJson     Json
+  submittedAt     DateTime @default(now())
+
+  brandSpace      BrandSpace               @relation(fields: [brandSpaceId], references: [id])
+  templateVersion DiscoveryTemplateVersion @relation(fields: [templateVersionId], references: [id])
+  edits           DiscoveryResponseEdit[]
+}
+
+model DiscoveryResponseEdit {
+  id                  String   @id @default(cuid())
+  responseId          String
+  previousAnswersJson Json
+  editedAt            DateTime @default(now())
+
+  response DiscoveryResponse @relation(fields: [responseId], references: [id])
+}
+
+// --- Brand identity output ---
+
+model BrandProfile {
+  id                  String   @id @default(cuid())
+  brandSpaceId        String   @unique
+  voiceSummary        String?
+  audienceSummary     String?
+  positioningSummary  String?
+  derivedAt           DateTime @default(now())
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+}
+
+model BrandKitItem {
+  id            String   @id @default(cuid())
+  brandSpaceId  String
+  type          String   // 'bio' | 'tagline' | 'palette' | 'banner_spec'
+  platform      String?
+  contentJson   Json
+  isSelected    Boolean  @default(false)
+  versionNumber Int      @default(1)
+  generatedAt   DateTime @default(now())
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+}
+
+// --- Planning ---
+
+model Project {
+  id           String   @id @default(cuid())
+  brandSpaceId String
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+
+  brandSpace    BrandSpace     @relation(fields: [brandSpaceId], references: [id])
+  calendarItems CalendarItem[]
+}
+
+model CalendarItem {
+  id            String   @id @default(cuid())
+  brandSpaceId  String
+  projectId     String?
+  title         String
+  platform      String
+  status        String   // idea | draft | approval | scheduled | posted
+  scheduledDate DateTime?
+  assetUrl      String?
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+  project    Project?   @relation(fields: [projectId], references: [id])
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  brandSpaceId  String
+  title         String
+  assigneeId    String?
+  dueDate       DateTime?
+  status        String    @default("open")
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+}
