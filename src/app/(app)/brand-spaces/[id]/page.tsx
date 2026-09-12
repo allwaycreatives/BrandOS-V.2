@@ -12,7 +12,6 @@ async function getBrandSpace(id: string) {
 }
 
 const upcomingSections = [
-  { title: 'Brand Kit', description: 'AI-generated bio, tagline, and palette options once discovery is done.' },
   { title: 'Calendar', description: 'Plan and track content by platform and status.' },
   { title: 'Boards', description: 'A freeform canvas for moodboards and campaign ideas.' },
 ]
@@ -45,6 +44,13 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           </div>
           <DiscoveryLink brandSpaceId={params.id} />
         </div>
+
+        <Link href={`/brand-spaces/${params.id}/brand-kit`} className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Brand Kit</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            {responseCount > 0 ? 'Generate bio and tagline options.' : 'Available once discovery is complete.'}
+          </div>
+        </Link>
 
         {upcomingSections.map((section) => (
           <div key={section.title} className="card" style={{ opacity: 0.7 }}>
