@@ -38,7 +38,7 @@ Bios should be 1-2 sentences, first person, suitable for a social media bio, ref
   try {
     parsed = JSON.parse(cleaned)
   } catch {
-    return
+    throw new Error(`AI response wasn't valid JSON. Raw response: ${raw.slice(0, 300)}`)
   }
 
   // Regenerating replaces unselected drafts — whatever's already selected
