@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import Link from 'next/link'
 import { createBrandSpace } from '../../actions'
 
 type BrandSpaceRow = { id: string; name: string }
@@ -39,10 +40,10 @@ export default async function DashboardPage() {
           <div className="card-empty">No brand spaces yet — create your first one above.</div>
         )}
         {brandSpaces.map((bs) => (
-          <div key={bs.id} className="card">
+          <Link key={bs.id} href={`/brand-spaces/${bs.id}`} className="card">
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{bs.name}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Open to view calendar and brand kit</div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
