@@ -4,6 +4,14 @@ import { notFound } from 'next/navigation'
 import GenerateButton from './GenerateButton'
 import OptionButton from './OptionButton'
 
+function safeText(contentJson: unknown): string {
+  if (contentJson && typeof contentJson === 'object') {
+    const text = (contentJson as Record<string, unknown>).text
+    if (typeof text === 'string') return text
+  }
+  return String(contentJson ?? '')
+}
+
 export default async function BrandKitPage({ params }: { params: { id: string } }) {
   const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
   if (!brandSpace) notFound()
@@ -48,7 +56,7 @@ export default async function BrandKitPage({ params }: { params: { id: string } 
                     brandSpaceId={params.id}
                     itemId={item.id}
                     type="bio"
-                    text={(item.contentJson as { text: string }).text}
+                    text={safeText(item.contentJson)}
                     isSelected={item.isSelected}
                   />
                 ))}
@@ -66,7 +74,7 @@ export default async function BrandKitPage({ params }: { params: { id: string } 
                     brandSpaceId={params.id}
                     itemId={item.id}
                     type="tagline"
-                    text={(item.contentJson as { text: string }).text}
+                    text={safeText(item.contentJson)}
                     isSelected={item.isSelected}
                   />
                 ))}

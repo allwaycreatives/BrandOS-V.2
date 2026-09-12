@@ -34,11 +34,31 @@ Bios should be 1-2 sentences, first person, suitable for a social media bio, ref
   const raw = await generateText(prompt)
   const cleaned = raw.replace(/```json|```/g, '').trim()
 
-  let parsed: { bios: string[]; taglines: string[] }
+  let parsed: { bios: unknown[]; taglines: unknown[] }
   try {
     parsed = JSON.parse(cleaned)
   } catch {
     throw new Error(`AI response wasn't valid JSON. Raw response: ${raw.slice(0, 300)}`)
+  }
+
+  // Gemini doesn't always follow the exact requested shape as reliably as
+  // Claude does — coerce whatever comes back into plain strings so a
+  // slightly-off response can't crash the page when it renders.
+  function toText(value: unknown): string {
+    if (typeof value === 'string') return value
+    if (value && typeof value === 'object') {
+      const obj = value as Record<string, unknown>
+      const candidate = obj.text ?? obj.bio ?? obj.tagline ?? obj.value
+      if (typeof candidate === 'string') return candidate
+    }
+    return String(value ?? '')
+  }
+
+  const bios = Array.isArray(parsed.bios) ? parsed.bios.map(toText).filter(Boolean) : []
+  const taglines = Array.isArray(parsed.taglines) ? parsed.taglines.map(toText).filter(Boolean) : []
+
+  if (bios.length === 0 && taglines.length === 0) {
+    throw new Error(`AI response didn't contain any usable bios or taglines. Raw response: ${raw.slice(0, 300)}`)
   }
 
   // Regenerating replaces unselected drafts — whatever's already selected
@@ -47,8 +67,8 @@ Bios should be 1-2 sentences, first person, suitable for a social media bio, ref
 
   await db.brandKitItem.createMany({
     data: [
-      ...parsed.bios.map((text) => ({ brandSpaceId, type: 'bio', contentJson: { text } })),
-      ...parsed.taglines.map((text) => ({ brandSpaceId, type: 'tagline', contentJson: { text } })),
+      ...bios.map((text) => ({ brandSpaceId, type: 'bio', contentJson: { text } })),
+      ...taglines.map((text) => ({ brandSpaceId, type: 'tagline', contentJson: { text } })),
     ],
   })
 
