@@ -7,11 +7,6 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
   const [fading, setFading] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setFading(true), 1900)
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
     if (!fading) return
     const timer = setTimeout(() => setVisible(false), 400)
     return () => clearTimeout(timer)
@@ -22,7 +17,6 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
       {children}
       {visible && (
         <div
-          onClick={() => setFading(true)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -37,7 +31,6 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
             background: 'radial-gradient(circle at 50% 42%, #17130f 0%, #0a0a0a 72%)',
             opacity: fading ? 0 : 1,
             transition: 'opacity 0.4s ease',
-            cursor: 'pointer',
           }}
         >
           <div className="logo-glow-wrap splash-fade">
@@ -49,13 +42,7 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
           </p>
           <div className="splash-fade splash-delay-3" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
             <span className="badge">Your brand is waiting to be built</span>
-            <button
-              className="primary"
-              onClick={(e) => {
-                e.stopPropagation()
-                setFading(true)
-              }}
-            >
+            <button className="primary" onClick={() => setFading(true)}>
               Enter BrandOS
             </button>
           </div>
