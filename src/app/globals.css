@@ -254,6 +254,15 @@ input::placeholder, textarea::placeholder {
   z-index: 0;
 }
 
+.logo-glow-wrap::after {
+  content: '';
+  position: absolute;
+  inset: -36px;
+  background: radial-gradient(circle, rgba(255, 143, 171, 0.16), transparent 72%);
+  animation: pulseGlow 3.2s ease-in-out infinite reverse;
+  z-index: -1;
+}
+
 .logo-glow-wrap img {
   position: relative;
   z-index: 1;
