@@ -258,3 +258,56 @@ input::placeholder, textarea::placeholder {
   position: relative;
   z-index: 1;
 }
+
+/* ---- Interaction polish, everywhere ---- */
+button {
+  transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.card {
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+a.card:hover {
+  transform: translateY(-3px);
+}
+
+/* ---- Discovery flow: question transitions ---- */
+@keyframes slideInQuestion {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.question-slide {
+  animation: slideInQuestion 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popIn {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.option-selected {
+  animation: popIn 0.22s ease-out;
+}
+
+/* ---- Confetti ---- */
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.85); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}

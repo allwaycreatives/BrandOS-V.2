@@ -1,10 +1,47 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { discoveryQuestions } from '@/lib/discoveryQuestions'
 import { submitDiscoveryResponse } from './actions'
 
 type Answers = Record<string, string | string[]>
+
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 70 }).map((_, i) => ({
+        left: Math.random() * 100,
+        color: ['#f5a623', '#ffffff', '#ff6b6b', '#4dd4ac', '#6c8cff'][i % 5],
+        delay: Math.random() * 0.5,
+        duration: 2 + Math.random() * 1.3,
+        rotate: Math.random() * 360,
+        size: 6 + Math.random() * 6,
+      })),
+    []
+  )
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 50 }}>
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            position: 'absolute',
+            top: -20,
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size * 1.6,
+            background: p.color,
+            opacity: 0.9,
+            borderRadius: 2,
+            animation: `confettiFall ${p.duration}s ease-in ${p.delay}s forwards`,
+            transform: `rotate(${p.rotate}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
 
 export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }) {
   const [step, setStep] = useState(0)
@@ -27,9 +64,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
 
   function toggleMultiSelect(option: string) {
     const existing = Array.isArray(currentValue) ? currentValue : []
-    setAnswer(
-      existing.includes(option) ? existing.filter((o) => o !== option) : [...existing, option]
-    )
+    setAnswer(existing.includes(option) ? existing.filter((o) => o !== option) : [...existing, option])
   }
 
   async function handleContinue() {
@@ -45,17 +80,21 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
 
   if (done) {
     return (
-      <div className="card" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>That's everything — thank you.</div>
-        <div style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
-          Your answers have been saved. The team working on your brand will take it from here.
+      <>
+        <Confetti />
+        <div className="card bounce-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>That's everything — nailed it.</div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
+            Your answers have been saved. The team working on your brand will take it from here.
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="card">
+    <div key={step} className="card question-slide">
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
         Question {step + 1} of {discoveryQuestions.length}
       </div>
@@ -66,7 +105,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
             width: `${((step + 1) / discoveryQuestions.length) * 100}%`,
             background: 'var(--accent)',
             borderRadius: 2,
-            transition: 'width 0.2s ease',
+            transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         />
       </div>
@@ -86,20 +125,24 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
 
       {question.type === 'choice' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {question.options?.map((option) => (
-            <button
-              key={option}
-              onClick={() => setAnswer(option)}
-              style={{
-                textAlign: 'left',
-                borderColor: currentValue === option ? 'var(--accent)' : undefined,
-                background: currentValue === option ? 'var(--accent-dim)' : undefined,
-                color: currentValue === option ? 'var(--accent)' : undefined,
-              }}
-            >
-              {option}
-            </button>
-          ))}
+          {question.options?.map((option) => {
+            const selected = currentValue === option
+            return (
+              <button
+                key={option}
+                onClick={() => setAnswer(option)}
+                className={selected ? 'option-selected' : undefined}
+                style={{
+                  textAlign: 'left',
+                  borderColor: selected ? 'var(--accent)' : undefined,
+                  background: selected ? 'var(--accent-dim)' : undefined,
+                  color: selected ? 'var(--accent)' : undefined,
+                }}
+              >
+                {option}
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -111,6 +154,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
               <button
                 key={option}
                 onClick={() => toggleMultiSelect(option)}
+                className={selected ? 'option-selected' : undefined}
                 style={{
                   borderRadius: 999,
                   borderColor: selected ? 'var(--accent)' : undefined,
