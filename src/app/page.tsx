@@ -10,7 +10,8 @@ export default function HomePage() {
       <p style={{ color: 'var(--text-secondary)', marginTop: -8 }} className="splash-fade splash-delay-2">
         The operating system for creators, brands, and the agencies serving them.
       </p>
-      <div className="splash-fade splash-delay-3">
+      <div className="splash-fade splash-delay-3" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <span className="badge">Your brand is waiting to be built</span>
         <Link href="/dashboard">
           <button className="primary">Go to dashboard</button>
         </Link>
