@@ -77,6 +77,29 @@ model BrandSpace {
   projects             Project[]
   calendarItems        CalendarItem[]
   tasks                Task[]
+  boards               Board[]
+}
+
+model Board {
+  id           String   @id @default(cuid())
+  brandSpaceId String
+  name         String   @default("Moodboard")
+  createdAt    DateTime @default(now())
+
+  brandSpace BrandSpace  @relation(fields: [brandSpaceId], references: [id])
+  cards      BoardCard[]
+}
+
+model BoardCard {
+  id        String   @id @default(cuid())
+  boardId   String
+  type      String   // note | image | link
+  content   String
+  positionX Float    @default(0)
+  positionY Float    @default(0)
+  createdAt DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id])
 }
 
 model BrandSpaceAccess {
@@ -181,9 +204,14 @@ model CalendarItem {
   projectId     String?
   title         String
   platform      String
-  status        String   // idea | draft | approval | scheduled | posted
+  status        String   @default("idea") // idea | planned | in_production | scheduled | published
   scheduledDate DateTime?
   assetUrl      String?
+  hook          String?
+  keyMessage    String?
+  script        String?
+  caption       String?
+  createdAt     DateTime @default(now())
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   project    Project?   @relation(fields: [projectId], references: [id])

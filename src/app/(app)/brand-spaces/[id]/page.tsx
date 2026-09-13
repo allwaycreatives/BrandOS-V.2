@@ -11,11 +11,6 @@ async function getBrandSpace(id: string) {
   }
 }
 
-const upcomingSections = [
-  { title: 'Calendar', description: 'Plan and track content by platform and status.' },
-  { title: 'Boards', description: 'A freeform canvas for moodboards and campaign ideas.' },
-]
-
 export default async function BrandSpacePage({ params }: { params: { id: string } }) {
   const brandSpace = await getBrandSpace(params.id)
 
@@ -31,7 +26,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
 
       <div style={{ marginTop: 8, marginBottom: 24 }}>
         <div className="topbar-greeting">{brandSpace!.name}</div>
-        <div className="topbar-sub">This brand space's home — more sections activate as we build them.</div>
+        <div className="topbar-sub">This brand space's home.</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
@@ -52,15 +47,15 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           </div>
         </Link>
 
-        {upcomingSections.map((section) => (
-          <div key={section.title} className="card" style={{ opacity: 0.7 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ fontWeight: 600 }}>{section.title}</div>
-              <span style={{ fontSize: 9, color: 'var(--text-muted)', border: '1px solid var(--border-strong)', borderRadius: 999, padding: '1px 6px', textTransform: 'uppercase' }}>Soon</span>
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{section.description}</div>
-          </div>
-        ))}
+        <Link href={`/brand-spaces/${params.id}/calendar`} className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Calendar</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Plan content and move it through production.</div>
+        </Link>
+
+        <Link href={`/brand-spaces/${params.id}/boards`} className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Boards</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>A freeform canvas for moodboards and campaign ideas.</div>
+        </Link>
       </div>
     </div>
   )
