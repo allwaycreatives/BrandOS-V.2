@@ -219,3 +219,42 @@ input, textarea {
 input::placeholder, textarea::placeholder {
   color: var(--text-muted);
 }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.splash-fade {
+  opacity: 0;
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-delay-1 { animation-delay: 0.1s; }
+.splash-delay-2 { animation-delay: 0.28s; }
+.splash-delay-3 { animation-delay: 0.46s; }
+.splash-delay-4 { animation-delay: 0.62s; }
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.08); }
+}
+
+.logo-glow-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.logo-glow-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -24px;
+  background: radial-gradient(circle, rgba(245, 166, 35, 0.4), transparent 70%);
+  animation: pulseGlow 2.6s ease-in-out infinite;
+  z-index: 0;
+}
+
+.logo-glow-wrap img {
+  position: relative;
+  z-index: 1;
+}
