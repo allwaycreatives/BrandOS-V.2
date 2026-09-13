@@ -6,6 +6,15 @@ import { revalidatePath } from 'next/cache'
 
 type DiscoveryAnswers = Record<string, string | string[]>
 
+const PLATFORM_GUIDANCE: Record<string, string> = {
+  Instagram: 'bio under 150 characters, casual line breaks allowed',
+  TikTok: 'bio under 80 characters, punchy and casual',
+  YouTube: 'about section 2-3 sentences, can be slightly longer and more descriptive',
+  LinkedIn: 'headline under 220 characters, professional tone',
+  Facebook: 'page intro under 100 characters',
+  X: 'bio under 160 characters, sharp and direct',
+}
+
 export async function generateBrandKit(brandSpaceId: string) {
   const response = await db.discoveryResponse.findFirst({
     where: { brandSpaceId },
@@ -15,8 +24,15 @@ export async function generateBrandKit(brandSpaceId: string) {
 
   const answers = response.answersJson as DiscoveryAnswers
   const toneWords = Array.isArray(answers.tone_words) ? answers.tone_words.join(', ') : ''
+  const platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0
+    ? answers.platforms
+    : ['Instagram']
 
-  const prompt = `You are a branding assistant. Based on these discovery answers, generate brand identity options.
+  const platformInstructions = platforms
+    .map((p) => `- ${p}: ${PLATFORM_GUIDANCE[p] || 'a short, platform-appropriate bio'}`)
+    .join('\n')
+
+  const prompt = `You are a branding assistant. Based on these discovery answers, generate platform-specific brand kit content.
 
 Desired outcome: ${answers.desired_outcome}
 Wants to be known for: ${answers.known_for}
@@ -26,57 +42,82 @@ Audience: ${answers.audience}
 Tone words: ${toneWords}
 Proudly not about: ${answers.anti_values}
 
-Return ONLY valid JSON, with no other text before or after it, in exactly this shape:
-{"bios": ["bio option 1", "bio option 2", "bio option 3"], "taglines": ["tagline option 1", "tagline option 2", "tagline option 3"]}
+Generate content for exactly these platforms, following each platform's length guidance:
+${platformInstructions}
 
-Bios should be 1-2 sentences, first person, suitable for a social media bio, reflecting the tone words. Taglines should each be under 8 words.`
+For EACH platform, generate exactly TWO distinct options (optionA and optionB) so the person can choose. Each option needs:
+- "bio": the actual bio/headline text for that platform, respecting its length guidance
+- "tagline": a short call-to-action or tagline, under 8 words
+- "profilePicture": a one-sentence description of what the profile picture should look like/feel like (crop, mood, style — not a literal image, just direction)
+- "highlights": ONLY for Instagram, an array of 4-6 short Instagram Highlight cover titles (2-3 words each) that fit this brand. Omit this field entirely for all other platforms.
+
+Return ONLY valid JSON, no other text, in exactly this shape:
+{"platformKits": {"<PlatformName>": {"optionA": {"bio": "...", "tagline": "...", "profilePicture": "...", "highlights": ["...", "..."]}, "optionB": {...}}, "<NextPlatform>": {...}}}`
 
   const raw = await generateText(prompt)
   const cleaned = raw.replace(/```json|```/g, '').trim()
 
-  let parsed: { bios: unknown[]; taglines: unknown[] }
+  let parsed: { platformKits?: Record<string, { optionA?: unknown; optionB?: unknown }> }
   try {
     parsed = JSON.parse(cleaned)
   } catch {
     throw new Error(`AI response wasn't valid JSON. Raw response: ${raw.slice(0, 300)}`)
   }
 
-  // Gemini doesn't always follow the exact requested shape as reliably as
-  // Claude does — coerce whatever comes back into plain strings so a
-  // slightly-off response can't crash the page when it renders.
-  function toText(value: unknown): string {
-    if (typeof value === 'string') return value
-    if (value && typeof value === 'object') {
-      const obj = value as Record<string, unknown>
-      const candidate = obj.text ?? obj.bio ?? obj.tagline ?? obj.value
-      if (typeof candidate === 'string') return candidate
+  const platformKits = parsed.platformKits
+  if (!platformKits || typeof platformKits !== 'object') {
+    throw new Error(`AI response didn't contain platform kits. Raw response: ${raw.slice(0, 300)}`)
+  }
+
+  function normalizeOption(value: unknown): { bio: string; tagline: string; profilePicture: string; highlights?: string[] } | null {
+    if (!value || typeof value !== 'object') return null
+    const obj = value as Record<string, unknown>
+    const bio = typeof obj.bio === 'string' ? obj.bio : ''
+    const tagline = typeof obj.tagline === 'string' ? obj.tagline : ''
+    const profilePicture = typeof obj.profilePicture === 'string' ? obj.profilePicture : ''
+    if (!bio && !tagline && !profilePicture) return null
+    const result: { bio: string; tagline: string; profilePicture: string; highlights?: string[] } = { bio, tagline, profilePicture }
+    if (Array.isArray(obj.highlights)) {
+      result.highlights = obj.highlights.filter((h): h is string => typeof h === 'string')
     }
-    return String(value ?? '')
+    return result
   }
 
-  const bios = Array.isArray(parsed.bios) ? parsed.bios.map(toText).filter(Boolean) : []
-  const taglines = Array.isArray(parsed.taglines) ? parsed.taglines.map(toText).filter(Boolean) : []
+  const rowsToInsert: { brandSpaceId: string; type: string; platform: string; contentJson: object }[] = []
 
-  if (bios.length === 0 && taglines.length === 0) {
-    throw new Error(`AI response didn't contain any usable bios or taglines. Raw response: ${raw.slice(0, 300)}`)
+  for (const platform of platforms) {
+    const kit = platformKits[platform]
+    if (!kit) continue
+    const optionA = normalizeOption(kit.optionA)
+    const optionB = normalizeOption(kit.optionB)
+    if (optionA) rowsToInsert.push({ brandSpaceId, type: 'platform_kit', platform, contentJson: optionA })
+    if (optionB) rowsToInsert.push({ brandSpaceId, type: 'platform_kit', platform, contentJson: optionB })
   }
 
-  // Regenerating replaces unselected drafts — whatever's already selected
-  // and saved is left alone.
-  await db.brandKitItem.deleteMany({ where: { brandSpaceId, isSelected: false } })
+  if (rowsToInsert.length === 0) {
+    throw new Error(`AI response didn't produce usable content for any platform. Raw response: ${raw.slice(0, 300)}`)
+  }
 
-  await db.brandKitItem.createMany({
-    data: [
-      ...bios.map((text) => ({ brandSpaceId, type: 'bio', contentJson: { text } })),
-      ...taglines.map((text) => ({ brandSpaceId, type: 'tagline', contentJson: { text } })),
-    ],
-  })
+  // Regenerating replaces unselected drafts — whatever's already selected stays.
+  await db.brandKitItem.deleteMany({ where: { brandSpaceId, type: 'platform_kit', isSelected: false } })
+  await db.brandKitItem.createMany({ data: rowsToInsert })
 
   revalidatePath(`/brand-spaces/${brandSpaceId}/brand-kit`)
 }
 
-export async function selectBrandKitItem(brandSpaceId: string, itemId: string, type: string) {
-  await db.brandKitItem.updateMany({ where: { brandSpaceId, type }, data: { isSelected: false } })
+export async function selectBrandKitItem(brandSpaceId: string, itemId: string, platform: string) {
+  await db.brandKitItem.updateMany({
+    where: { brandSpaceId, platform, type: 'platform_kit' },
+    data: { isSelected: false },
+  })
   await db.brandKitItem.update({ where: { id: itemId }, data: { isSelected: true } })
+  revalidatePath(`/brand-spaces/${brandSpaceId}/brand-kit`)
+}
+
+export async function setPlatformPriority(brandSpaceId: string, orderedPlatforms: string[]) {
+  await db.brandSpace.update({
+    where: { id: brandSpaceId },
+    data: { platformPriority: orderedPlatforms },
+  })
   revalidatePath(`/brand-spaces/${brandSpaceId}/brand-kit`)
 }
