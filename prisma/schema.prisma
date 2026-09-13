@@ -66,6 +66,7 @@ model BrandSpace {
   organizationId String
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]
+  notionEmbedUrl String?
   createdAt      DateTime @default(now())
 
   organization        Organization         @relation(fields: [organizationId], references: [id])

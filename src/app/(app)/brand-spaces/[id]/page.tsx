@@ -37,25 +37,55 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
               ? `${responseCount} response${responseCount === 1 ? '' : 's'} received.`
               : 'Send this link to your client — no login needed on their end.'}
           </div>
-          <DiscoveryLink brandSpaceId={params.id} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <DiscoveryLink brandSpaceId={params.id} />
+            {responseCount > 0 && (
+              <Link href={`/brand-spaces/${params.id}/discovery`}>
+                <button style={{ width: '100%' }}>View responses</button>
+              </Link>
+            )}
+          </div>
         </div>
 
-        <Link href={`/brand-spaces/${params.id}/brand-kit`} className="card">
+        <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Brand Kit</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
             {responseCount > 0 ? 'Generate bio and tagline options.' : 'Available once discovery is complete.'}
           </div>
-        </Link>
+          <Link href={`/brand-spaces/${params.id}/brand-kit`}>
+            <button className="primary" style={{ width: '100%' }}>Open Brand Kit</button>
+          </Link>
+        </div>
 
-        <Link href={`/brand-spaces/${params.id}/calendar`} className="card">
+        <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Calendar</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Plan content and move it through production.</div>
-        </Link>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            Plan content and move it through production.
+          </div>
+          <Link href={`/brand-spaces/${params.id}/calendar`}>
+            <button className="primary" style={{ width: '100%' }}>Open Calendar</button>
+          </Link>
+        </div>
 
-        <Link href={`/brand-spaces/${params.id}/boards`} className="card">
+        <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Boards</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>A freeform canvas for moodboards and campaign ideas.</div>
-        </Link>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            A freeform canvas for moodboards and campaign ideas.
+          </div>
+          <Link href={`/brand-spaces/${params.id}/boards`}>
+            <button className="primary" style={{ width: '100%' }}>Open Boards</button>
+          </Link>
+        </div>
+
+        <div className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Notion</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            View a connected Notion page right here.
+          </div>
+          <Link href={`/brand-spaces/${params.id}/notion`}>
+            <button className="primary" style={{ width: '100%' }}>Open Notion</button>
+          </Link>
+        </div>
       </div>
     </div>
   )

@@ -90,6 +90,14 @@ export default async function BrandKitPage({ params }: { params: { id: string } 
               </div>
             )
           })}
+
+          {items.length > 0 && (
+            <div style={{ marginTop: 32 }}>
+              <Link href={`/brand-spaces/${params.id}/calendar`}>
+                <button className="primary">Continue to Content Calendar →</button>
+              </Link>
+            </div>
+          )}
         </>
       )}
     </div>
