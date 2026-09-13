@@ -21,7 +21,11 @@ body {
   margin: 0;
   background: var(--bg-app);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-poppins), var(--font-inter), sans-serif;
 }
 
 a {
@@ -137,6 +141,7 @@ a {
 .topbar-greeting {
   font-size: 22px;
   font-weight: 600;
+  font-family: var(--font-poppins), var(--font-inter), sans-serif;
 }
 
 .topbar-sub {
@@ -239,6 +244,23 @@ input::placeholder, textarea::placeholder {
 .splash-delay-2 { animation-delay: 0.28s; }
 .splash-delay-3 { animation-delay: 0.46s; }
 .splash-delay-4 { animation-delay: 0.62s; }
+
+@keyframes dropSettle {
+  0% { opacity: 0; transform: translateY(-42px) scale(0.8); }
+  55% { opacity: 1; transform: translateY(8px) scale(1.06); }
+  75% { opacity: 1; transform: translateY(-4px) scale(0.98); }
+  90% { transform: translateY(1px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.splash-drop {
+  opacity: 0;
+  animation: dropSettle 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.splash-drop-delay-1 { animation-delay: 0.45s; }
+.splash-drop-delay-2 { animation-delay: 0.95s; }
+.splash-drop-delay-3 { animation-delay: 1.2s; }
 
 @keyframes pulseGlow {
   0%, 100% { opacity: 0.45; transform: scale(1); }

@@ -33,14 +33,25 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
             transition: 'opacity 0.4s ease',
           }}
         >
-          <div className="logo-glow-wrap splash-fade">
+          <div className="logo-glow-wrap splash-drop">
             <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 64, height: 64, objectFit: 'contain' }} />
           </div>
-          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 44 }} className="splash-fade splash-delay-1" />
-          <p style={{ color: 'var(--text-secondary)', maxWidth: 380, marginTop: -4 }} className="splash-fade splash-delay-2">
+          <img
+            src="/brandos-logo.png"
+            alt="BrandOS"
+            style={{ height: 44 }}
+            className="splash-drop splash-drop-delay-1"
+          />
+          <p
+            style={{ color: 'var(--text-secondary)', maxWidth: 380, marginTop: -4 }}
+            className="splash-drop splash-drop-delay-2"
+          >
             The operating system for creators, brands, and the agencies serving them.
           </p>
-          <div className="splash-fade splash-delay-3" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div
+            className="splash-drop splash-drop-delay-3"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}
+          >
             <span className="badge">Your brand is waiting to be built</span>
             <button className="primary" onClick={() => setFading(true)}>
               Enter BrandOS
