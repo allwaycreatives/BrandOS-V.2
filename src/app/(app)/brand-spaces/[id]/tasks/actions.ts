@@ -9,7 +9,7 @@ export async function createTask(brandSpaceId: string, formData: FormData) {
   if (!title) return
 
   const description = String(formData.get('description') || '').trim() || null
-  const fileUrl = String(formData.get('fileUrl') || '').trim() || null
+  const fileUrl = String(formData.get('fileUrl') || '').trim() || String(formData.get('fileLinkFallback') || '').trim() || null
   const assigneeUserId = String(formData.get('assigneeUserId') || '').trim() || null
 
   await db.task.create({

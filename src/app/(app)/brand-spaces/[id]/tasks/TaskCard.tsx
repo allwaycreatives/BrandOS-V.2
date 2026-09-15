@@ -53,9 +53,9 @@ export default function TaskCard({
           onChange={(e) => startTransition(() => updateTaskStatus(brandSpaceId, task.id, e.target.value))}
           style={{ fontSize: 11.5, padding: '4px 8px' }}
         >
-          <option value="open">Open</option>
-          <option value="in_progress">In progress</option>
-          <option value="done">Done</option>
+          <option value="open">Waiting to start</option>
+          <option value="in_progress">Working on it</option>
+          <option value="done">Done!</option>
         </select>
       </div>
 
