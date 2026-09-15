@@ -12,15 +12,17 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="logo-glow-wrap">
-          <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 26, height: 26, objectFit: 'contain', flexShrink: 0 }} />
+          <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 30, height: 30, objectFit: 'contain', flexShrink: 0 }} />
         </div>
-        <div className="splash-fade splash-delay-1 sidebar-brand-wordmark">
-          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 14, display: 'block' }} />
-          <div className="sidebar-brand-sub">by All Way Creatives</div>
-        </div>
+        <img
+          src="/brandos-logo.png"
+          alt="BrandOS"
+          style={{ height: 18, display: 'block' }}
+          className="splash-fade splash-delay-1"
+        />
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" style={{ flex: 1 }}>
         <div className="sidebar-label">Navigate</div>
         {navItems.map((item) => (
           <a
@@ -34,7 +36,11 @@ export default function Sidebar() {
           </a>
         ))}
       </nav>
+
+      <div className="sidebar-footer">
+        <img src="/aw-logo.png" alt="" style={{ width: 14, height: 14, objectFit: 'contain', opacity: 0.7 }} />
+        <span>by All Way Creatives</span>
+      </div>
     </aside>
   )
 }
-
