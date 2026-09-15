@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
+import { getOrCreateCurrentUser } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
 export async function createTask(brandSpaceId: string, formData: FormData) {
@@ -20,5 +21,16 @@ export async function createTask(brandSpaceId: string, formData: FormData) {
 
 export async function updateTaskStatus(brandSpaceId: string, taskId: string, status: string) {
   await db.task.update({ where: { id: taskId }, data: { status } })
+  revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
+}
+
+export async function addTaskComment(brandSpaceId: string, taskId: string, body: string) {
+  const { user } = await getOrCreateCurrentUser()
+  if (!body.trim()) return
+
+  await db.comment.create({
+    data: { brandSpaceId, objectType: 'task', objectId: taskId, authorUserId: user.id, body: body.trim() },
+  })
+
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
 }

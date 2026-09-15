@@ -47,6 +47,7 @@ model User {
   memberships    Membership[]
   brandAccess    BrandSpaceAccess[]
   assignedTasks  Task[]
+  comments       Comment[]
 }
 
 model Membership {
@@ -232,4 +233,16 @@ model Task {
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   assignee   User?      @relation(fields: [assigneeUserId], references: [id])
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  brandSpaceId String
+  objectType   String   // e.g. 'task' — extendable to other objects later
+  objectId     String
+  authorUserId String
+  body         String
+  createdAt    DateTime @default(now())
+
+  author User @relation(fields: [authorUserId], references: [id])
 }

@@ -29,6 +29,21 @@ export default async function TasksPage({ params }: { params: { id: string } }) 
   for (const m of orgMembers) assigneeOptions.set(m.user.id, { id: m.user.id, label: m.user.name || m.user.email })
   for (const a of invited) assigneeOptions.set(a.user.id, { id: a.user.id, label: a.user.name || a.user.email })
 
+  const allComments = await db.comment
+    .findMany({
+      where: { brandSpaceId: params.id, objectType: 'task' },
+      orderBy: { createdAt: 'asc' },
+      include: { author: { select: { name: true, email: true } } },
+    })
+    .catch(() => [])
+
+  const commentsByTask = new Map<string, typeof allComments>()
+  for (const c of allComments) {
+    const list = commentsByTask.get(c.objectId) || []
+    list.push(c)
+    commentsByTask.set(c.objectId, list)
+  }
+
   const createWithId = createTask.bind(null, params.id)
 
   return (
@@ -58,7 +73,7 @@ export default async function TasksPage({ params }: { params: { id: string } }) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {tasks.length === 0 && <div className="card-empty">No tasks yet.</div>}
         {tasks.map((task) => (
-          <TaskCard key={task.id} brandSpaceId={params.id} task={task} />
+          <TaskCard key={task.id} brandSpaceId={params.id} task={task} comments={commentsByTask.get(task.id) || []} />
         ))}
       </div>
     </div>
