@@ -1,26 +1,25 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
+import { UserButton } from '@clerk/nextjs'
+import { getOrCreateCurrentUser } from '@/lib/auth'
 import { createBrandSpace } from '../../actions'
 
-type BrandSpaceRow = { id: string; name: string }
-
-async function getBrandSpaces(): Promise<BrandSpaceRow[]> {
-  try {
-    return await db.brandSpace.findMany({
-      select: { id: true, name: true },
-      orderBy: { createdAt: 'desc' },
-    })
-  } catch {
-    return [
-      { id: 'demo-1', name: 'Mara Kline' },
-      { id: 'demo-2', name: 'Green Table Co' },
-      { id: 'demo-3', name: 'Nia Reyes' },
-    ]
-  }
-}
-
 export default async function DashboardPage() {
-  const brandSpaces = await getBrandSpaces()
+  const { user, organizationId } = await getOrCreateCurrentUser()
+
+  const ownedSpaces = await db.brandSpace
+    .findMany({ where: { organizationId }, select: { id: true, name: true } })
+    .catch(() => [])
+
+  const invitedAccess = await db.brandSpaceAccess
+    .findMany({ where: { userId: user.id }, include: { brandSpace: { select: { id: true, name: true } } } })
+    .catch(() => [])
+
+  const invitedSpaces = invitedAccess
+    .map((a) => a.brandSpace)
+    .filter((bs) => !ownedSpaces.some((o) => o.id === bs.id))
+
+  const brandSpaces = [...ownedSpaces, ...invitedSpaces]
 
   return (
     <div>
@@ -29,10 +28,13 @@ export default async function DashboardPage() {
           <div className="topbar-greeting">Your brand spaces</div>
           <div className="topbar-sub">Everything you're managing, in one place.</div>
         </div>
-        <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
-          <input name="name" required placeholder="Brand or client name" />
-          <button className="primary" type="submit">Create</button>
-        </form>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
+            <input name="name" required placeholder="Brand or client name" />
+            <button className="primary" type="submit">Create</button>
+          </form>
+          <UserButton afterSignOutUrl="/sign-in" />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter, Poppins } from 'next/font/google'
+import { ClerkProvider } from '@clerk/nextjs'
 import SplashScreen from '@/components/SplashScreen'
 import './globals.css'
 
@@ -13,10 +14,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
-      <body>
-        <SplashScreen>{children}</SplashScreen>
-      </body>
-    </html>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" afterSignInUrl="/dashboard" afterSignUpUrl="/dashboard">
+      <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
+        <body>
+          <SplashScreen>{children}</SplashScreen>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

@@ -1,18 +1,12 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import DiscoveryLink from './DiscoveryLink'
-
-async function getBrandSpace(id: string) {
-  try {
-    return await db.brandSpace.findUnique({ where: { id } })
-  } catch {
-    return null
-  }
-}
+import InviteLink from './InviteLink'
 
 export default async function BrandSpacePage({ params }: { params: { id: string } }) {
-  const brandSpace = await getBrandSpace(params.id)
+  const brandSpace = await assertBrandSpaceAccess(params.id)
 
   if (!brandSpace) {
     notFound()
@@ -85,6 +79,14 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           <Link href={`/brand-spaces/${params.id}/notion`}>
             <button className="primary" style={{ width: '100%' }}>Open Notion</button>
           </Link>
+        </div>
+
+        <div className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            Give a client or team member access to just this brand space.
+          </div>
+          <InviteLink brandSpaceId={params.id} />
         </div>
       </div>
     </div>
