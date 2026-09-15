@@ -72,6 +72,16 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         </div>
 
         <div className="card">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Tasks</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            Quick jobs — no discovery required. Assign, attach a file, track status.
+          </div>
+          <Link href={`/brand-spaces/${params.id}/tasks`}>
+            <button className="primary" style={{ width: '100%' }}>Open Tasks</button>
+          </Link>
+        </div>
+
+        <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Notion</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
             View a connected Notion page right here.

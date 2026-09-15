@@ -46,6 +46,7 @@ model User {
   createdAt      DateTime            @default(now())
   memberships    Membership[]
   brandAccess    BrandSpaceAccess[]
+  assignedTasks  Task[]
 }
 
 model Membership {
@@ -219,12 +220,16 @@ model CalendarItem {
 }
 
 model Task {
-  id            String    @id @default(cuid())
-  brandSpaceId  String
-  title         String
-  assigneeId    String?
-  dueDate       DateTime?
-  status        String    @default("open")
+  id             String    @id @default(cuid())
+  brandSpaceId   String
+  title          String
+  description    String?
+  fileUrl        String?   // e.g. a Google Drive share link
+  assigneeUserId String?
+  dueDate        DateTime?
+  status         String    @default("open") // open | in_progress | done
+  createdAt      DateTime  @default(now())
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
+  assignee   User?      @relation(fields: [assigneeUserId], references: [id])
 }
