@@ -15,7 +15,11 @@ export default function NewTaskForm({
   const [uploadedName, setUploadedName] = useState('')
   const [uploadedUrl, setUploadedUrl] = useState('')
   const [error, setError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [audioUploading, setAudioUploading] = useState(false)
+  const [audioUploadedName, setAudioUploadedName] = useState('')
+  const [audioUploadedUrl, setAudioUploadedUrl] = useState('')
+  const [audioError, setAudioError] = useState('')
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -37,6 +41,26 @@ export default function NewTaskForm({
     }
   }
 
+  async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setAudioUploading(true)
+    setAudioError('')
+    try {
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload',
+      })
+      setAudioUploadedUrl(blob.url)
+      setAudioUploadedName(file.name)
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Upload failed — try again.')
+    } finally {
+      setAudioUploading(false)
+    }
+  }
+
   const createWithId = createTask.bind(null, brandSpaceId)
 
   return (
@@ -46,7 +70,7 @@ export default function NewTaskForm({
 
       <div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Attach a file</div>
-        <input ref={fileInputRef} type="file" onChange={handleFileChange} disabled={uploading} style={{ fontSize: 12.5 }} />
+        <input type="file" onChange={handleFileChange} disabled={uploading} style={{ fontSize: 12.5 }} />
         {uploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
         {uploadedUrl && !uploading && (
           <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {uploadedName} attached</div>
@@ -58,6 +82,19 @@ export default function NewTaskForm({
       <input name="fileLinkFallback" placeholder="Paste a link instead, if that's easier" />
       <input type="hidden" name="fileUrl" value={uploadedUrl} />
 
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+          Video too big to transcribe? Attach just the audio here instead (optional)
+        </div>
+        <input type="file" accept="audio/*" onChange={handleAudioFileChange} disabled={audioUploading} style={{ fontSize: 12.5 }} />
+        {audioUploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
+        {audioUploadedUrl && !audioUploading && (
+          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
+        )}
+        {audioError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{audioError}</div>}
+        <input type="hidden" name="audioUrl" value={audioUploadedUrl} />
+      </div>
+
       <select name="assigneeUserId" defaultValue="">
         <option value="">Unassigned</option>
         {assigneeOptions.map((a) => (
@@ -65,7 +102,7 @@ export default function NewTaskForm({
         ))}
       </select>
 
-      <button className="primary" type="submit" disabled={uploading}>Add task</button>
+      <button className="primary" type="submit" disabled={uploading || audioUploading}>Add task</button>
     </form>
   )
 }

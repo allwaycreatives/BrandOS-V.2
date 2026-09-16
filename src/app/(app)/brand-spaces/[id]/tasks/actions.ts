@@ -2,6 +2,8 @@
 
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
+import { transcribeAudio } from '@/lib/groq'
+import { generateText } from '@/lib/ai'
 import { revalidatePath } from 'next/cache'
 
 export async function createTask(brandSpaceId: string, formData: FormData) {
@@ -10,10 +12,11 @@ export async function createTask(brandSpaceId: string, formData: FormData) {
 
   const description = String(formData.get('description') || '').trim() || null
   const fileUrl = String(formData.get('fileUrl') || '').trim() || String(formData.get('fileLinkFallback') || '').trim() || null
+  const audioUrl = String(formData.get('audioUrl') || '').trim() || null
   const assigneeUserId = String(formData.get('assigneeUserId') || '').trim() || null
 
   await db.task.create({
-    data: { brandSpaceId, title, description, fileUrl, assigneeUserId, status: 'open' },
+    data: { brandSpaceId, title, description, fileUrl, audioUrl, assigneeUserId, status: 'open' },
   })
 
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
@@ -32,5 +35,33 @@ export async function addTaskComment(brandSpaceId: string, taskId: string, body:
     data: { brandSpaceId, objectType: 'task', objectId: taskId, authorUserId: user.id, body: body.trim() },
   })
 
+  revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
+}
+
+export async function transcribeAndReview(brandSpaceId: string, taskId: string) {
+  const task = await db.task.findUnique({ where: { id: taskId } })
+  const sourceUrl = task?.audioUrl || task?.fileUrl
+  if (!sourceUrl) {
+    throw new Error("This task doesn't have a file attached to transcribe.")
+  }
+
+  const transcript = await transcribeAudio(sourceUrl)
+
+  const prompt = `You're reviewing a short-form video transcript for a content creator. Transcript:
+
+"""
+${transcript}
+"""
+
+Give short, practical feedback:
+1. Rate the hook (the first 1-2 sentences) — does it stop the scroll? If it's weak, suggest a stronger one.
+2. Comment briefly on structure/pacing.
+3. One specific, actionable change for the next version.
+
+Keep it under 150 words. Direct and practical, no fluff, no generic praise.`
+
+  const feedback = await generateText(prompt)
+
+  await db.task.update({ where: { id: taskId }, data: { transcript, aiFeedback: feedback } })
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
 }

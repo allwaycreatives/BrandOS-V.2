@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateTaskStatus, addTaskComment } from './actions'
+import { updateTaskStatus, addTaskComment, transcribeAndReview } from './actions'
 
 type Comment = {
   id: string
@@ -15,7 +15,10 @@ type Task = {
   title: string
   description: string | null
   fileUrl: string | null
+  audioUrl: string | null
   status: string
+  transcript: string | null
+  aiFeedback: string | null
   assignee: { name: string | null; email: string } | null
 }
 
@@ -32,6 +35,9 @@ export default function TaskCard({
   const [showComments, setShowComments] = useState(false)
   const [draft, setDraft] = useState('')
   const [posting, setPosting] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [transcribeError, setTranscribeError] = useState('')
+  const [showTranscript, setShowTranscript] = useState(false)
 
   function handlePost() {
     if (!draft.trim()) return
@@ -40,6 +46,20 @@ export default function TaskCard({
       await addTaskComment(brandSpaceId, task.id, draft)
       setDraft('')
       setPosting(false)
+    })
+  }
+
+  function handleTranscribe() {
+    setTranscribing(true)
+    setTranscribeError('')
+    startTransition(async () => {
+      try {
+        await transcribeAndReview(brandSpaceId, task.id)
+      } catch (err) {
+        setTranscribeError(err instanceof Error ? err.message : 'Something went wrong.')
+      } finally {
+        setTranscribing(false)
+      }
     })
   }
 
@@ -73,7 +93,37 @@ export default function TaskCard({
         <button type="button" onClick={() => setShowComments((s) => !s)} style={{ fontSize: 11.5, padding: '3px 9px' }}>
           💬 {comments.length > 0 ? comments.length : ''} {comments.length === 1 ? 'comment' : 'comments'}
         </button>
+        {(task.fileUrl || task.audioUrl) && !task.aiFeedback && (
+          <button type="button" onClick={handleTranscribe} disabled={transcribing} style={{ fontSize: 11.5, padding: '3px 9px' }}>
+            {transcribing ? 'Transcribing...' : '🎬 Transcribe & review'}
+          </button>
+        )}
       </div>
+
+      {transcribeError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 8 }}>{transcribeError}</div>}
+
+      {task.aiFeedback && (
+        <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid #5c3f1a' }}>
+          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
+            AI feedback on the hook & structure
+          </div>
+          <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{task.aiFeedback}</div>
+          {task.transcript && (
+            <button
+              type="button"
+              onClick={() => setShowTranscript((s) => !s)}
+              style={{ fontSize: 11, padding: '3px 9px', marginTop: 10 }}
+            >
+              {showTranscript ? 'Hide transcript' : 'Show full transcript'}
+            </button>
+          )}
+          {showTranscript && task.transcript && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8, whiteSpace: 'pre-wrap' }}>
+              {task.transcript}
+            </div>
+          )}
+        </div>
+      )}
 
       {showComments && (
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
