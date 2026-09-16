@@ -225,8 +225,7 @@ model Task {
   brandSpaceId   String
   title          String
   description    String?
-  fileUrl        String?   // e.g. a Google Drive share link, or the full video
-  audioUrl       String?   // optional smaller audio-only file, used for transcription
+  fileUrl        String?   // e.g. a Google Drive share link
   assigneeUserId String?
   dueDate        DateTime?
   status         String    @default("open") // open | in_progress | done
