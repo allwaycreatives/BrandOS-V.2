@@ -27,18 +27,22 @@ export async function getOrCreateCurrentUser() {
   return { user, organizationId: membership.organizationId }
 }
 
-// Returns the brand space if the current user owns it (same organization)
-// OR has been explicitly invited to it (a BrandSpaceAccess row) — otherwise null.
+// Returns the brand space plus the current user's effective role for it:
+// 'agency' if they own the workspace (same organization), the specific
+// BrandSpaceAccess role ('client', 'team_member', etc.) if invited, or
+// null if they have no access at all.
 export async function assertBrandSpaceAccess(brandSpaceId: string) {
   const { user, organizationId } = await getOrCreateCurrentUser()
   const brandSpace = await db.brandSpace.findUnique({ where: { id: brandSpaceId } })
   if (!brandSpace) return null
 
-  if (brandSpace.organizationId === organizationId) return brandSpace
+  if (brandSpace.organizationId === organizationId) {
+    return { brandSpace, role: 'agency' as const }
+  }
 
   const access = await db.brandSpaceAccess
     .findUnique({ where: { brandSpaceId_userId: { brandSpaceId, userId: user.id } } })
     .catch(() => null)
 
-  return access ? brandSpace : null
+  return access ? { brandSpace, role: access.role } : null
 }
