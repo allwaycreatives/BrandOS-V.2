@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { discoveryQuestions } from '@/lib/discoveryQuestions'
+import { getQuestionsForTrack, engagementTypes } from '@/lib/discoveryQuestions'
 import { submitDiscoveryResponse } from './actions'
 
 type Answers = Record<string, string | string[]>
@@ -44,13 +44,16 @@ function Confetti() {
 }
 
 export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }) {
+  const [engagementType, setEngagementType] = useState<string | null>(null)
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Answers>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
 
-  const question = discoveryQuestions[step]
-  const isLast = step === discoveryQuestions.length - 1
+  const questions = useMemo(() => (engagementType ? getQuestionsForTrack(engagementType) : []), [engagementType])
+
+  const question = questions[step]
+  const isLast = step === questions.length - 1
   const currentValue = answers[question?.id]
 
   const canContinue =
@@ -73,7 +76,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
       return
     }
     setSubmitting(true)
-    await submitDiscoveryResponse(brandSpaceId, answers)
+    await submitDiscoveryResponse(brandSpaceId, { ...answers, engagement_type: engagementType || 'both' })
     setSubmitting(false)
     setDone(true)
   }
@@ -93,16 +96,39 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
     )
   }
 
+  if (!engagementType) {
+    return (
+      <div className="card question-slide">
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>What do you want help with?</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+          This decides which questions you'll see — no need to answer anything that doesn't apply to you.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {engagementTypes.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => setEngagementType(option.id)}
+              style={{ textAlign: 'left', padding: '12px 14px' }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{option.label}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>{option.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div key={step} className="card question-slide">
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
-        Question {step + 1} of {discoveryQuestions.length}
+        Question {step + 1} of {questions.length}
       </div>
       <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginBottom: 24, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
-            width: `${((step + 1) / discoveryQuestions.length) * 100}%`,
+            width: `${((step + 1) / questions.length) * 100}%`,
             background: 'var(--accent)',
             borderRadius: 2,
             transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -170,7 +196,9 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-        <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
+        <button
+          onClick={() => (step === 0 ? setEngagementType(null) : setStep((s) => Math.max(0, s - 1)))}
+        >
           Back
         </button>
         <button className="primary" onClick={handleContinue} disabled={!canContinue || submitting}>

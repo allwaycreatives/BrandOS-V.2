@@ -32,17 +32,26 @@ export async function generateBrandKit(brandSpaceId: string) {
     .map((p) => `- ${p}: ${PLATFORM_GUIDANCE[p] || 'a short, platform-appropriate bio'}`)
     .join('\n')
 
+  const fieldLabels: [string, string | undefined][] = [
+    ['Desired outcome', answers.desired_outcome as string],
+    ['Wants to be known for', answers.known_for as string],
+    ['Origin story', answers.origin_story as string],
+    ['Brand style', answers.brand_style as string],
+    ['Audience', answers.audience as string],
+    ['Tone words', toneWords || undefined],
+    ['Proudly not about', answers.anti_values as string],
+    ['Main action they want people to take', answers.primary_cta as string],
+    ['Lead magnet / free offer', answers.lead_magnet as string],
+    ['Monetization', answers.monetization as string],
+  ]
+  const knownAnswers = fieldLabels
+    .filter(([, value]) => Boolean(value))
+    .map(([label, value]) => `${label}: ${value}`)
+    .join('\n')
+
   const prompt = `You are a branding assistant. Based on these discovery answers, generate platform-specific brand kit content.
 
-Desired outcome: ${answers.desired_outcome}
-Wants to be known for: ${answers.known_for}
-Origin story: ${answers.origin_story}
-Brand style: ${answers.brand_style}
-Audience: ${answers.audience}
-Tone words: ${toneWords}
-Proudly not about: ${answers.anti_values}
-Main action they want people to take: ${answers.primary_cta}
-Lead magnet / free offer: ${answers.lead_magnet}
+${knownAnswers}
 
 Generate content for exactly these platforms, following each platform's length guidance:
 ${platformInstructions}

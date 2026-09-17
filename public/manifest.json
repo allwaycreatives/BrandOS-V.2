@@ -1,0 +1,12 @@
+{
+  "name": "BrandOS",
+  "short_name": "BrandOS",
+  "description": "The operating system for creators, brands, and the agencies serving them.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    { "src": "/icon.png", "sizes": "256x256", "type": "image/png" }
+  ]
+}
