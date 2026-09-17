@@ -71,6 +71,37 @@ export const discoveryQuestions: DiscoveryQuestion[] = [
     type: 'text',
   },
   {
+    id: 'primary_cta',
+    prompt: 'After someone sees your content, what do you want them to actually do?',
+    helper: "The one action that matters most right now — everything else is secondary.",
+    type: 'choice',
+    options: [
+      'Follow for more',
+      'Visit my website or shop',
+      'DM me or book a call',
+      'Join my email list',
+      'Buy now',
+    ],
+  },
+  {
+    id: 'lead_magnet',
+    prompt: "Do you have (or want) a free offer to pull people in — a guide, checklist, discount, template?",
+    helper: "If you don't have one yet, describe what you'd want it to be.",
+    type: 'text',
+  },
+  {
+    id: 'monetization',
+    prompt: 'How does — or will — this brand actually make money?',
+    helper: "Be specific: products, services, sponsorships, ad revenue, affiliate — whatever applies.",
+    type: 'text',
+  },
+  {
+    id: 'current_marketing',
+    prompt: "What are you currently doing, if anything, to market yourself?",
+    helper: "Honest answer, even if it's 'nothing yet' — this tells us where to start.",
+    type: 'text',
+  },
+  {
     id: 'platforms',
     prompt: 'Which platforms matter most right now?',
     helper: 'Pick your priorities — we can always add more later.',

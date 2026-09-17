@@ -57,6 +57,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  transition: width 0.2s ease;
+  overflow: hidden;
 }
 
 .sidebar-brand {

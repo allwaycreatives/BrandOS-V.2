@@ -41,13 +41,15 @@ Brand style: ${answers.brand_style}
 Audience: ${answers.audience}
 Tone words: ${toneWords}
 Proudly not about: ${answers.anti_values}
+Main action they want people to take: ${answers.primary_cta}
+Lead magnet / free offer: ${answers.lead_magnet}
 
 Generate content for exactly these platforms, following each platform's length guidance:
 ${platformInstructions}
 
 For EACH platform, generate exactly TWO distinct options (optionA and optionB) so the person can choose. Each option needs:
 - "bio": the actual bio/headline text for that platform, respecting its length guidance
-- "tagline": a short call-to-action or tagline, under 8 words
+- "tagline": a short call-to-action or tagline, under 8 words, aligned with the main action they want people to take
 - "profilePicture": a one-sentence description of what the profile picture should look like/feel like (crop, mood, style — not a literal image, just direction)
 - "highlights": ONLY for Instagram, an array of 4-6 short Instagram Highlight cover titles (2-3 words each) that fit this brand. Omit this field entirely for all other platforms.
 

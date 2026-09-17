@@ -12,16 +12,68 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     notFound()
   }
 
+  const latestResponse = await db.discoveryResponse
+    .findFirst({ where: { brandSpaceId: params.id }, orderBy: { submittedAt: 'desc' } })
+    .catch(() => null)
+
   const responseCount = await db.discoveryResponse.count({ where: { brandSpaceId: params.id } }).catch(() => 0)
+  const answers = (latestResponse?.answersJson as Record<string, string | string[]>) || {}
 
   return (
     <div>
       <Link href="/dashboard" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>← All brand spaces</Link>
 
-      <div style={{ marginTop: 8, marginBottom: 24 }}>
+      <div style={{ marginTop: 8, marginBottom: 20 }}>
         <div className="topbar-greeting">{brandSpace!.name}</div>
         <div className="topbar-sub">This brand space's home.</div>
       </div>
+
+      {latestResponse ? (
+        <div className="card" style={{ marginBottom: 24, borderColor: 'var(--border-strong)' }}>
+          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 10 }}>
+            Brand Summary
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+            {answers.known_for && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Known for</div>
+                <div style={{ fontSize: 13.5 }}>{answers.known_for as string}</div>
+              </div>
+            )}
+            {answers.audience && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Audience</div>
+                <div style={{ fontSize: 13.5 }}>{answers.audience as string}</div>
+              </div>
+            )}
+            {answers.brand_style && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Brand style</div>
+                <div style={{ fontSize: 13.5 }}>{answers.brand_style as string}</div>
+              </div>
+            )}
+            {Array.isArray(answers.tone_words) && answers.tone_words.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Tone</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {answers.tone_words.map((t) => (
+                    <span key={t} style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <Link href={`/brand-spaces/${params.id}/discovery`} style={{ fontSize: 12, color: 'var(--accent)', display: 'inline-block', marginTop: 12 }}>
+            View full discovery →
+          </Link>
+        </div>
+      ) : (
+        <div className="card-empty" style={{ marginBottom: 24 }}>
+          No brand summary yet — send the discovery link below to get one.
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <div className="card">
