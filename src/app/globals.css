@@ -80,6 +80,38 @@ a {
   letter-spacing: 0.02em;
 }
 
+/* ---- App boot intro animation ---- */
+@keyframes appIntroMarkIn {
+  0%   { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes appIntroMarkPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
+}
+
+.app-intro-mark {
+  animation:
+    appIntroMarkIn 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards,
+    appIntroMarkPulse 1.8s ease-in-out 0.6s infinite;
+}
+
+.app-intro-mark-exit {
+  animation: none;
+  transform: scale(1.08);
+  opacity: 0;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-intro-mark {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;

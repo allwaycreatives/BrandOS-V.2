@@ -1,61 +1,61 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+const INTRO_MIN_VISIBLE_MS = 500
 
 export default function SplashScreen({ children }: { children: React.ReactNode }) {
-  const [visible, setVisible] = useState(true)
-  const [fading, setFading] = useState(false)
+  const [exiting, setExiting] = useState(false)
+  const [mounted, setMounted] = useState(true)
+  const startedAt = useRef(Date.now())
+  const dismissedRef = useRef(false)
 
   useEffect(() => {
-    if (!fading) return
-    const timer = setTimeout(() => setVisible(false), 400)
+    function dismiss() {
+      if (dismissedRef.current) return
+      dismissedRef.current = true
+      const elapsed = Date.now() - startedAt.current
+      const wait = Math.max(0, INTRO_MIN_VISIBLE_MS - elapsed)
+      setTimeout(() => setExiting(true), wait)
+    }
+
+    // Dismiss once this component has mounted — for this app, that's
+    // effectively "first real render complete."
+    dismiss()
+
+    // Guaranteed dismiss: never leave this stuck on screen even if
+    // something fails elsewhere in the app.
+    window.addEventListener('error', dismiss)
+    return () => window.removeEventListener('error', dismiss)
+  }, [])
+
+  useEffect(() => {
+    if (!exiting) return
+    const timer = setTimeout(() => setMounted(false), 400)
     return () => clearTimeout(timer)
-  }, [fading])
+  }, [exiting])
 
   return (
     <>
       {children}
-      {visible && (
+      {mounted && (
         <div
+          aria-hidden="true"
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 999,
+            zIndex: 9999,
+            background: 'var(--bg-app)',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 16,
-            textAlign: 'center',
-            padding: '0 1.5rem',
-            background: 'radial-gradient(circle at 50% 42%, #17130f 0%, #0a0a0a 72%)',
-            opacity: fading ? 0 : 1,
-            transition: 'opacity 0.4s ease',
+            transition: 'opacity 0.35s ease',
+            opacity: exiting ? 0 : 1,
+            pointerEvents: exiting ? 'none' : 'auto',
           }}
         >
-          <div className="logo-glow-wrap splash-drop">
-            <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 64, height: 64, objectFit: 'contain' }} />
-          </div>
-          <img
-            src="/brandos-logo.png"
-            alt="BrandOS"
-            style={{ height: 44 }}
-            className="splash-drop splash-drop-delay-1"
-          />
-          <p
-            style={{ color: 'var(--text-secondary)', maxWidth: 380, marginTop: -4 }}
-            className="splash-drop splash-drop-delay-2"
-          >
-            The operating system for creators, brands, and the agencies serving them.
-          </p>
-          <div
-            className="splash-drop splash-drop-delay-3"
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}
-          >
-            <span className="badge">Your brand is waiting to be built</span>
-            <button className="primary" onClick={() => setFading(true)}>
-              Enter BrandOS
-            </button>
+          <div className={exiting ? 'app-intro-mark-exit' : 'app-intro-mark'} style={{ width: 96, height: 96 }}>
+            <img src="/aw-logo.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
         </div>
       )}
