@@ -24,6 +24,9 @@ export async function generateBrandKit(brandSpaceId: string) {
 
   const answers = response.answersJson as DiscoveryAnswers
   const toneWords = Array.isArray(answers.tone_words) ? answers.tone_words.join(', ') : ''
+  const desiredOutcomes = Array.isArray(answers.desired_outcome)
+    ? answers.desired_outcome.join(', ')
+    : (answers.desired_outcome as string) || undefined
   const platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0
     ? answers.platforms
     : ['Instagram']
@@ -33,7 +36,7 @@ export async function generateBrandKit(brandSpaceId: string) {
     .join('\n')
 
   const fieldLabels: [string, string | undefined][] = [
-    ['Desired outcome', answers.desired_outcome as string],
+    ['Desired outcome(s)', desiredOutcomes],
     ['Wants to be known for', answers.known_for as string],
     ['Origin story', answers.origin_story as string],
     ['Brand style', answers.brand_style as string],

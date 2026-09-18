@@ -16,8 +16,8 @@ export const discoveryQuestions: DiscoveryQuestion[] = [
   {
     id: 'desired_outcome',
     prompt: "What do you actually want this brand to create for you?",
-    helper: "Start at the end. Not 'more followers' — the real result you're after.",
-    type: 'choice',
+    helper: "Start at the end. Not 'more followers' — the real result you're after. Pick as many as genuinely apply.",
+    type: 'multi-select',
     track: 'brand',
     options: [
       'More premium clients or customers',
