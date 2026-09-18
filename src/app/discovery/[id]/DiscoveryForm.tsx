@@ -1,10 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getQuestionsForTrack, engagementTypes } from '@/lib/discoveryQuestions'
 import { submitDiscoveryResponse } from './actions'
 
 type Answers = Record<string, string | string[]>
+
+function draftKey(brandSpaceId: string) {
+  return `discovery-draft:${brandSpaceId}`
+}
 
 function Confetti() {
   const pieces = useMemo(
@@ -49,6 +53,41 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
   const [answers, setAnswers] = useState<Answers>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
+  const [restored, setRestored] = useState(false)
+
+  // Restore any in-progress draft for this brand space on load — this is
+  // what lets someone close the app mid-flow and pick back up later.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey(brandSpaceId))
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (!draft.readyToSync) {
+          setEngagementType(draft.engagementType || null)
+          setStep(draft.step || 0)
+          setAnswers(draft.answers || {})
+        }
+      }
+    } catch {
+      // Ignore corrupt/unavailable storage — just start fresh.
+    }
+    setRestored(true)
+  }, [brandSpaceId])
+
+  // Save progress to the device continuously, so nothing is lost if the
+  // connection drops or the tab closes mid-flow.
+  useEffect(() => {
+    if (!restored || !engagementType) return
+    try {
+      localStorage.setItem(
+        draftKey(brandSpaceId),
+        JSON.stringify({ engagementType, step, answers, readyToSync: false })
+      )
+    } catch {
+      // Storage full or unavailable — not critical, just skip saving.
+    }
+  }, [brandSpaceId, engagementType, step, answers, restored])
 
   const questions = useMemo(() => (engagementType ? getQuestionsForTrack(engagementType) : []), [engagementType])
 
@@ -75,10 +114,26 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
       setStep((s) => s + 1)
       return
     }
+
     setSubmitting(true)
-    await submitDiscoveryResponse(brandSpaceId, { ...answers, engagement_type: engagementType || 'both' })
-    setSubmitting(false)
-    setDone(true)
+    const finalAnswers = { ...answers, engagement_type: engagementType || 'both' }
+
+    try {
+      if (!navigator.onLine) throw new Error('offline')
+      await submitDiscoveryResponse(brandSpaceId, finalAnswers)
+      localStorage.removeItem(draftKey(brandSpaceId))
+      setDone(true)
+    } catch {
+      // No connection (or the request failed) — keep it safe on the device
+      // and sync automatically the moment we're back online.
+      localStorage.setItem(
+        draftKey(brandSpaceId),
+        JSON.stringify({ engagementType, step, answers: finalAnswers, readyToSync: true })
+      )
+      setSavedOffline(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) {
@@ -93,6 +148,18 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
           </div>
         </div>
       </>
+    )
+  }
+
+  if (savedOffline) {
+    return (
+      <div className="card bounce-in" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📶</div>
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Saved on this device.</div>
+        <div style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
+          No connection right now, but nothing is lost — this will sync automatically the moment this device is back online.
+        </div>
+      </div>
     )
   }
 
@@ -176,6 +243,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {question.options?.map((option) => {
             const selected = Array.isArray(currentValue) && currentValue.includes(option)
+            const isPrimary = question.showPrimaryOrder && Array.isArray(currentValue) && currentValue[0] === option
             return (
               <button
                 key={option}
@@ -186,9 +254,17 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
                   borderColor: selected ? 'var(--accent)' : undefined,
                   background: selected ? 'var(--accent-dim)' : undefined,
                   color: selected ? 'var(--accent)' : undefined,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
                 {option}
+                {isPrimary && (
+                  <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--accent)', color: '#16110a', padding: '1px 6px', borderRadius: 999 }}>
+                    PRIMARY
+                  </span>
+                )}
               </button>
             )
           })}

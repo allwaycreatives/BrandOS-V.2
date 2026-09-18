@@ -49,7 +49,13 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         {answers.brand_style && (
           <div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Brand style</div>
-            <div style={{ fontSize: 13.5 }}>{answers.brand_style as string}</div>
+            <div style={{ fontSize: 13.5 }}>
+              {Array.isArray(answers.brand_style)
+                ? answers.brand_style.length > 1
+                  ? `${answers.brand_style[0]} (primary) + ${answers.brand_style.slice(1).join(', ')}`
+                  : answers.brand_style[0]
+                : answers.brand_style}
+            </div>
           </div>
         )}
         {Array.isArray(answers.tone_words) && answers.tone_words.length > 0 && (

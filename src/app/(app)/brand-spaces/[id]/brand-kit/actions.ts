@@ -27,6 +27,12 @@ export async function generateBrandKit(brandSpaceId: string) {
   const desiredOutcomes = Array.isArray(answers.desired_outcome)
     ? answers.desired_outcome.join(', ')
     : (answers.desired_outcome as string) || undefined
+  const brandStyleAnswer = answers.brand_style
+  const brandStyle = Array.isArray(brandStyleAnswer)
+    ? brandStyleAnswer.length > 1
+      ? `${brandStyleAnswer[0]} (this is the PRIMARY lens — lead with this), blended with a supporting layer of: ${brandStyleAnswer.slice(1).join(', ')}`
+      : brandStyleAnswer[0]
+    : (brandStyleAnswer as string) || undefined
   const platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0
     ? answers.platforms
     : ['Instagram']
@@ -39,7 +45,7 @@ export async function generateBrandKit(brandSpaceId: string) {
     ['Desired outcome(s)', desiredOutcomes],
     ['Wants to be known for', answers.known_for as string],
     ['Origin story', answers.origin_story as string],
-    ['Brand style', answers.brand_style as string],
+    ['Brand style', brandStyle],
     ['Audience', answers.audience as string],
     ['Tone words', toneWords || undefined],
     ['Proudly not about', answers.anti_values as string],

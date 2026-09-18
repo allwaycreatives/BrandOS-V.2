@@ -10,6 +10,7 @@ export type DiscoveryQuestion = {
   type: 'choice' | 'multi-select' | 'text'
   options?: string[]
   track: 'brand' | 'marketing' | 'both'
+  showPrimaryOrder?: boolean
 }
 
 export const discoveryQuestions: DiscoveryQuestion[] = [
@@ -44,9 +45,10 @@ export const discoveryQuestions: DiscoveryQuestion[] = [
   {
     id: 'brand_style',
     prompt: 'Which of these feels most like the brand you want to build?',
-    helper: "There's no wrong answer — this shapes tone, visuals, and content style.",
-    type: 'choice',
+    helper: "Pick your primary first — that's the dominant lens. If a second one genuinely applies too (e.g. relatable AND an authority), add it after — it'll be treated as a supporting layer, not an equal blend.",
+    type: 'multi-select',
     track: 'brand',
+    showPrimaryOrder: true,
     options: [
       'Relatable & personal — people follow me for me',
       'A built world — a distinct aesthetic and vocabulary people opt into',
