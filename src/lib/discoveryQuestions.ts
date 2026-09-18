@@ -116,9 +116,10 @@ export const discoveryQuestions: DiscoveryQuestion[] = [
   {
     id: 'platforms',
     prompt: 'Which platforms matter most right now?',
-    helper: 'Pick your priorities — we can always add more later.',
+    helper: "Pick your primary platform first — the one that gets the most attention. Anything else you add after that is a secondary/supporting platform, not equal priority.",
     type: 'multi-select',
     track: 'both',
+    showPrimaryOrder: true,
     options: ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Facebook', 'X'],
   },
 ]
