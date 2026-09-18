@@ -3,36 +3,37 @@
 import { db } from '@/lib/db'
 import { discoveryQuestions } from '@/lib/discoveryQuestions'
 
-// The first time a brand space receives a discovery submission, we create
-// its DiscoveryTemplate + DiscoveryTemplateVersion from the fixed question
-// set in discoveryQuestions.ts. Later, this is where template *editing*
-// (Decision 1 in the PRD) will plug in — for now everyone gets the same
-// well-researched default.
-async function getOrCreateTemplateVersion(brandSpaceId: string) {
-  const existingTemplate = await db.discoveryTemplate.findFirst({
-    where: { brandSpaceId },
+// Resolves which template version a submission belongs to: a custom,
+// agency-defined template if one is marked active for this brand space,
+// otherwise the default swipeable quiz (auto-created on first use).
+async function getActiveTemplateVersion(brandSpaceId: string) {
+  const activeTemplate = await db.discoveryTemplate.findFirst({
+    where: { brandSpaceId, isActive: true },
     include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } },
   })
+  if (activeTemplate?.versions[0]) {
+    return activeTemplate.versions[0]
+  }
 
-  if (existingTemplate && existingTemplate.versions[0]) {
-    return existingTemplate.versions[0]
+  const defaultTemplate = await db.discoveryTemplate.findFirst({
+    where: { brandSpaceId, isDefault: true },
+    include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } },
+  })
+  if (defaultTemplate?.versions[0]) {
+    return defaultTemplate.versions[0]
   }
 
   const template = await db.discoveryTemplate.create({
-    data: { brandSpaceId, name: 'Default discovery', isDefault: true },
+    data: { brandSpaceId, name: 'Default discovery', isDefault: true, isActive: false, format: 'quiz' },
   })
 
   return db.discoveryTemplateVersion.create({
-    data: {
-      templateId: template.id,
-      versionNumber: 1,
-      questionsJson: discoveryQuestions,
-    },
+    data: { templateId: template.id, versionNumber: 1, questionsJson: discoveryQuestions },
   })
 }
 
 export async function submitDiscoveryResponse(brandSpaceId: string, answers: Record<string, string | string[]>) {
-  const templateVersion = await getOrCreateTemplateVersion(brandSpaceId)
+  const templateVersion = await getActiveTemplateVersion(brandSpaceId)
 
   await db.discoveryResponse.create({
     data: {

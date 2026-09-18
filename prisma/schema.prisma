@@ -124,6 +124,8 @@ model DiscoveryTemplate {
   brandSpaceId String
   name         String
   isDefault    Boolean  @default(false)
+  isActive     Boolean  @default(false)
+  format       String   @default("quiz") // quiz | longform
   createdAt    DateTime @default(now())
 
   brandSpace BrandSpace                 @relation(fields: [brandSpaceId], references: [id])

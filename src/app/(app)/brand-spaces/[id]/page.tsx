@@ -144,6 +144,9 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
                 <button style={{ width: '100%' }}>View responses</button>
               </Link>
             )}
+            <Link href={`/brand-spaces/${params.id}/discovery/template`}>
+              <button style={{ width: '100%', fontSize: 12 }}>Customize questionnaire</button>
+            </Link>
           </div>
         </div>
 

@@ -1,17 +1,30 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { discoveryQuestions } from '@/lib/discoveryQuestions'
+import { discoveryQuestions as defaultQuestions } from '@/lib/discoveryQuestions'
+
+type QuestionLike = { id: string; prompt: string; section?: string }
 
 export default async function DiscoverySummaryPage({ params }: { params: { id: string } }) {
   const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
   if (!brandSpace) notFound()
 
   const response = await db.discoveryResponse
-    .findFirst({ where: { brandSpaceId: params.id }, orderBy: { submittedAt: 'desc' } })
+    .findFirst({
+      where: { brandSpaceId: params.id },
+      orderBy: { submittedAt: 'desc' },
+      include: { templateVersion: true },
+    })
     .catch(() => null)
 
   const answers = (response?.answersJson as Record<string, string | string[]>) || {}
+
+  // Use the actual question set that produced this response — the default
+  // quiz, or a custom template's own questions — so labels are always
+  // correct, even for long-form/custom questionnaires.
+  const storedQuestions = response?.templateVersion?.questionsJson as QuestionLike[] | undefined
+  const questions: QuestionLike[] =
+    storedQuestions && storedQuestions.length > 0 ? storedQuestions : defaultQuestions
 
   return (
     <div style={{ maxWidth: 640 }}>
@@ -28,11 +41,14 @@ export default async function DiscoverySummaryPage({ params }: { params: { id: s
         <div className="card-empty">No discovery responses yet.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {discoveryQuestions.map((q) => {
+          {questions.map((q) => {
             const value = answers[q.id]
             if (!value) return null
             return (
               <div key={q.id} className="card">
+                {q.section && (
+                  <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 4 }}>{q.section}</div>
+                )}
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
                   {q.prompt}
                 </div>
