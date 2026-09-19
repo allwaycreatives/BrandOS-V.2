@@ -1,4 +1,4 @@
-# BrandOS — starter (Sprint 1-2 scope)
+﻿# BrandOS — starter (Sprint 1-2 scope)
 
 This is the first real code, matching `Technical-Architecture-MVP.md`:
 - Next.js (App Router) + TypeScript
@@ -57,4 +57,6 @@ src/
     discovery/[token]/page.tsx  public client-facing discovery form
   lib/db.ts                     Prisma client
 prisma/schema.prisma            full MVP data model
+-
 ```
+
