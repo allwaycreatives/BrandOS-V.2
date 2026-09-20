@@ -60,3 +60,5 @@ prisma/schema.prisma            full MVP data model
 -
 ```
 
+
+<!-- redeploy trigger: fresh build after Clerk key fix -->
