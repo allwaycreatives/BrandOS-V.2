@@ -1,12 +1,14 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import NewTaskForm from './NewTaskForm'
 import TaskCard from './TaskCard'
 
 export default async function TasksPage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+  const { brandSpace } = access
 
   const tasks = await db.task
     .findMany({

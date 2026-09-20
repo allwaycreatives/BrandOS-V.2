@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import { createCalendarItem } from './actions'
 import CalendarCard from './CalendarCard'
 
@@ -13,8 +14,9 @@ const COLUMNS = [
 ]
 
 export default async function CalendarPage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+  const { brandSpace } = access
 
   const items = await db.calendarItem
     .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' } })

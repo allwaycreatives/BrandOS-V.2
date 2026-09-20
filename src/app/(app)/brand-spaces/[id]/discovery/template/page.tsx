@@ -1,11 +1,13 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import TemplateBuilder from './TemplateBuilder'
 
 export default async function TemplatePage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access || access.role !== 'agency') notFound()
+  const { brandSpace } = access
 
   const activeCustomTemplate = await db.discoveryTemplate
     .findFirst({ where: { brandSpaceId: params.id, isActive: true, format: 'longform' } })

@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import { addBoardCard } from '../actions'
 import BoardCanvas from './BoardCanvas'
 
 export default async function BoardCanvasPage({ params }: { params: { id: string; boardId: string } }) {
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+
   const board = await db.board.findUnique({ where: { id: params.boardId } }).catch(() => null)
   if (!board || board.brandSpaceId !== params.id) notFound()
 

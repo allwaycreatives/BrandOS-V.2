@@ -1,12 +1,14 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import { createBoard } from './actions'
 import DeleteBoardButton from './DeleteBoardButton'
 
 export default async function BoardsListPage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+  const { brandSpace } = access
 
   const boards = await db.board
     .findMany({

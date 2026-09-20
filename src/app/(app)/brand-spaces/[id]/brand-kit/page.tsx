@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import GenerateButton from './GenerateButton'
 import OptionButton from './OptionButton'
 import PlatformPriority from './PlatformPriority'
@@ -16,8 +17,9 @@ function safeContent(contentJson: unknown): { bio: string; tagline: string; prof
 }
 
 export default async function BrandKitPage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access || access.role !== 'agency') notFound()
+  const { brandSpace } = access
 
   const discoveryResponse = await db.discoveryResponse
     .findFirst({ where: { brandSpaceId: params.id }, orderBy: { submittedAt: 'desc' } })

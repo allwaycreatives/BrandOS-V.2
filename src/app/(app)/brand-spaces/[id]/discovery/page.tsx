@@ -1,13 +1,15 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import { discoveryQuestions as defaultQuestions } from '@/lib/discoveryQuestions'
 
 type QuestionLike = { id: string; prompt: string; section?: string }
 
 export default async function DiscoverySummaryPage({ params }: { params: { id: string } }) {
-  const brandSpace = await db.brandSpace.findUnique({ where: { id: params.id } }).catch(() => null)
-  if (!brandSpace) notFound()
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+  const { brandSpace } = access
 
   const response = await db.discoveryResponse
     .findFirst({

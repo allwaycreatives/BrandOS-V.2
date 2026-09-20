@@ -1,9 +1,13 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import CalendarItemForm from './CalendarItemForm'
 
 export default async function CalendarItemPage({ params }: { params: { id: string; itemId: string } }) {
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access) notFound()
+
   const item = await db.calendarItem.findUnique({ where: { id: params.itemId } }).catch(() => null)
   if (!item || item.brandSpaceId !== params.id) notFound()
 
