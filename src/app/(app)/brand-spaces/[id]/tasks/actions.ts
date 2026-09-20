@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
 import { transcribeAudio, transcribeWithSegments, formatTimestamp } from '@/lib/groq'
@@ -110,7 +111,7 @@ Use the exact timestamps from the transcript above — don't invent times that a
 
   await db.task.update({
     where: { id: taskId },
-    data: { transcript: task?.transcript || text, clipSuggestions: clips },
+    data: { transcript: task?.transcript || text, clipSuggestions: clips as unknown as Prisma.InputJsonValue },
   })
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
 }
