@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateTaskStatus, addTaskComment, transcribeAndReview } from './actions'
+import { updateTaskStatus, addTaskComment, transcribeAndReview, suggestClips } from './actions'
 
 type Comment = {
   id: string
@@ -9,6 +9,8 @@ type Comment = {
   createdAt: string | Date
   author: { name: string | null; email: string }
 }
+
+type ClipSuggestion = { startTime: string; endTime: string; reason: string; quote: string }
 
 type Task = {
   id: string
@@ -19,6 +21,7 @@ type Task = {
   status: string
   transcript: string | null
   aiFeedback: string | null
+  clipSuggestions: unknown
   assignee: { name: string | null; email: string } | null
 }
 
@@ -38,6 +41,10 @@ export default function TaskCard({
   const [transcribing, setTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState('')
   const [showTranscript, setShowTranscript] = useState(false)
+  const [findingClips, setFindingClips] = useState(false)
+  const [clipsError, setClipsError] = useState('')
+
+  const clips: ClipSuggestion[] = Array.isArray(task.clipSuggestions) ? (task.clipSuggestions as ClipSuggestion[]) : []
 
   function handlePost() {
     if (!draft.trim()) return
@@ -59,6 +66,20 @@ export default function TaskCard({
         setTranscribeError(err instanceof Error ? err.message : 'Something went wrong.')
       } finally {
         setTranscribing(false)
+      }
+    })
+  }
+
+  function handleSuggestClips() {
+    setFindingClips(true)
+    setClipsError('')
+    startTransition(async () => {
+      try {
+        await suggestClips(brandSpaceId, task.id)
+      } catch (err) {
+        setClipsError(err instanceof Error ? err.message : 'Something went wrong.')
+      } finally {
+        setFindingClips(false)
       }
     })
   }
@@ -98,9 +119,15 @@ export default function TaskCard({
             {transcribing ? 'Transcribing...' : '🎬 Transcribe & review'}
           </button>
         )}
+        {(task.fileUrl || task.audioUrl) && clips.length === 0 && (
+          <button type="button" onClick={handleSuggestClips} disabled={findingClips} style={{ fontSize: 11.5, padding: '3px 9px' }}>
+            {findingClips ? 'Finding clips...' : '✂️ Suggest clips'}
+          </button>
+        )}
       </div>
 
       {transcribeError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 8 }}>{transcribeError}</div>}
+      {clipsError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 8 }}>{clipsError}</div>}
 
       {task.aiFeedback && (
         <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid #5c3f1a' }}>
@@ -122,6 +149,25 @@ export default function TaskCard({
               {task.transcript}
             </div>
           )}
+        </div>
+      )}
+
+      {clips.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 8 }}>
+            Suggested clips
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {clips.map((clip, i) => (
+              <div key={i} style={{ padding: 10, borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid #5c3f1a' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>
+                  {clip.startTime} – {clip.endTime}
+                </div>
+                <div style={{ fontSize: 12.5, marginBottom: 4 }}>{clip.reason}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{clip.quote}"</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

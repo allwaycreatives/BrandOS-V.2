@@ -234,6 +234,7 @@ model Task {
   status         String    @default("open") // open | in_progress | done
   transcript     String?
   aiFeedback     String?
+  clipSuggestions Json?
   createdAt      DateTime  @default(now())
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
