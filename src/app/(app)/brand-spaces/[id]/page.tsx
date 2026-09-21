@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import DiscoveryLink from './DiscoveryLink'
 import InviteLink from './InviteLink'
+import ClientItemRow from './ClientItemRow'
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Waiting to start',
@@ -83,7 +84,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     </div>
   )
 
-  // ---- Client view: simple, read-only, no tools to tinker with ----
+  // ---- Client view: simple, with optional expand + comments ----
   if (role === 'client') {
     const tasks = await db.task
       .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' } })
@@ -91,6 +92,16 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     const calendarItems = await db.calendarItem
       .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, take: 8 })
       .catch(() => [])
+
+    const allComments = await db.comment
+      .findMany({
+        where: { brandSpaceId: params.id, objectType: { in: ['task', 'calendarItem'] } },
+        orderBy: { createdAt: 'asc' },
+        include: { author: { select: { name: true, email: true } } },
+      })
+      .catch(() => [])
+
+    const commentsFor = (objectId: string) => allComments.filter((c) => c.objectId === objectId)
 
     return (
       <div style={{ maxWidth: 640 }}>
@@ -102,21 +113,37 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         {brandSummaryCard}
 
         <div className="card" style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>What's happening</div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>What's happening</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+            Tap anything for more detail, or to leave a comment.
+          </div>
           {tasks.length === 0 && calendarItems.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Nothing yet — check back soon.</div>
           )}
           {tasks.map((t) => (
-            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
-              <span>{t.title}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{STATUS_LABELS[t.status] || t.status}</span>
-            </div>
+            <ClientItemRow
+              key={t.id}
+              brandSpaceId={params.id}
+              objectType="task"
+              objectId={t.id}
+              title={t.title}
+              statusLabel={STATUS_LABELS[t.status] || t.status}
+              description={t.description}
+              comments={commentsFor(t.id)}
+            />
           ))}
           {calendarItems.map((c) => (
-            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
-              <span>{c.title} <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>({c.platform})</span></span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{STATUS_LABELS[c.status] || c.status}</span>
-            </div>
+            <ClientItemRow
+              key={c.id}
+              brandSpaceId={params.id}
+              objectType="calendarItem"
+              objectId={c.id}
+              title={c.title}
+              subtitle={c.platform}
+              statusLabel={STATUS_LABELS[c.status] || c.status}
+              description={c.hook || c.keyMessage}
+              comments={commentsFor(c.id)}
+            />
           ))}
         </div>
       </div>

@@ -21,18 +21,28 @@ export default async function DashboardPage() {
 
   const brandSpaces = [...ownedSpaces, ...invitedSpaces]
 
+  // A client-only account: never created a brand space of their own, and
+  // every invite they have is specifically as a client, not a team member.
+  // They shouldn't see brand-space creation at all.
+  const isClientOnly =
+    ownedSpaces.length === 0 &&
+    invitedAccess.length > 0 &&
+    invitedAccess.every((a) => a.role === 'client')
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div className="topbar-greeting">Your brand spaces</div>
-          <div className="topbar-sub">Everything you're managing, in one place.</div>
+          <div className="topbar-greeting">{isClientOnly ? 'Your brand' : 'Your brand spaces'}</div>
+          <div className="topbar-sub">{isClientOnly ? "What we're working on together." : "Everything you're managing, in one place."}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
-            <input name="name" required placeholder="Brand or client name" />
-            <button className="primary" type="submit">Create</button>
-          </form>
+          {!isClientOnly && (
+            <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
+              <input name="name" required placeholder="Brand or client name" />
+              <button className="primary" type="submit">Create</button>
+            </form>
+          )}
           <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </div>
