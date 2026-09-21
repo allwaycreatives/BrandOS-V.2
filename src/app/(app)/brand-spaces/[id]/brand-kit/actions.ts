@@ -15,51 +15,78 @@ const PLATFORM_GUIDANCE: Record<string, string> = {
   X: 'bio under 160 characters, sharp and direct',
 }
 
+type LongFormQuestion = { id: string; section?: string; prompt: string; helper?: string }
+
 export async function generateBrandKit(brandSpaceId: string) {
   const response = await db.discoveryResponse.findFirst({
     where: { brandSpaceId },
     orderBy: { submittedAt: 'desc' },
+    include: { templateVersion: { include: { template: true } } },
   })
   if (!response) return
 
   const answers = response.answersJson as DiscoveryAnswers
-  const toneWords = Array.isArray(answers.tone_words) ? answers.tone_words.join(', ') : ''
-  const desiredOutcomes = Array.isArray(answers.desired_outcome)
-    ? answers.desired_outcome.join(', ')
-    : (answers.desired_outcome as string) || undefined
-  const brandStyleAnswer = answers.brand_style
-  const brandStyle = Array.isArray(brandStyleAnswer)
-    ? brandStyleAnswer.length > 1
-      ? `${brandStyleAnswer[0]} (this is the PRIMARY lens — lead with this), blended with a supporting layer of: ${brandStyleAnswer.slice(1).join(', ')}`
-      : brandStyleAnswer[0]
-    : (brandStyleAnswer as string) || undefined
-  const platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0
-    ? answers.platforms
-    : ['Instagram']
+  const isCustomTemplate = response.templateVersion?.template?.format === 'longform'
+
+  let knownAnswers: string
+  let platforms: string[]
+  let customTemplateNote = ''
+
+  if (isCustomTemplate) {
+    // This brand space used a custom, agency-built questionnaire (like a
+    // deep business intake) instead of the default identity quiz — build
+    // the answer summary from whatever questions were actually asked,
+    // instead of looking for fields (known_for, tone_words, etc.) that
+    // simply don't exist for this kind of template.
+    const customQuestions = (response.templateVersion?.questionsJson as LongFormQuestion[]) || []
+    knownAnswers = customQuestions
+      .map((q) => {
+        const value = answers[q.id]
+        if (!value) return null
+        const answerText = Array.isArray(value) ? value.join(', ') : value
+        return `${q.section ? `[${q.section}] ` : ''}${q.prompt}: ${answerText}`
+      })
+      .filter(Boolean)
+      .join('\n')
+    platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0 ? answers.platforms : ['Instagram']
+    customTemplateNote = `\nNote: these answers come from a custom business questionnaire, not a personal-brand identity quiz — write based on the business facts given, not assumed personality traits.\n`
+  } else {
+    const toneWords = Array.isArray(answers.tone_words) ? answers.tone_words.join(', ') : ''
+    const desiredOutcomes = Array.isArray(answers.desired_outcome)
+      ? answers.desired_outcome.join(', ')
+      : (answers.desired_outcome as string) || undefined
+    const brandStyleAnswer = answers.brand_style
+    const brandStyle = Array.isArray(brandStyleAnswer)
+      ? brandStyleAnswer.length > 1
+        ? `${brandStyleAnswer[0]} (this is the PRIMARY lens — lead with this), blended with a supporting layer of: ${brandStyleAnswer.slice(1).join(', ')}`
+        : brandStyleAnswer[0]
+      : (brandStyleAnswer as string) || undefined
+    platforms = Array.isArray(answers.platforms) && answers.platforms.length > 0 ? answers.platforms : ['Instagram']
+
+    const fieldLabels: [string, string | undefined][] = [
+      ['Desired outcome(s)', desiredOutcomes],
+      ['Wants to be known for', answers.known_for as string],
+      ['Origin story', answers.origin_story as string],
+      ['Brand style', brandStyle],
+      ['Audience', answers.audience as string],
+      ['Tone words', toneWords || undefined],
+      ['Proudly not about', answers.anti_values as string],
+      ['Main action they want people to take', answers.primary_cta as string],
+      ['Lead magnet / free offer', answers.lead_magnet as string],
+      ['Monetization', answers.monetization as string],
+    ]
+    knownAnswers = fieldLabels
+      .filter(([, value]) => Boolean(value))
+      .map(([label, value]) => `${label}: ${value}`)
+      .join('\n')
+  }
 
   const platformInstructions = platforms
     .map((p) => `- ${p}: ${PLATFORM_GUIDANCE[p] || 'a short, platform-appropriate bio'}`)
     .join('\n')
 
-  const fieldLabels: [string, string | undefined][] = [
-    ['Desired outcome(s)', desiredOutcomes],
-    ['Wants to be known for', answers.known_for as string],
-    ['Origin story', answers.origin_story as string],
-    ['Brand style', brandStyle],
-    ['Audience', answers.audience as string],
-    ['Tone words', toneWords || undefined],
-    ['Proudly not about', answers.anti_values as string],
-    ['Main action they want people to take', answers.primary_cta as string],
-    ['Lead magnet / free offer', answers.lead_magnet as string],
-    ['Monetization', answers.monetization as string],
-  ]
-  const knownAnswers = fieldLabels
-    .filter(([, value]) => Boolean(value))
-    .map(([label, value]) => `${label}: ${value}`)
-    .join('\n')
-
   const prompt = `You are a branding assistant. Based on these discovery answers, generate platform-specific brand kit content.
-
+${customTemplateNote}
 ${knownAnswers}
 
 Generate content for exactly these platforms, following each platform's length guidance:
