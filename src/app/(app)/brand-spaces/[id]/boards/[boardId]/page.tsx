@@ -2,18 +2,18 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
-import { addBoardCard } from '../actions'
 import BoardCanvas from './BoardCanvas'
+import BoardActions from './BoardActions'
 
 export default async function BoardCanvasPage({ params }: { params: { id: string; boardId: string } }) {
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
+  const readOnly = access.role === 'client'
 
   const board = await db.board.findUnique({ where: { id: params.boardId } }).catch(() => null)
   if (!board || board.brandSpaceId !== params.id) notFound()
 
   const cards = await db.boardCard.findMany({ where: { boardId: params.boardId } }).catch(() => [])
-  const addWithIds = addBoardCard.bind(null, params.id, params.boardId)
 
   return (
     <div>
@@ -21,21 +21,14 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
         ← All boards
       </Link>
 
-      <div style={{ marginTop: 8, marginBottom: 16 }}>
-        <div className="topbar-greeting">{board.name}</div>
+      <div style={{ marginTop: 8, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 26, fontWeight: 600, margin: 0 }}>{board.name}</h1>
+        {!readOnly && <BoardActions brandSpaceId={params.id} boardId={board.id} shareToken={board.shareToken} />}
       </div>
 
-      <form action={addWithIds} style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select name="type" style={{ padding: '9px 12px' }}>
-          <option value="note">Note</option>
-          <option value="image">Image URL</option>
-          <option value="link">Link</option>
-        </select>
-        <input name="content" required placeholder="Text, image URL, or link" style={{ flex: 1, minWidth: 220 }} />
-        <button className="primary" type="submit">Add card</button>
-      </form>
-
       <BoardCanvas
+        boardId={board.id}
+        readOnly={readOnly}
         cards={cards.map((c) => ({ id: c.id, type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY }))}
       />
     </div>

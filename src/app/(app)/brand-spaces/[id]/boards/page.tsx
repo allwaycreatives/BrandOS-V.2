@@ -3,12 +3,16 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import { createBoard } from './actions'
+import { TEMPLATE_LIST } from './templates'
 import DeleteBoardButton from './DeleteBoardButton'
+import DuplicateBoardButton from './DuplicateBoardButton'
+import TemplatePicker from './TemplatePicker'
 
 export default async function BoardsListPage({ params }: { params: { id: string } }) {
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access
+  const canEdit = access.role !== 'client'
 
   const boards = await db.board
     .findMany({
@@ -28,30 +32,44 @@ export default async function BoardsListPage({ params }: { params: { id: string 
 
       <div style={{ marginTop: 8, marginBottom: 20 }}>
         <div className="topbar-greeting">Boards</div>
-        <div className="topbar-sub">Separate spaces for different kinds of visual thinking — a shot list, location scouting, mood, wardrobe, whatever the work needs.</div>
+        <div className="topbar-sub">Visual spaces for brand, campaigns and shoots. Start from a template, duplicate what works, share with a link.</div>
       </div>
 
-      <form action={createWithId} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <input name="name" required placeholder="Board name — e.g. 'Shot List' or 'Mood & Tone'" style={{ flex: 1 }} />
-        <button className="primary" type="submit">Create board</button>
-      </form>
+      {canEdit && boards.length === 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Start from a template</div>
+          <TemplatePicker brandSpaceId={params.id} templates={TEMPLATE_LIST} />
+        </div>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-        {boards.length === 0 && (
-          <div className="card-empty">
-            No boards yet — create one above to start pinning up ideas, references, and visuals.
-          </div>
-        )}
+      {canEdit && (
+        <form action={createWithId} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <input name="name" required placeholder="New blank board, e.g. 'Shot List' or 'Mood & Tone'" style={{ flex: 1 }} />
+          <button className="primary" type="submit">Create board</button>
+        </form>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {boards.length === 0 && !canEdit && <div className="card-empty">No boards have been shared here yet.</div>}
         {boards.map((board) => (
-          <Link key={board.id} href={`/brand-spaces/${params.id}/boards/${board.id}`} className="card" style={{ position: 'relative' }}>
-            <DeleteBoardButton brandSpaceId={params.id} boardId={board.id} />
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{board.name}</div>
+          <Link key={board.id} href={`/brand-spaces/${params.id}/boards/${board.id}`} className="card" style={{ position: 'relative', paddingTop: 34 }}>
+            {canEdit && <DeleteBoardButton brandSpaceId={params.id} boardId={board.id} />}
+            {canEdit && <DuplicateBoardButton boardId={board.id} />}
+            <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{board.name}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
               {board._count.cards} {board._count.cards === 1 ? 'card' : 'cards'}
+              {board.shareToken ? ' · shared' : ''}
             </div>
           </Link>
         ))}
       </div>
+
+      {canEdit && boards.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Start from a template</div>
+          <TemplatePicker brandSpaceId={params.id} templates={TEMPLATE_LIST} />
+        </div>
+      )}
     </div>
   )
 }

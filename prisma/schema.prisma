@@ -88,6 +88,7 @@ model Board {
   id           String   @id @default(cuid())
   brandSpaceId String
   name         String   @default("Moodboard")
+  shareToken   String?  @unique // when set, anyone with the link can view this board (read-only)
   createdAt    DateTime @default(now())
 
   brandSpace BrandSpace  @relation(fields: [brandSpaceId], references: [id])
