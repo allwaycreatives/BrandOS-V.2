@@ -81,6 +81,7 @@ model BrandSpace {
   calendarItems        CalendarItem[]
   tasks                Task[]
   boards               Board[]
+  invites              BrandSpaceInvite[]
 }
 
 model Board {
@@ -251,4 +252,20 @@ model Comment {
   createdAt    DateTime @default(now())
 
   author User @relation(fields: [authorUserId], references: [id])
+}
+
+// A shareable invite link. The role is fixed here on the server, so nobody
+// can change it by editing the URL. Set revokedAt to switch a link off.
+model BrandSpaceInvite {
+  id           String         @id @default(cuid())
+  token        String         @unique
+  brandSpaceId String
+  role         BrandSpaceRole
+  createdById  String
+  createdAt    DateTime       @default(now())
+  revokedAt    DateTime?
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id], onDelete: Cascade)
+
+  @@index([brandSpaceId])
 }
