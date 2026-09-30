@@ -82,6 +82,7 @@ model BrandSpace {
   tasks                Task[]
   boards               Board[]
   invites              BrandSpaceInvite[]
+  campaigns            Campaign[]
 }
 
 model Board {
@@ -209,6 +210,7 @@ model CalendarItem {
   id            String   @id @default(cuid())
   brandSpaceId  String
   projectId     String?
+  campaignId    String?
   title         String
   platform      String
   status        String   @default("idea") // idea | planned | in_production | scheduled | published
@@ -222,6 +224,7 @@ model CalendarItem {
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   project    Project?   @relation(fields: [projectId], references: [id])
+  campaign   Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 }
 
 model Task {
@@ -232,6 +235,7 @@ model Task {
   fileUrl        String?   // e.g. a Google Drive share link, or the full video
   audioUrl       String?   // optional smaller audio-only file, used for transcription
   assigneeUserId String?
+  campaignId     String?
   dueDate        DateTime?
   status         String    @default("open") // open | in_progress | done
   transcript     String?
@@ -241,6 +245,7 @@ model Task {
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   assignee   User?      @relation(fields: [assigneeUserId], references: [id])
+  campaign   Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 }
 
 model Comment {
@@ -267,6 +272,25 @@ model BrandSpaceInvite {
   revokedAt    DateTime?
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id], onDelete: Cascade)
+
+  @@index([brandSpaceId])
+}
+
+// A campaign groups content (calendar items, which move idea -> published) and tasks
+// for one push, e.g. a launch. Deleting a campaign keeps its content and tasks.
+model Campaign {
+  id           String    @id @default(cuid())
+  brandSpaceId String
+  name         String
+  goal         String?
+  status       String    @default("planning") // planning | live | done
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime  @default(now())
+
+  brandSpace    BrandSpace     @relation(fields: [brandSpaceId], references: [id])
+  calendarItems CalendarItem[]
+  tasks         Task[]
 
   @@index([brandSpaceId])
 }

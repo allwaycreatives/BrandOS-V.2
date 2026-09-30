@@ -28,6 +28,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const mainItems = [
     { label: 'Home', href: '/dashboard', icon: '⌂' },
     { label: 'My tasks', href: '/tasks', icon: '☑' },
+    { label: 'Campaigns', href: '/campaigns', icon: '◈' },
   ]
 
   const brandItems = brandSpaceId
@@ -35,6 +36,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         { label: 'Overview', href: `/brand-spaces/${brandSpaceId}`, icon: '◧' },
         { label: 'Discovery', href: `/brand-spaces/${brandSpaceId}/discovery`, icon: '◎' },
         { label: 'Brand Kit', href: `/brand-spaces/${brandSpaceId}/brand-kit`, icon: '✦' },
+        { label: 'Campaigns', href: `/brand-spaces/${brandSpaceId}/campaigns`, icon: '◈' },
         { label: 'Calendar', href: `/brand-spaces/${brandSpaceId}/calendar`, icon: '▦' },
         { label: 'Boards', href: `/brand-spaces/${brandSpaceId}/boards`, icon: '▤' },
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
