@@ -35,3 +35,22 @@ export async function quickCreateTask(formData: FormData) {
   revalidatePath('/tasks')
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
 }
+
+// First-run guide. These deliberately do not revalidate /dashboard: that would swap the
+// guide for the normal Home halfway through. The guide refreshes once at the end.
+export async function createBrandForOnboarding(name: string) {
+  const clean = name.trim().slice(0, 80)
+  if (!clean) throw new Error('Please enter a name.')
+  const { organizationId } = await getOrCreateCurrentUser()
+  const brand = await db.brandSpace.create({ data: { name: clean, organizationId } })
+  return { brandSpaceId: brand.id }
+}
+
+export async function addTaskToBrand(brandSpaceId: string, title: string) {
+  const clean = title.trim().slice(0, 200)
+  if (!clean) return { ok: false }
+  const access = await assertBrandSpaceAccess(brandSpaceId)
+  if (!access || access.role === 'client') throw new Error('No access.')
+  await db.task.create({ data: { brandSpaceId, title: clean, status: 'open' } })
+  return { ok: true }
+}

@@ -7,6 +7,8 @@ import { createCampaign } from '../brand-spaces/[id]/campaigns/actions'
 import { getCampaignProgress } from '@/lib/campaigns'
 import CampaignCard from '@/components/CampaignCard'
 import TaskRow from '@/components/TaskRow'
+import FirstRun from '@/components/FirstRun'
+import { TEMPLATE_LIST } from '../brand-spaces/[id]/boards/templates'
 
 const ROLE_LABEL = { owner: 'Your brand', team_member: 'Team member', client: 'Client' } as const
 
@@ -61,18 +63,7 @@ export default async function HomePage() {
       <div className="topbar-greeting">{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
       <div className="topbar-sub" style={{ marginBottom: 22 }}>{sub}</div>
 
-      {!isClientOnly && brands.length === 0 && (
-        <div className="card" style={{ maxWidth: 480, marginBottom: 24 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Start your first brand</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
-            A brand is one person, business, or client. Everything you plan for it lives together.
-          </div>
-          <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
-            <input name="name" required placeholder="Nova Studio" style={{ flex: 1 }} />
-            <button className="primary" type="submit">Create brand</button>
-          </form>
-        </div>
-      )}
+      {!isClientOnly && brands.length === 0 && <FirstRun templates={TEMPLATE_LIST} />}
 
       {!isClientOnly && brands.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 28 }}>

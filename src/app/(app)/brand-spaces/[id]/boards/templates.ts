@@ -126,4 +126,5 @@ export const TEMPLATE_LIST = Object.entries(TEMPLATES).map(([key, t]) => ({
   name: t.name,
   description: t.description,
   boardCount: t.boards.length,
+  boardNames: t.boards.map((b) => b.name),
 }))
