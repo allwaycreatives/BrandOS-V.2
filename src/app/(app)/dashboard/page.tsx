@@ -6,6 +6,9 @@ import { createBrandSpace, quickCreateTask } from '../../actions'
 import { createCampaign } from '../brand-spaces/[id]/campaigns/actions'
 import { getCampaignProgress } from '@/lib/campaigns'
 import CampaignCard from '@/components/CampaignCard'
+import ProjectCard from '@/components/ProjectCard'
+import { createProject } from '../brand-spaces/[id]/projects/actions'
+import { getProjectProgress } from '@/lib/projects'
 import TaskRow from '@/components/TaskRow'
 import FirstRun from '@/components/FirstRun'
 import { TEMPLATE_LIST } from '../brand-spaces/[id]/boards/templates'
@@ -44,6 +47,12 @@ export default async function HomePage() {
         .catch(() => [])
     : []
   const campaignProgress = await getCampaignProgress(activeCampaigns.map((c) => c.id))
+  const activeProjects = workBrands.length
+    ? await db.project
+        .findMany({ where: { brandSpaceId: { in: workBrands.map((b) => b.id) }, status: { not: 'delivered' } }, orderBy: { createdAt: 'desc' }, take: 4 })
+        .catch(() => [])
+    : []
+  const projectProgress = await getProjectProgress(activeProjects.map((p) => p.id))
   const openByBrand = new Map(openCounts.map((c) => [c.brandSpaceId, c._count._all]))
   const brandById = new Map(brands.map((b) => [b.id, b]))
   const totalOpen = openCounts.reduce((n, c) => n + c._count._all, 0)
@@ -96,6 +105,20 @@ export default async function HomePage() {
             </form>
           </div>
           <div className="card">
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New project</div>
+            <form action={createProject} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input name="name" required placeholder="Brand film" />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
+                  {workBrands.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <button className="primary" type="submit">Create</button>
+              </div>
+            </form>
+          </div>
+          <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New brand</div>
             <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
               <input name="name" required placeholder="Brand or client name" style={{ flex: 1 }} />
@@ -121,6 +144,20 @@ export default async function HomePage() {
               overdue={!!t.dueDate && t.dueDate < startOfToday}
             />
           ))}
+        </div>
+      )}
+
+      {!isClientOnly && activeProjects.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Projects</div>
+            <Link href="/projects" style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>See all</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            {activeProjects.map((p) => (
+              <ProjectCard key={p.id} project={p} brand={brandById.get(p.brandSpaceId)!} progress={projectProgress.get(p.id) ?? { total: 0, done: 0 }} />
+            ))}
+          </div>
         </div>
       )}
 

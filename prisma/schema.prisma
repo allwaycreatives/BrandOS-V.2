@@ -88,12 +88,14 @@ model BrandSpace {
 model Board {
   id           String   @id @default(cuid())
   brandSpaceId String
+  projectId    String?
   name         String   @default("Moodboard")
   shareToken   String?  @unique // when set, anyone with the link can view this board (read-only)
   createdAt    DateTime @default(now())
 
   brandSpace BrandSpace  @relation(fields: [brandSpaceId], references: [id])
   cards      BoardCard[]
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
 }
 
 model BoardCard {
@@ -200,10 +202,14 @@ model Project {
   brandSpaceId String
   name         String
   description  String?
+  status       String    @default("brief") // brief | in_progress | review | delivered
+  dueDate      DateTime?
   createdAt    DateTime @default(now())
 
   brandSpace    BrandSpace     @relation(fields: [brandSpaceId], references: [id])
   calendarItems CalendarItem[]
+  tasks         Task[]
+  boards        Board[]
 }
 
 model CalendarItem {
@@ -236,6 +242,7 @@ model Task {
   audioUrl       String?   // optional smaller audio-only file, used for transcription
   assigneeUserId String?
   campaignId     String?
+  projectId      String?
   dueDate        DateTime?
   status         String    @default("open") // open | in_progress | done
   transcript     String?
@@ -246,6 +253,7 @@ model Task {
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   assignee   User?      @relation(fields: [assigneeUserId], references: [id])
   campaign   Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
 }
 
 model Comment {
