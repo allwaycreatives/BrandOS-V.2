@@ -2,12 +2,20 @@
 
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { getOrCreateCurrentUser } from '@/lib/auth'
+import { getOrCreateCurrentUser, assertBrandSpaceAccess } from '@/lib/auth'
 import { transcribeAudio, transcribeWithSegments, formatTimestamp } from '@/lib/groq'
 import { generateText } from '@/lib/ai'
 import { revalidatePath } from 'next/cache'
 
+// Every task action must come from someone who belongs to this brand space.
+async function requireAccess(brandSpaceId: string, opts?: { notClient?: boolean }) {
+  const access = await assertBrandSpaceAccess(brandSpaceId)
+  if (!access) throw new Error('You do not have access to this brand space.')
+  if (opts?.notClient && access.role === 'client') throw new Error('Clients cannot do this.')
+}
+
 export async function createTask(brandSpaceId: string, formData: FormData) {
+  await requireAccess(brandSpaceId, { notClient: true })
   const title = String(formData.get('title') || '').trim()
   if (!title) return
 
@@ -24,11 +32,13 @@ export async function createTask(brandSpaceId: string, formData: FormData) {
 }
 
 export async function updateTaskStatus(brandSpaceId: string, taskId: string, status: string) {
+  await requireAccess(brandSpaceId)
   await db.task.update({ where: { id: taskId }, data: { status } })
   revalidatePath(`/brand-spaces/${brandSpaceId}/tasks`)
 }
 
 export async function addTaskComment(brandSpaceId: string, taskId: string, body: string) {
+  await requireAccess(brandSpaceId)
   const { user } = await getOrCreateCurrentUser()
   if (!body.trim()) return
 
@@ -40,6 +50,7 @@ export async function addTaskComment(brandSpaceId: string, taskId: string, body:
 }
 
 export async function transcribeAndReview(brandSpaceId: string, taskId: string) {
+  await requireAccess(brandSpaceId, { notClient: true })
   const task = await db.task.findUnique({ where: { id: taskId } })
   const sourceUrl = task?.audioUrl || task?.fileUrl
   if (!sourceUrl) {
@@ -68,6 +79,7 @@ Keep it under 150 words. Direct and practical, no fluff, no generic praise.`
 }
 
 export async function suggestClips(brandSpaceId: string, taskId: string) {
+  await requireAccess(brandSpaceId, { notClient: true })
   const task = await db.task.findUnique({ where: { id: taskId } })
   const sourceUrl = task?.audioUrl || task?.fileUrl
   if (!sourceUrl) {

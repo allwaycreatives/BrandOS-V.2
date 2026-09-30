@@ -1,63 +1,137 @@
-import { db } from '@/lib/db'
 import Link from 'next/link'
-import { UserButton } from '@clerk/nextjs'
+import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
-import { createBrandSpace } from '../../actions'
+import { getUserBrands } from '@/lib/brands'
+import { createBrandSpace, quickCreateTask } from '../../actions'
+import TaskRow from '@/components/TaskRow'
 
-export default async function DashboardPage() {
+const ROLE_LABEL = { owner: 'Your brand', team_member: 'Team member', client: 'Client' } as const
+
+export default async function HomePage() {
   const { user, organizationId } = await getOrCreateCurrentUser()
+  const brands = await getUserBrands(user.id, organizationId)
+  const workBrands = brands.filter((b) => b.role !== 'client')
+  const isClientOnly = brands.length > 0 && workBrands.length === 0
+  const firstName = user.name?.split(' ')[0]
 
-  const ownedSpaces = await db.brandSpace
-    .findMany({ where: { organizationId }, select: { id: true, name: true } })
-    .catch(() => [])
+  const weekAhead = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
 
-  const invitedAccess = await db.brandSpaceAccess
-    .findMany({ where: { userId: user.id }, include: { brandSpace: { select: { id: true, name: true } } } })
-    .catch(() => [])
+  const dueSoon = workBrands.length
+    ? await db.task
+        .findMany({
+          where: { brandSpaceId: { in: workBrands.map((b) => b.id) }, status: { not: 'done' }, dueDate: { not: null, lte: weekAhead } },
+          orderBy: { dueDate: 'asc' },
+          take: 6,
+        })
+        .catch(() => [])
+    : []
 
-  const invitedSpaces = invitedAccess
-    .map((a) => a.brandSpace)
-    .filter((bs) => !ownedSpaces.some((o) => o.id === bs.id))
+  const openCounts = workBrands.length
+    ? await db.task
+        .groupBy({ by: ['brandSpaceId'], where: { brandSpaceId: { in: workBrands.map((b) => b.id) }, status: { not: 'done' } }, _count: { _all: true } })
+        .catch(() => [])
+    : []
+  const openByBrand = new Map(openCounts.map((c) => [c.brandSpaceId, c._count._all]))
+  const brandById = new Map(brands.map((b) => [b.id, b]))
+  const totalOpen = openCounts.reduce((n, c) => n + c._count._all, 0)
 
-  const brandSpaces = [...ownedSpaces, ...invitedSpaces]
-
-  // A client-only account: never created a brand space of their own, and
-  // every invite they have is specifically as a client, not a team member.
-  // They shouldn't see brand-space creation at all.
-  const isClientOnly =
-    ownedSpaces.length === 0 &&
-    invitedAccess.length > 0 &&
-    invitedAccess.every((a) => a.role === 'client')
+  const sub = isClientOnly
+    ? "What we're working on together."
+    : brands.length === 0
+    ? "Let's set up your first brand."
+    : dueSoon.length > 0
+    ? `${dueSoon.length} ${dueSoon.length === 1 ? 'task needs' : 'tasks need'} you this week.`
+    : totalOpen > 0
+    ? `${totalOpen} open ${totalOpen === 1 ? 'task' : 'tasks'}, none due this week.`
+    : 'You are all caught up.'
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div className="topbar-greeting">{isClientOnly ? 'Your brand' : 'Your brand spaces'}</div>
-          <div className="topbar-sub">{isClientOnly ? "What we're working on together." : "Everything you're managing, in one place."}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {!isClientOnly && (
-            <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
-              <input name="name" required placeholder="Brand or client name" />
-              <button className="primary" type="submit">Create</button>
-            </form>
-          )}
-          <UserButton afterSignOutUrl="/sign-in" />
-        </div>
-      </div>
+      <div className="topbar-greeting">{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
+      <div className="topbar-sub" style={{ marginBottom: 22 }}>{sub}</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-        {brandSpaces.length === 0 && (
-          <div className="card-empty">No brand spaces yet — create your first one above.</div>
-        )}
-        {brandSpaces.map((bs) => (
-          <Link key={bs.id} href={`/brand-spaces/${bs.id}`} className="card">
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{bs.name}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Open to view calendar and brand kit</div>
-          </Link>
-        ))}
-      </div>
+      {!isClientOnly && brands.length === 0 && (
+        <div className="card" style={{ maxWidth: 480, marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Start your first brand</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
+            A brand is one person, business, or client. Everything you plan for it lives together.
+          </div>
+          <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
+            <input name="name" required placeholder="Nova Studio" style={{ flex: 1 }} />
+            <button className="primary" type="submit">Create brand</button>
+          </form>
+        </div>
+      )}
+
+      {!isClientOnly && brands.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 28 }}>
+          <div className="card">
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New task</div>
+            <form action={quickCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input name="title" required placeholder="Edit the launch reel" />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
+                  {workBrands.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <button className="primary" type="submit">Add task</button>
+              </div>
+            </form>
+          </div>
+          <div className="card">
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New brand</div>
+            <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
+              <input name="name" required placeholder="Brand or client name" style={{ flex: 1 }} />
+              <button type="submit">Create</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {!isClientOnly && dueSoon.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Needs you</div>
+            <Link href="/tasks" style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>See all tasks</Link>
+          </div>
+          {dueSoon.map((t) => (
+            <TaskRow
+              key={t.id}
+              title={t.title}
+              status={t.status}
+              dueDate={t.dueDate}
+              brand={brandById.get(t.brandSpaceId)!}
+              overdue={!!t.dueDate && t.dueDate < startOfToday}
+            />
+          ))}
+        </div>
+      )}
+
+      {brands.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>{isClientOnly ? 'Your brand' : 'Your brands'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            {brands.map((b) => {
+              const open = openByBrand.get(b.id) ?? 0
+              return (
+                <Link key={b.id} href={`/brand-spaces/${b.id}`} className="card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color }} />
+                    <span style={{ fontWeight: 600 }}>{b.name}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                    {ROLE_LABEL[b.role]}
+                    {b.role !== 'client' && ` · ${open} open ${open === 1 ? 'task' : 'tasks'}`}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-export default function Sidebar() {
+type SidebarBrand = { id: string; name: string; color: string }
+
+export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -23,10 +25,14 @@ export default function Sidebar() {
   const brandSpaceMatch = pathname.match(/\/brand-spaces\/([^/]+)/)
   const brandSpaceId = brandSpaceMatch?.[1]
 
-  const navItems = brandSpaceId
+  const mainItems = [
+    { label: 'Home', href: '/dashboard', icon: '⌂' },
+    { label: 'My tasks', href: '/tasks', icon: '☑' },
+  ]
+
+  const brandItems = brandSpaceId
     ? [
-        { label: 'All brand spaces', href: '/dashboard', icon: '◧' },
-        { label: 'Brand space home', href: `/brand-spaces/${brandSpaceId}`, icon: '⌂' },
+        { label: 'Overview', href: `/brand-spaces/${brandSpaceId}`, icon: '◧' },
         { label: 'Discovery', href: `/brand-spaces/${brandSpaceId}/discovery`, icon: '◎' },
         { label: 'Brand Kit', href: `/brand-spaces/${brandSpaceId}/brand-kit`, icon: '✦' },
         { label: 'Calendar', href: `/brand-spaces/${brandSpaceId}/calendar`, icon: '▦' },
@@ -34,7 +40,23 @@ export default function Sidebar() {
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
         { label: 'Notion', href: `/brand-spaces/${brandSpaceId}/notion`, icon: '◐' },
       ]
-    : [{ label: 'Dashboard', href: '/dashboard', icon: '◧' }]
+    : []
+
+  function renderLink(item: { label: string; href: string; icon: string }) {
+    const isActive = pathname === item.href
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        title={collapsed ? item.label : undefined}
+        className={`sidebar-link${isActive ? ' active' : ''}`}
+        style={collapsed ? { justifyContent: 'center' } : undefined}
+      >
+        <span aria-hidden="true">{item.icon}</span>
+        {!collapsed && <span>{item.label}</span>}
+      </Link>
+    )
+  }
 
   return (
     <aside className="sidebar" style={{ width: collapsed ? 64 : 220 }}>
@@ -52,23 +74,37 @@ export default function Sidebar() {
         )}
       </div>
 
-      <nav className="sidebar-nav" style={{ flex: 1 }}>
-        {!collapsed && <div className="sidebar-label">{brandSpaceId ? 'This brand space' : 'Navigate'}</div>}
-        {navItems.map((item) => {
-          const isActive = pathname === item.href
+      <nav className="sidebar-nav" style={{ flex: 1, overflowY: 'auto' }}>
+        {mainItems.map(renderLink)}
+
+        {!collapsed && <div className="sidebar-label" style={{ marginTop: 18 }}>Brands</div>}
+        {collapsed && <div style={{ height: 14 }} />}
+        {brands.map((b) => {
+          const isCurrent = brandSpaceId === b.id
           return (
             <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              className={`sidebar-link${isActive ? ' active' : ''}`}
-              style={collapsed ? { justifyContent: 'center' } : undefined}
+              key={b.id}
+              href={`/brand-spaces/${b.id}`}
+              title={collapsed ? b.name : undefined}
+              className={`sidebar-link${isCurrent && pathname === `/brand-spaces/${b.id}` ? ' active' : ''}`}
+              style={collapsed ? { justifyContent: 'center' } : isCurrent ? { color: 'var(--text-primary)' } : undefined}
             >
-              <span aria-hidden="true">{item.icon}</span>
-              {!collapsed && <span>{item.label}</span>}
+              <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+              {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>}
             </Link>
           )
         })}
+        {brands.length === 0 && !collapsed && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px' }}>No brands yet</div>
+        )}
+
+        {brandItems.length > 0 && (
+          <>
+            {!collapsed && <div className="sidebar-label" style={{ marginTop: 18 }}>This brand</div>}
+            {collapsed && <div style={{ height: 14 }} />}
+            {brandItems.map(renderLink)}
+          </>
+        )}
       </nav>
 
       <button
