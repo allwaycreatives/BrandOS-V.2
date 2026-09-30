@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import DiscoveryLink from './DiscoveryLink'
 import InviteLink from './InviteLink'
+import DuplicateBrandButton from './DuplicateBrandButton'
 import ClientItemRow from './ClientItemRow'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -155,9 +156,12 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     <div>
       <Link href="/dashboard" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>← All brand spaces</Link>
 
-      <div style={{ marginTop: 8, marginBottom: 20 }}>
-        <div className="topbar-greeting">{brandSpace.name}</div>
-        <div className="topbar-sub">This brand space's home.</div>
+      <div style={{ marginTop: 8, marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div className="topbar-greeting">{brandSpace.name}</div>
+          <div className="topbar-sub">This brand space's home.</div>
+        </div>
+        {role === 'agency' && <DuplicateBrandButton brandSpaceId={params.id} />}
       </div>
 
       {brandSummaryCard}
