@@ -54,6 +54,15 @@ export default async function HomePage() {
         .catch(() => [])
     : []
   const projectProgress = await getProjectProgress(activeProjects.map((p) => p.id))
+  const reviewItems = workBrands.length
+    ? await db.deliverable
+        .findMany({
+          where: { brandSpaceId: { in: workBrands.map((b) => b.id) }, status: { in: ['in_review', 'changes_requested'] } },
+          orderBy: { updatedAt: 'desc' },
+          take: 6,
+        })
+        .catch(() => [])
+    : []
   const openByBrand = new Map(openCounts.map((c) => [c.brandSpaceId, c._count._all]))
   const brandById = new Map(brands.map((b) => [b.id, b]))
   const totalOpen = openCounts.reduce((n, c) => n + c._count._all, 0)
@@ -159,6 +168,24 @@ export default async function HomePage() {
               overdue={!!t.dueDate && t.dueDate < startOfToday}
             />
           ))}
+        </div>
+      )}
+
+      {!isClientOnly && reviewItems.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Reviews</div>
+          {reviewItems.map((r) => {
+            const b = brandById.get(r.brandSpaceId)
+            const changes = r.status === 'changes_requested'
+            return (
+              <Link key={r.id} href={`/brand-spaces/${r.brandSpaceId}/reviews/${r.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
+                {b && <span style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />}
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                <span style={{ fontSize: 11.5, color: changes ? 'var(--accent)' : 'var(--text-muted)' }}>{changes ? 'Changes requested' : 'Waiting on client'}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)', minWidth: 70, textAlign: 'right' }}>{b?.name}</span>
+              </Link>
+            )
+          })}
         </div>
       )}
 

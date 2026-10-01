@@ -85,6 +85,9 @@ model BrandSpace {
   invites              BrandSpaceInvite[]
   campaigns            Campaign[]
   ideas                Idea[]
+  deliverables         Deliverable[]
+  styleSummary         String?  // what this client likes and keeps changing
+  styleSummaryAt       DateTime?
 }
 
 model Board {
@@ -213,6 +216,7 @@ model Project {
   calendarItems CalendarItem[]
   tasks         Task[]
   boards        Board[]
+  deliverables  Deliverable[]
 }
 
 model CalendarItem {
@@ -318,4 +322,44 @@ model Idea {
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
 
   @@index([brandSpaceId])
+}
+
+// Something handed to a client for review: a link to a video, edit, design or document.
+// We store the link, not the file. The client reviews through reviewToken, no account needed.
+model Deliverable {
+  id          String   @id @default(cuid())
+  brandSpaceId String
+  projectId   String?
+  title       String
+  url         String
+  notes       String?
+  status      String   @default("draft") // draft | in_review | changes_requested | approved
+  version     Int      @default(1)
+  reviewToken String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brandSpace BrandSpace          @relation(fields: [brandSpaceId], references: [id])
+  project    Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  feedback   DeliverableFeedback[]
+
+  @@index([brandSpaceId])
+}
+
+// One comment, change request or approval. Kept forever so we learn what each client wants.
+model DeliverableFeedback {
+  id            String   @id @default(cuid())
+  deliverableId String
+  version       Int
+  authorName    String
+  fromClient    Boolean  @default(true)
+  kind          String   // comment | changes_requested | approved
+  body          String
+  at            String?  // optional timestamp for video, like "0:42"
+  resolved      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  @@index([deliverableId])
 }

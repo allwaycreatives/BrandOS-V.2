@@ -5,6 +5,8 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { PROJECT_STAGES } from '../constants'
 import { updateProject, setProjectStatus, addProjectTask, setProjectTaskStatus, addProjectBoard, duplicateProject } from '../actions'
 import DeleteProjectButton from '../DeleteProjectButton'
+import { createDeliverable } from '../../reviews/actions'
+import { REVIEW_STATUS } from '../../reviews/constants'
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 const SERIF = "Georgia, 'Times New Roman', serif"
@@ -20,6 +22,8 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
   const boards = await db.board
     .findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { cards: true } } } })
     .catch(() => [])
+
+  const deliverables = await db.deliverable.findMany({ where: { projectId: project.id }, orderBy: { updatedAt: 'desc' } }).catch(() => [])
 
   const stageIndex = PROJECT_STAGES.findIndex((s) => s.key === project.status)
 
@@ -86,6 +90,24 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
         <input name="title" required placeholder="Add a task" style={{ flex: 1, minWidth: 220 }} />
         <input type="date" name="dueDate" />
         <button type="submit">Add task</button>
+      </form>
+
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Deliverables for review</div>
+      <div style={{ marginBottom: 10 }}>
+        {deliverables.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nothing sent to the client yet.</div>}
+        {deliverables.map((dl) => (
+          <Link key={dl.id} href={`/brand-spaces/${params.id}/reviews/${dl.id}`} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
+            <span style={{ flex: 1 }}>{dl.title}</span>
+            <span style={{ fontSize: 12, color: dl.status === 'changes_requested' ? 'var(--accent)' : 'var(--text-secondary)' }}>v{dl.version} · {REVIEW_STATUS[dl.status] ?? dl.status}</span>
+          </Link>
+        ))}
+      </div>
+      <form action={createDeliverable} style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
+        <input type="hidden" name="brandSpaceId" value={params.id} />
+        <input type="hidden" name="projectId" value={project.id} />
+        <input name="title" required placeholder="What are you sending?" style={{ flex: 1, minWidth: 180 }} />
+        <input name="url" required placeholder="Link to it" style={{ flex: 1, minWidth: 180 }} />
+        <button type="submit">Add for review</button>
       </form>
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Boards</div>

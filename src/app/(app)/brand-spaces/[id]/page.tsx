@@ -228,16 +228,6 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           </Link>
         </div>
 
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Notion</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            View a connected Notion page right here.
-          </div>
-          <Link href={`/brand-spaces/${params.id}/notion`}>
-            <button className="primary" style={{ width: '100%' }}>Open Notion</button>
-          </Link>
-        </div>
-
         {canInvite && (
         <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>

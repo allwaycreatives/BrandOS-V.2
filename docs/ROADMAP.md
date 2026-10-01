@@ -12,6 +12,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Campaigns: 5-stage content pipeline (idea to published), tasks, duplicate
 - Projects: brief / in progress / in review / delivered, tasks and boards, duplicate
 - Duplicate a whole brand (boards, discovery questions, campaigns as a fresh plan)
+- Reviews: send a link, client comments / requests changes / approves with no account (WhatsApp-friendly), version history, "what this client wants" memory built from all feedback
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -35,3 +36,19 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Replace `prisma db push` with proper migrations (needs direct database access)
 - Plans and paid packages (billing)
 - Overall look, feel and onboarding flow — the current build "isn't there yet"
+
+## Decisions: what we deliberately do NOT build
+- Task discovery (too small to need it; discovery is for brands, campaigns, client briefs)
+- Hosting raw footage or large files — we store links (Drive, Frame.io, YouTube, Dropbox). Existing task file uploads are a cost risk to review with a developer.
+- Posting/scheduling to social platforms (integrations break; planning only)
+- Chat/inbox, time tracking, invoicing, Gantt charts (until customers ask)
+- Per-industry versions of the product (one product, starter packs instead)
+- Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
+
+## Next (reviews)
+- Email / WhatsApp notifications when a client comments or approves (today the team checks Home and the Reviews page)
+- Image/design proofs with pins on the image; timestamped comments that jump the video
+- Throttle and spam protection on the public review page
+- Brief intake link that creates a project
+- Client-facing white-label (agency logo and colors on share and review pages): likely a paid-plan feature
+- Retainer packages / quotas

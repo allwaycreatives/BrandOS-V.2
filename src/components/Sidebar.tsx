@@ -41,10 +41,10 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         { label: 'Projects', href: `/brand-spaces/${brandSpaceId}/projects`, icon: '▣' },
         { label: 'Campaigns', href: `/brand-spaces/${brandSpaceId}/campaigns`, icon: '◈' },
         { label: 'Ideas', href: `/brand-spaces/${brandSpaceId}/ideas`, icon: '✧' },
+        { label: 'Reviews', href: `/brand-spaces/${brandSpaceId}/reviews`, icon: '✔' },
         { label: 'Calendar', href: `/brand-spaces/${brandSpaceId}/calendar`, icon: '▦' },
         { label: 'Boards', href: `/brand-spaces/${brandSpaceId}/boards`, icon: '▤' },
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
-        { label: 'Notion', href: `/brand-spaces/${brandSpaceId}/notion`, icon: '◐' },
         { label: 'People', href: `/brand-spaces/${brandSpaceId}/people`, icon: '☺' },
       ]
     : []
@@ -52,7 +52,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   // Show only what this person can actually open.
   const currentRole = brands.find((b) => b.id === brandSpaceId)?.role
   const brandItems = allBrandItems.filter((item) => {
-    if (currentRole === 'client') return !['Projects', 'Campaigns', 'Ideas', 'People'].includes(item.label)
+    if (currentRole === 'client') return !['Projects', 'Campaigns', 'Ideas', 'Reviews', 'People'].includes(item.label)
     if (item.label === 'People') return currentRole === 'owner'
     return true
   })
