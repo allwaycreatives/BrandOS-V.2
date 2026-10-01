@@ -17,16 +17,12 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Upload endpoint requires sign-in, with file type and size limits
 - Build no longer runs `--accept-data-loss`
 
-## Next: Roles and permissions (agency / team use)
-Who can do what, inside a workspace:
-- **Admin / owner** — full control. Is the only one who can invite people by default.
-- **Team member** — can create and edit content, tasks, campaigns. **Cannot invite others by default.**
-- **Optional per-person permission:** admin can switch on "can invite people" for a specific team member.
-- **Client** — view, comment and approve only.
-- Open questions: what else should be toggleable per person (delete things? manage billing? see all client brands or only assigned ones)? Should team members be assigned to specific brands?
-- Build notes: today only the workspace owner can create invites (see `createInvite` in
-  `src/app/(app)/brand-spaces/[id]/inviteActions.ts`). A "can invite" flag would live on
-  the member's access record.
+## Roles and permissions — first version done
+- Owner manages everything, including a new People & permissions page per brand
+- Team members can create and edit, but can invite others only if the owner switches "Can invite" on for them
+- Clients view and approve only; they never see campaigns or projects
+- Owner can switch a person between client and team member, remove them, and switch off invite links
+- Still open: more per-person toggles (delete things, see all brands vs only assigned ones), team roles across a whole workspace instead of per brand, an "owner" that can be shared by more than one person
 
 ## Next: Make it simple, duplicatable, shareable
 - Read-only shareable brand page (works as a brand guide for clients)
@@ -37,6 +33,5 @@ Who can do what, inside a workspace:
 
 ## Needs a developer
 - Replace `prisma db push` with proper migrations (needs direct database access)
-- Revoke/manage invite links from the UI
 - Plans and paid packages (billing)
 - Overall look, feel and onboarding flow — the current build "isn't there yet"

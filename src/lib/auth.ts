@@ -37,12 +37,12 @@ export async function assertBrandSpaceAccess(brandSpaceId: string) {
   if (!brandSpace) return null
 
   if (brandSpace.organizationId === organizationId) {
-    return { brandSpace, role: 'agency' as const }
+    return { brandSpace, role: 'agency' as const, canInvite: true }
   }
 
   const access = await db.brandSpaceAccess
     .findUnique({ where: { brandSpaceId_userId: { brandSpaceId, userId: user.id } } })
     .catch(() => null)
 
-  return access ? { brandSpace, role: access.role } : null
+  return access ? { brandSpace, role: access.role, canInvite: access.role !== 'client' && access.canInvite } : null
 }

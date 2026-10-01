@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-type SidebarBrand = { id: string; name: string; color: string }
+type SidebarBrand = { id: string; name: string; color: string; role?: string }
 
 export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const pathname = usePathname()
@@ -32,7 +32,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     { label: 'Campaigns', href: '/campaigns', icon: '◈' },
   ]
 
-  const brandItems = brandSpaceId
+  const allBrandItems = brandSpaceId
     ? [
         { label: 'Overview', href: `/brand-spaces/${brandSpaceId}`, icon: '◧' },
         { label: 'Discovery', href: `/brand-spaces/${brandSpaceId}/discovery`, icon: '◎' },
@@ -43,8 +43,17 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         { label: 'Boards', href: `/brand-spaces/${brandSpaceId}/boards`, icon: '▤' },
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
         { label: 'Notion', href: `/brand-spaces/${brandSpaceId}/notion`, icon: '◐' },
+        { label: 'People', href: `/brand-spaces/${brandSpaceId}/people`, icon: '☺' },
       ]
     : []
+
+  // Show only what this person can actually open.
+  const currentRole = brands.find((b) => b.id === brandSpaceId)?.role
+  const brandItems = allBrandItems.filter((item) => {
+    if (currentRole === 'client') return !['Projects', 'Campaigns', 'People'].includes(item.label)
+    if (item.label === 'People') return currentRole === 'owner'
+    return true
+  })
 
   function renderLink(item: { label: string; href: string; icon: string }) {
     const isActive = pathname === item.href

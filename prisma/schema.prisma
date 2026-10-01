@@ -115,6 +115,7 @@ model BrandSpaceAccess {
   brandSpaceId String
   userId       String
   role         BrandSpaceRole
+  canInvite    Boolean        @default(false) // owner can let a team member invite others
 
   brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
   user       User       @relation(fields: [userId], references: [id])

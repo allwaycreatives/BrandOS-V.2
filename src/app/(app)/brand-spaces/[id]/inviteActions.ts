@@ -4,8 +4,8 @@ import { randomBytes } from 'crypto'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
 
-// Only the workspace owner ('agency') can create invite links, and only for
-// the two safe roles. Re-uses an existing live link for the same role.
+// The owner can always create invite links; a team member only if the owner switched
+// "can invite" on for them. Only the two safe roles are possible. Re-uses a live link.
 export async function createInvite(
   brandSpaceId: string,
   role: 'client' | 'team_member'
@@ -13,7 +13,7 @@ export async function createInvite(
   if (role !== 'client' && role !== 'team_member') return { error: 'Invalid role.' }
 
   const access = await assertBrandSpaceAccess(brandSpaceId)
-  if (!access || access.role !== 'agency') return { error: 'You do not have permission to invite people.' }
+  if (!access || !access.canInvite) return { error: 'You do not have permission to invite people.' }
 
   const existing = await db.brandSpaceInvite.findFirst({
     where: { brandSpaceId, role, revokedAt: null },

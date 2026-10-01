@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function BrandSpacePage({ params }: { params: { id: string } }) {
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
-  const { brandSpace, role } = access
+  const { brandSpace, role, canInvite } = access
 
   const latestResponse = await db.discoveryResponse
     .findFirst({ where: { brandSpaceId: params.id }, orderBy: { submittedAt: 'desc' } })
@@ -237,6 +237,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           </Link>
         </div>
 
+        {canInvite && (
         <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
@@ -244,6 +245,16 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           </div>
           <InviteLink brandSpaceId={params.id} />
         </div>
+        )}
+
+        {role === 'agency' && (
+          <Link href={`/brand-spaces/${params.id}/people`} className="card">
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>People &amp; permissions</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              See who has access, choose who can invite others, and switch off invite links.
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   )
