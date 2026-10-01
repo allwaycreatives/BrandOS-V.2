@@ -13,6 +13,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Projects: brief / in progress / in review / delivered, tasks and boards, duplicate
 - Duplicate a whole brand (boards, discovery questions, campaigns as a fresh plan)
 - Reviews: send a link, client comments / requests changes / approves with no account (WhatsApp-friendly), version history, "what this client wants" memory built from all feedback
+- Updates bell: owners and team members are notified when a client comments, requests changes or approves (email too once RESEND_API_KEY and EMAIL_FROM are set)
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -46,9 +47,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
 
 ## Next (reviews)
-- Email / WhatsApp notifications when a client comments or approves (today the team checks Home and the Reviews page)
+- WhatsApp notifications, a per-person switch for email, and notifications for invites and approvals on campaign content
 - Image/design proofs with pins on the image; timestamped comments that jump the video
-- Throttle and spam protection on the public review page
 - Brief intake link that creates a project
 - Client-facing white-label (agency logo and colors on share and review pages): likely a paid-plan feature
 - Retainer packages / quotas
