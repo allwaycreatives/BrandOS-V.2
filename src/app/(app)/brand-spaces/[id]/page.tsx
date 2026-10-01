@@ -5,6 +5,7 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import DiscoveryLink from './DiscoveryLink'
 import InviteLink from './InviteLink'
 import DuplicateBrandButton from './DuplicateBrandButton'
+import ShareBrandCard from './ShareBrandCard'
 import ClientItemRow from './ClientItemRow'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -255,6 +256,8 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
             </div>
           </Link>
         )}
+
+        {role === 'agency' && <ShareBrandCard brandSpaceId={params.id} shareToken={brandSpace.shareToken} />}
       </div>
     </div>
   )

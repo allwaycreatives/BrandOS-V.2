@@ -12,6 +12,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Campaigns: 5-stage content pipeline (idea to published), tasks, duplicate
 - Projects: brief / in progress / in review / delivered, tasks and boards, duplicate
 - Duplicate a whole brand (boards, discovery questions, campaigns as a fresh plan)
+- Ideas: park an idea fast, promote it to a campaign or project
+- Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
 - Invite links fixed and made secure (role is set on the server, links can be revoked later)
 - Upload endpoint requires sign-in, with file type and size limits
@@ -25,10 +27,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Still open: more per-person toggles (delete things, see all brands vs only assigned ones), team roles across a whole workspace instead of per brand, an "owner" that can be shared by more than one person
 
 ## Next: Make it simple, duplicatable, shareable
-- Read-only shareable brand page (works as a brand guide for clients)
 - Share a campaign or project (read-only link), client approval on campaign content
 - Save your own board/campaign/project as a reusable template; later a public template gallery
-- Ideas: a place to park ideas and promote them to a campaign or project
 - Per-role wording throughout (client vs brand vs channel)
 
 ## Needs a developer
