@@ -7,6 +7,8 @@ import InviteLink from './InviteLink'
 import DuplicateBrandButton from './DuplicateBrandButton'
 import ShareBrandCard from './ShareBrandCard'
 import ClientItemRow from './ClientItemRow'
+import ClampText from '@/components/ClampText'
+import { brandColor } from '@/lib/brandColor'
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Waiting to start',
@@ -17,6 +19,18 @@ const STATUS_LABELS: Record<string, string> = {
   in_production: 'In production',
   scheduled: 'Scheduled',
   published: 'Published',
+}
+
+const SERIF = "Georgia, 'Times New Roman', serif"
+
+function Tile({ href, label, value, caption, hot }: { href: string; label: string; value: string | number; caption: string; hot?: boolean }) {
+  return (
+    <Link href={href} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '14px 16px' }}>
+      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
+      <span style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 600, lineHeight: 1.15, color: hot ? 'var(--accent)' : undefined }}>{value}</span>
+      <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{caption}</span>
+    </Link>
+  )
 }
 
 export default async function BrandSpacePage({ params }: { params: { id: string } }) {
@@ -31,58 +45,78 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
   const responseCount = await db.discoveryResponse.count({ where: { brandSpaceId: params.id } }).catch(() => 0)
   const answers = (latestResponse?.answersJson as Record<string, string | string[]>) || {}
 
+  const knownFor = typeof answers.known_for === 'string' ? answers.known_for : ''
+  const audience = typeof answers.audience === 'string' ? answers.audience : ''
+  const rawStyle = answers.brand_style
+  const style = Array.isArray(rawStyle)
+    ? rawStyle.length > 1
+      ? `${rawStyle[0]} (primary) + ${rawStyle.slice(1).join(', ')}`
+      : rawStyle[0] ?? ''
+    : typeof rawStyle === 'string'
+    ? rawStyle
+    : ''
+  const tones = Array.isArray(answers.tone_words) ? answers.tone_words : []
+  const label: React.CSSProperties = { fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }
+
   const brandSummaryCard = latestResponse ? (
-    <div className="card" style={{ marginBottom: 24, borderColor: 'var(--border-strong)' }}>
-      <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 10 }}>
-        Brand Summary
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-        {answers.known_for && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Known for</div>
-            <div style={{ fontSize: 13.5 }}>{answers.known_for as string}</div>
-          </div>
-        )}
-        {answers.audience && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Audience</div>
-            <div style={{ fontSize: 13.5 }}>{answers.audience as string}</div>
-          </div>
-        )}
-        {answers.brand_style && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Brand style</div>
-            <div style={{ fontSize: 13.5 }}>
-              {Array.isArray(answers.brand_style)
-                ? answers.brand_style.length > 1
-                  ? `${answers.brand_style[0]} (primary) + ${answers.brand_style.slice(1).join(', ')}`
-                  : answers.brand_style[0]
-                : answers.brand_style}
+    <div className="card" style={{ marginBottom: 28, padding: '22px 24px' }}>
+      <div style={{ ...label, color: 'var(--accent)', fontWeight: 600, marginBottom: 12 }}>Brand identity</div>
+      {knownFor && (
+        <div style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.3, fontWeight: 600, marginBottom: 14 }}>
+          <ClampText text={knownFor} limit={170} />
+        </div>
+      )}
+      {tones.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+          {tones.map((t) => (
+            <span key={t} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 999, border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+      {(audience || style) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          {audience && (
+            <div>
+              <div style={label}>Audience</div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
+                <ClampText text={audience} limit={170} />
+              </div>
             </div>
-          </div>
-        )}
-        {Array.isArray(answers.tone_words) && answers.tone_words.length > 0 && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Tone</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {answers.tone_words.map((t) => (
-                <span key={t} style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}>
-                  {t}
-                </span>
-              ))}
+          )}
+          {style && (
+            <div>
+              <div style={label}>Brand style</div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
+                <ClampText text={style} limit={170} />
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       {role === 'agency' && (
-        <Link href={`/brand-spaces/${params.id}/discovery`} style={{ fontSize: 12, color: 'var(--accent)', display: 'inline-block', marginTop: 12 }}>
-          View full discovery →
-        </Link>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 16, fontSize: 12.5 }}>
+          <Link href={`/brand-spaces/${params.id}/discovery`} style={{ color: 'var(--accent)' }}>
+            View full discovery →
+          </Link>
+          <Link href={`/brand-spaces/${params.id}/discovery/template`} style={{ color: 'var(--text-secondary)' }}>
+            Customize questions
+          </Link>
+        </div>
       )}
     </div>
+  ) : role === 'client' ? (
+    <div className="card-empty" style={{ marginBottom: 24 }}>No brand summary yet.</div>
   ) : (
-    <div className="card-empty" style={{ marginBottom: 24 }}>
-      No brand summary yet{role === 'agency' ? ' — send the discovery link below to get one.' : '.'}
+    <div className="card" style={{ marginBottom: 28, padding: '22px 24px', borderColor: 'var(--accent-dim)' }}>
+      <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 600, marginBottom: 6 }}>Start with discovery</div>
+      <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.55, marginBottom: 16, maxWidth: 520 }}>
+        Send this short questionnaire to your client. They answer in a few minutes, with no login, and you get a clear brand summary right here.
+      </div>
+      <div style={{ maxWidth: 320 }}>
+        <DiscoveryLink brandSpaceId={params.id} />
+      </div>
     </div>
   )
 
@@ -152,103 +186,111 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     )
   }
 
-  // ---- Agency / team member view: full toolset ----
+  // ---- Agency / team member view: brand command center ----
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const bs = { brandSpaceId: params.id }
+  const [openTasks, activeCampaigns, activeProjects, waitingReviews, openIdeas, boardCount, calendarOpen, changeItems, overdueTasks] = await Promise.all([
+    db.task.count({ where: { ...bs, status: { not: 'done' } } }).catch(() => 0),
+    db.campaign.count({ where: { ...bs, status: { not: 'done' } } }).catch(() => 0),
+    db.project.count({ where: { ...bs, status: { not: 'delivered' } } }).catch(() => 0),
+    db.deliverable.count({ where: { ...bs, status: { in: ['in_review', 'changes_requested'] } } }).catch(() => 0),
+    db.idea.count({ where: { ...bs, status: 'open' } }).catch(() => 0),
+    db.board.count({ where: bs }).catch(() => 0),
+    db.calendarItem.count({ where: { ...bs, status: { not: 'published' } } }).catch(() => 0),
+    db.deliverable.findMany({ where: { ...bs, status: 'changes_requested' }, orderBy: { updatedAt: 'desc' }, take: 3, select: { id: true, title: true } }).catch(() => []),
+    db.task.findMany({ where: { ...bs, status: { not: 'done' }, dueDate: { lt: startOfToday } }, orderBy: { dueDate: 'asc' }, take: 3, select: { id: true, title: true } }).catch(() => []),
+  ])
+
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  const summaryParts = [
+    openTasks > 0 && plural(openTasks, 'open task', 'open tasks'),
+    activeCampaigns > 0 && plural(activeCampaigns, 'active campaign', 'active campaigns'),
+    activeProjects > 0 && plural(activeProjects, 'project in progress', 'projects in progress'),
+    waitingReviews > 0 && `${waitingReviews} in review`,
+  ].filter(Boolean)
+  const base = `/brand-spaces/${params.id}`
+  const attention = [
+    ...changeItems.map((d) => ({ key: `d${d.id}`, tag: 'Changes requested', title: d.title, href: `${base}/reviews/${d.id}` })),
+    ...overdueTasks.map((t) => ({ key: `t${t.id}`, tag: 'Overdue', title: t.title, href: `${base}/tasks` })),
+  ]
+  const showTeam = canInvite || role === 'agency'
+
   return (
     <div>
-      <Link href="/dashboard" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>← All brand spaces</Link>
-
-      <div style={{ marginTop: 8, marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="topbar-greeting">{brandSpace.name}</div>
-          <div className="topbar-sub">This brand space's home.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 14, height: 14, borderRadius: '50%', background: brandColor(brandSpace.name), flexShrink: 0 }} />
+            <h1 style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{brandSpace.name}</h1>
+          </div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6 }}>
+            {summaryParts.length > 0 ? summaryParts.join('  ·  ') : 'Nothing in progress yet. Start with discovery or add a task.'}
+          </div>
         </div>
         {role === 'agency' && <DuplicateBrandButton brandSpaceId={params.id} />}
       </div>
 
+      {attention.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Needs attention</div>
+          {attention.map((a) => (
+            <Link key={a.key} href={a.href} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
+              <span style={{ fontSize: 11.5, color: 'var(--accent)', minWidth: 110 }}>{a.tag}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {brandSummaryCard}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Discovery</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            {responseCount > 0
-              ? `${responseCount} response${responseCount === 1 ? '' : 's'} received.`
-              : 'Send this link to your client — no login needed on their end.'}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <DiscoveryLink brandSpaceId={params.id} />
-            {responseCount > 0 && (
-              <Link href={`/brand-spaces/${params.id}/discovery`}>
-                <button style={{ width: '100%' }}>View responses</button>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Work</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 32 }}>
+        <Tile href={`${base}/tasks`} label="Tasks" value={openTasks} caption={overdueTasks.length > 0 ? `${overdueTasks.length}+ overdue` : 'open'} hot={overdueTasks.length > 0} />
+        <Tile href={`${base}/campaigns`} label="Campaigns" value={activeCampaigns} caption="active" />
+        <Tile href={`${base}/projects`} label="Projects" value={activeProjects} caption="in progress" />
+        <Tile href={`${base}/reviews`} label="Reviews" value={waitingReviews} caption={changeItems.length > 0 ? `${changeItems.length} with changes` : 'out with clients'} hot={changeItems.length > 0} />
+        <Tile href={`${base}/ideas`} label="Ideas" value={openIdeas} caption="parked" />
+        <Tile href={`${base}/calendar`} label="Calendar" value={calendarOpen} caption="content to publish" />
+        <Tile href={`${base}/boards`} label="Boards" value={boardCount} caption="moodboards and plans" />
+        <Tile href={`${base}/brand-kit`} label="Brand kit" value="Open" caption={responseCount > 0 ? 'bio and tagline options' : 'after discovery'} />
+      </div>
+
+      {showTeam && (
+        <>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Team &amp; sharing</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            {canInvite && (
+              <div className="card">
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.5 }}>
+                  Give a client or team member access to this brand. Invite a hands-on client as &quot;Team member&quot; to give them the full toolset.
+                </div>
+                <InviteLink brandSpaceId={params.id} />
+              </div>
+            )}
+            {role === 'agency' && <ShareBrandCard brandSpaceId={params.id} shareToken={brandSpace.shareToken} />}
+            {role === 'agency' && responseCount > 0 && (
+              <div className="card">
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Discovery link</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                  {plural(responseCount, 'response', 'responses')} so far. Send the link again to collect more.
+                </div>
+                <DiscoveryLink brandSpaceId={params.id} />
+              </div>
+            )}
+            {role === 'agency' && (
+              <Link href={`${base}/people`} className="card">
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>People &amp; permissions</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  See who has access, choose who can invite others, and switch off invite links.
+                </div>
               </Link>
             )}
-            <Link href={`/brand-spaces/${params.id}/discovery/template`}>
-              <button style={{ width: '100%', fontSize: 12 }}>Customize questionnaire</button>
-            </Link>
           </div>
-        </div>
-
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Brand Kit</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            {responseCount > 0 ? 'Generate bio and tagline options.' : 'Available once discovery is complete.'}
-          </div>
-          <Link href={`/brand-spaces/${params.id}/brand-kit`}>
-            <button className="primary" style={{ width: '100%' }}>Open Brand Kit</button>
-          </Link>
-        </div>
-
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Calendar</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            Plan content and move it through production.
-          </div>
-          <Link href={`/brand-spaces/${params.id}/calendar`}>
-            <button className="primary" style={{ width: '100%' }}>Open Calendar</button>
-          </Link>
-        </div>
-
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Boards</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            A freeform canvas for moodboards and campaign ideas.
-          </div>
-          <Link href={`/brand-spaces/${params.id}/boards`}>
-            <button className="primary" style={{ width: '100%' }}>Open Boards</button>
-          </Link>
-        </div>
-
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Tasks</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            Quick jobs — no discovery required. Assign, attach a file, track status.
-          </div>
-          <Link href={`/brand-spaces/${params.id}/tasks`}>
-            <button className="primary" style={{ width: '100%' }}>Open Tasks</button>
-          </Link>
-        </div>
-
-        {canInvite && (
-        <div className="card">
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            Give a client or team member access to just this brand space. Want a hands-on client to see the full toolset instead of the simple view? Invite them as "Team member" rather than "Client."
-          </div>
-          <InviteLink brandSpaceId={params.id} />
-        </div>
-        )}
-
-        {role === 'agency' && (
-          <Link href={`/brand-spaces/${params.id}/people`} className="card">
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>People &amp; permissions</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-              See who has access, choose who can invite others, and switch off invite links.
-            </div>
-          </Link>
-        )}
-
-        {role === 'agency' && <ShareBrandCard brandSpaceId={params.id} shareToken={brandSpace.shareToken} />}
-      </div>
+        </>
+      )}
     </div>
   )
 }

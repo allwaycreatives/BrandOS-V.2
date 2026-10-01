@@ -381,3 +381,13 @@ a.card:hover {
 .bounce-in {
   animation: bounceIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Long text that shows a short version with "Read more" (no JavaScript needed) */
+.clamp > summary { display: block; list-style: none; cursor: pointer; }
+.clamp > summary::-webkit-details-marker { display: none; }
+.clamp .clamp-full { display: none; }
+.clamp[open] .clamp-short { display: none; }
+.clamp[open] .clamp-full { display: inline; }
+.clamp .clamp-toggle { color: var(--accent); font-size: 12px; font-weight: 400; font-family: var(--font-body, inherit); margin-left: 6px; }
+.clamp[open] .clamp-more { display: none; }
+.clamp:not([open]) .clamp-less { display: none; }
