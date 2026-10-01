@@ -1,0 +1,27 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { db } from '@/lib/db'
+import { assertBrandSpaceAccess } from '@/lib/auth'
+import { brandColor } from '@/lib/brandColor'
+import IdeaList from '@/components/IdeaList'
+
+export default async function BrandIdeasPage({ params }: { params: { id: string } }) {
+  const access = await assertBrandSpaceAccess(params.id)
+  if (!access || access.role === 'client') notFound()
+  const { brandSpace } = access
+
+  const ideas = await db.idea.findMany({ where: { brandSpaceId: params.id, status: 'open' }, orderBy: { createdAt: 'desc' } }).catch(() => [])
+
+  return (
+    <div>
+      <Link href={`/brand-spaces/${params.id}`} style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        ← {brandSpace.name}
+      </Link>
+      <div style={{ marginTop: 8, marginBottom: 20 }}>
+        <div className="topbar-greeting">Ideas</div>
+        <div className="topbar-sub">Park ideas for {brandSpace.name}. Turn the good ones into a campaign or project.</div>
+      </div>
+      <IdeaList ideas={ideas} brands={[{ id: brandSpace.id, name: brandSpace.name, color: brandColor(brandSpace.name) }]} fixedBrandId={params.id} />
+    </div>
+  )
+}

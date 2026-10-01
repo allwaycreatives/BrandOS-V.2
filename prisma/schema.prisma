@@ -66,6 +66,7 @@ model Membership {
 model BrandSpace {
   id             String   @id @default(cuid())
   organizationId String
+  shareToken           String?  @unique // when set, anyone with the link can read the brand guide
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]
   notionEmbedUrl String?
@@ -83,6 +84,7 @@ model BrandSpace {
   boards               Board[]
   invites              BrandSpaceInvite[]
   campaigns            Campaign[]
+  ideas                Idea[]
 }
 
 model Board {
@@ -300,6 +302,20 @@ model Campaign {
   brandSpace    BrandSpace     @relation(fields: [brandSpaceId], references: [id])
   calendarItems CalendarItem[]
   tasks         Task[]
+
+  @@index([brandSpaceId])
+}
+
+// A parked idea. Promoting it creates a campaign or project and marks it "promoted".
+model Idea {
+  id           String   @id @default(cuid())
+  brandSpaceId String
+  title        String
+  notes        String?
+  status       String   @default("open") // open | promoted | archived
+  createdAt    DateTime @default(now())
+
+  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
 
   @@index([brandSpaceId])
 }

@@ -7,6 +7,7 @@ import { createCampaign } from '../brand-spaces/[id]/campaigns/actions'
 import { getCampaignProgress } from '@/lib/campaigns'
 import CampaignCard from '@/components/CampaignCard'
 import ProjectCard from '@/components/ProjectCard'
+import { createIdea } from '../brand-spaces/[id]/ideas/actions'
 import { createProject } from '../brand-spaces/[id]/projects/actions'
 import { getProjectProgress } from '@/lib/projects'
 import TaskRow from '@/components/TaskRow'
@@ -87,6 +88,20 @@ export default async function HomePage() {
                   ))}
                 </select>
                 <button className="primary" type="submit">Add task</button>
+              </div>
+            </form>
+          </div>
+          <div className="card">
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>Park an idea</div>
+            <form action={createIdea} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input name="title" required placeholder="Behind-the-scenes series" />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
+                  {workBrands.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <button type="submit">Save</button>
               </div>
             </form>
           </div>
