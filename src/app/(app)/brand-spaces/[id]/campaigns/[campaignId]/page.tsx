@@ -12,6 +12,7 @@ import {
   duplicateCampaign,
 } from '../actions'
 import DeleteCampaignButton from '../DeleteCampaignButton'
+import SaveTemplateButton from '@/components/SaveTemplateButton'
 import { PLATFORMS } from '../constants'
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
@@ -42,9 +43,12 @@ export default async function CampaignPage({ params }: { params: { id: string; c
 
       <div style={{ marginTop: 8, marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h1 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, margin: 0 }}>{campaign.name}</h1>
-        <form action={duplicate}>
-          <button type="submit">Duplicate campaign</button>
-        </form>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <form action={duplicate}>
+            <button type="submit">Duplicate campaign</button>
+          </form>
+          <SaveTemplateButton kind="campaign" sourceId={campaign.id} defaultName={campaign.name} />
+        </div>
       </div>
 
       <form action={update} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 24, alignItems: 'end' }}>

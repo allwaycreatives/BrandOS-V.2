@@ -31,6 +31,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     { label: 'Projects', href: '/projects', icon: '▣' },
     { label: 'Campaigns', href: '/campaigns', icon: '◈' },
     { label: 'Ideas', href: '/ideas', icon: '✧' },
+    { label: 'Templates', href: '/templates', icon: '❏' },
   ]
 
   const allBrandItems = brandSpaceId

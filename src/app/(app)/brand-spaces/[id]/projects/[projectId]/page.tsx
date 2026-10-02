@@ -5,6 +5,7 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { PROJECT_STAGES } from '../constants'
 import { updateProject, setProjectStatus, addProjectTask, setProjectTaskStatus, addProjectBoard, duplicateProject } from '../actions'
 import DeleteProjectButton from '../DeleteProjectButton'
+import SaveTemplateButton from '@/components/SaveTemplateButton'
 import { createDeliverable } from '../../reviews/actions'
 import { REVIEW_STATUS } from '../../reviews/constants'
 
@@ -35,9 +36,12 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
 
       <div style={{ marginTop: 8, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h1 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, margin: 0 }}>{project.name}</h1>
-        <form action={duplicateProject.bind(null, project.id)}>
-          <button type="submit">Duplicate project</button>
-        </form>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <form action={duplicateProject.bind(null, project.id)}>
+            <button type="submit">Duplicate project</button>
+          </form>
+          <SaveTemplateButton kind="project" sourceId={project.id} defaultName={project.name} />
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>

@@ -3,8 +3,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { duplicateBoard, enableBoardShare, disableBoardShare } from '../actions'
+import SaveTemplateButton from '@/components/SaveTemplateButton'
 
-export default function BoardActions({ brandSpaceId, boardId, shareToken }: { brandSpaceId: string; boardId: string; shareToken: string | null }) {
+export default function BoardActions({ brandSpaceId, boardId, name, shareToken }: { brandSpaceId: string; boardId: string; name: string; shareToken: string | null }) {
   const router = useRouter()
   const [token, setToken] = useState(shareToken)
   const [open, setOpen] = useState(false)
@@ -47,6 +48,7 @@ export default function BoardActions({ brandSpaceId, boardId, shareToken }: { br
   return (
     <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
       <button type="button" onClick={duplicate} disabled={isPending}>Duplicate</button>
+      <SaveTemplateButton kind="board" sourceId={boardId} defaultName={name} />
       <button type="button" className="primary" onClick={share} disabled={isPending}>Share</button>
       {open && (
         <div className="card" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 320, zIndex: 20 }}>

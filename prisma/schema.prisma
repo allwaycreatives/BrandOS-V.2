@@ -36,6 +36,7 @@ model Organization {
   createdAt   DateTime      @default(now())
   memberships Membership[]
   brandSpaces BrandSpace[]
+  templates Template[]
 }
 
 model User {
@@ -379,4 +380,19 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
+}
+
+// Your own reusable setup, saved from a board, campaign or project. Belongs to the workspace,
+// so it can be used for any brand in it. payloadJson is a snapshot taken when it was saved.
+model Template {
+  id             String   @id @default(cuid())
+  organizationId String
+  kind           String   // board | campaign | project
+  name           String
+  payloadJson    Json
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }

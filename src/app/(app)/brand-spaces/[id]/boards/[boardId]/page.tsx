@@ -23,7 +23,7 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
 
       <div style={{ marginTop: 8, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 26, fontWeight: 600, margin: 0 }}>{board.name}</h1>
-        {!readOnly && <BoardActions brandSpaceId={params.id} boardId={board.id} shareToken={board.shareToken} />}
+        {!readOnly && <BoardActions brandSpaceId={params.id} boardId={board.id} name={board.name} shareToken={board.shareToken} />}
       </div>
 
       <BoardCanvas
