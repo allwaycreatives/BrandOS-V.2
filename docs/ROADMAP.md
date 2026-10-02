@@ -14,6 +14,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Duplicate a whole brand (boards, discovery questions, campaigns as a fresh plan)
 - Reviews: send a link, client comments / requests changes / approves with no account (WhatsApp-friendly), version history, "what this client wants" memory built from all feedback
 - Updates bell: owners and team members are notified when a client comments, requests changes or approves (email too once RESEND_API_KEY and EMAIL_FROM are set)
+- Share → copy loop: anyone with a board's share link can copy it into their own workspace (sign-up first if new). Images stay linked to the original files.
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -31,6 +32,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 ## Next: Make it simple, duplicatable, shareable
 - Share a campaign or project (read-only link), client approval on campaign content
 - Save your own board/campaign/project as a reusable template; later a public template gallery
+- Copy-from-share for campaigns and projects (boards done)
 - Per-role wording throughout (client vs brand vs channel)
 
 ## Needs a developer
