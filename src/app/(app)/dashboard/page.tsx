@@ -2,16 +2,13 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
 import { getUserBrands } from '@/lib/brands'
-import { createBrandSpace, quickCreateTask } from '../../actions'
-import { createCampaign } from '../brand-spaces/[id]/campaigns/actions'
 import { getCampaignProgress } from '@/lib/campaigns'
 import CampaignCard from '@/components/CampaignCard'
 import ProjectCard from '@/components/ProjectCard'
-import { createIdea } from '../brand-spaces/[id]/ideas/actions'
-import { createProject } from '../brand-spaces/[id]/projects/actions'
 import { getProjectProgress } from '@/lib/projects'
 import TaskRow from '@/components/TaskRow'
 import FirstRun from '@/components/FirstRun'
+import QuickCreate from '@/components/QuickCreate'
 import { TEMPLATE_LIST } from '../brand-spaces/[id]/boards/templates'
 
 const ROLE_LABEL = { owner: 'Your brand', team_member: 'Team member', client: 'Client' } as const
@@ -84,73 +81,7 @@ export default async function HomePage() {
 
       {!isClientOnly && brands.length === 0 && <FirstRun templates={TEMPLATE_LIST} />}
 
-      {!isClientOnly && brands.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12, marginBottom: 28 }}>
-          <div className="card">
-            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New task</div>
-            <form action={quickCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input name="title" required placeholder="Edit the launch reel" />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
-                  {workBrands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <button className="primary" type="submit">Add task</button>
-              </div>
-            </form>
-          </div>
-          <div className="card">
-            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>Park an idea</div>
-            <form action={createIdea} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input name="title" required placeholder="Behind-the-scenes series" />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
-                  {workBrands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <button type="submit">Save</button>
-              </div>
-            </form>
-          </div>
-          <div className="card">
-            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New campaign</div>
-            <form action={createCampaign} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input name="name" required placeholder="Summer launch" />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
-                  {workBrands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <button className="primary" type="submit">Create</button>
-              </div>
-            </form>
-          </div>
-          <div className="card">
-            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New project</div>
-            <form action={createProject} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input name="name" required placeholder="Brand film" />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select name="brandSpaceId" defaultValue={workBrands[0]?.id} style={{ flex: 1 }}>
-                  {workBrands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <button className="primary" type="submit">Create</button>
-              </div>
-            </form>
-          </div>
-          <div className="card">
-            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New brand</div>
-            <form action={createBrandSpace} style={{ display: 'flex', gap: 8 }}>
-              <input name="name" required placeholder="Brand or client name" style={{ flex: 1 }} />
-              <button type="submit">Create</button>
-            </form>
-          </div>
-        </div>
-      )}
+      {!isClientOnly && brands.length > 0 && <QuickCreate brands={workBrands.map((b) => ({ id: b.id, name: b.name }))} />}
 
       {!isClientOnly && dueSoon.length > 0 && (
         <div style={{ marginBottom: 28 }}>
