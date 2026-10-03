@@ -45,6 +45,7 @@ a {
 
 .app-shell {
   display: flex;
+  align-items: flex-start;
   min-height: 100vh;
 }
 
@@ -58,7 +59,12 @@ a {
   flex-direction: column;
   gap: 24px;
   transition: width 0.2s ease;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
 }
 
 .sidebar-brand {
@@ -482,3 +488,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .qc-main, .qc-brand { flex: 1 1 100%; }
   .qc-go { flex: 1 1 100%; }
 }
+
+/* Tools of the open brand sit indented under it */
+.sidebar-sub .sidebar-link { font-size: 13px; padding-top: 6px; padding-bottom: 6px; }

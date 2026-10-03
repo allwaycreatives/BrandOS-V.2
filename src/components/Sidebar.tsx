@@ -118,29 +118,28 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         {brands.map((b) => {
           const isCurrent = brandSpaceId === b.id
           return (
-            <Link
-              key={b.id}
-              href={`/brand-spaces/${b.id}`}
-              title={collapsed ? b.name : undefined}
-              className={`sidebar-link${isCurrent && pathname === `/brand-spaces/${b.id}` ? ' active' : ''}`}
-              style={collapsed ? { justifyContent: 'center' } : isCurrent ? { color: 'var(--text-primary)' } : undefined}
-            >
-              <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
-              {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>}
-            </Link>
+            <div key={b.id}>
+              <Link
+                href={`/brand-spaces/${b.id}`}
+                title={collapsed ? b.name : undefined}
+                className="sidebar-link"
+                style={collapsed ? { justifyContent: 'center' } : isCurrent ? { color: 'var(--text-primary)', fontWeight: 600 } : undefined}
+              >
+                <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+                {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>}
+              </Link>
+              {isCurrent && brandItems.length > 0 && (
+                <div className="sidebar-sub" style={collapsed ? undefined : { marginLeft: 14, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
+                  {brandItems.map(renderLink)}
+                </div>
+              )}
+            </div>
           )
         })}
         {brands.length === 0 && !collapsed && (
           <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px' }}>No brands yet</div>
         )}
 
-        {brandItems.length > 0 && (
-          <>
-            {!collapsed && <div className="sidebar-label" style={{ marginTop: 18 }}>This brand</div>}
-            {collapsed && <div style={{ height: 14 }} />}
-            {brandItems.map(renderLink)}
-          </>
-        )}
       </nav>
 
       <button

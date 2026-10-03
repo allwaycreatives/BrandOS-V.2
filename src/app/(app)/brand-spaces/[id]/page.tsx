@@ -28,7 +28,7 @@ function Tile({ href, label, value, caption, hot }: { href: string; label: strin
   return (
     <Link href={href} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '14px 16px' }}>
       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 600, lineHeight: 1.15, color: hot ? 'var(--accent)' : undefined }}>{value}</span>
+      <span style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.15, color: hot ? 'var(--accent)' : undefined }}>{value}</span>
       <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{caption}</span>
     </Link>
   )
@@ -226,7 +226,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
             <h1 style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{brandSpace.name}</h1>
           </div>
           <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6 }}>
-            {summaryParts.length > 0 ? summaryParts.join('  ·  ') : 'Nothing in progress yet. Start with discovery or add a task.'}
+            {summaryParts.length > 0 ? summaryParts.join('  ·  ') : responseCount > 0 ? 'Nothing in progress yet. Add a task, project or campaign to get going.' : 'Nothing in progress yet. Start with discovery or add a task.'}
           </div>
         </div>
         {role === 'agency' && <DuplicateBrandButton brandSpaceId={params.id} />}

@@ -59,10 +59,10 @@ export default async function ReviewsPage({ params }: { params: { id: string } }
       </form>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 12, marginBottom: 24 }}>
-        <div className="card"><div style={{ fontSize: 22, fontFamily: SERIF, fontWeight: 600 }}>{deliverables.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Deliverables</div></div>
-        <div className="card"><div style={{ fontSize: 22, fontFamily: SERIF, fontWeight: 600 }}>{approved.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Approved</div></div>
-        <div className="card"><div style={{ fontSize: 22, fontFamily: SERIF, fontWeight: 600 }}>{avgRounds}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Avg versions to approval</div></div>
-        <div className="card"><div style={{ fontSize: 22, fontFamily: SERIF, fontWeight: 600, color: openChanges ? 'var(--accent)' : undefined }}>{openChanges}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Changes to address</div></div>
+        <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{deliverables.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Deliverables</div></div>
+        <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{approved.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Approved</div></div>
+        <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{avgRounds}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Avg versions to approval</div></div>
+        <div className="card"><div style={{ fontSize: 22, fontWeight: 600, color: openChanges ? 'var(--accent)' : undefined }}>{openChanges}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Changes to address</div></div>
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Deliverables</div>

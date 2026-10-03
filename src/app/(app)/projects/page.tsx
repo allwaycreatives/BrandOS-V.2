@@ -35,6 +35,10 @@ export default async function AllProjectsPage() {
         <div className="card-empty" style={{ marginBottom: 24 }}>Create a brand first, then add projects to it.</div>
       )}
 
+      {brands.length > 0 && projects.length === 0 && (
+        <div className="card-empty">No projects yet. Create your first one above, or start from a saved template.</div>
+      )}
+
       {PROJECT_STAGES.map((stage) => {
         const list = projects.filter((p) => p.status === stage.key)
         if (list.length === 0) return null

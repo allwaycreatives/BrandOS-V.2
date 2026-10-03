@@ -37,6 +37,10 @@ export default async function AllCampaignsPage() {
         <div className="card-empty" style={{ marginBottom: 24 }}>Create a brand first, then plan campaigns for it.</div>
       )}
 
+      {brands.length > 0 && campaigns.length === 0 && (
+        <div className="card-empty">No campaigns yet. Create your first one above, or start from a saved template.</div>
+      )}
+
       {ORDER.map((status) => {
         const list = campaigns.filter((c) => c.status === status)
         if (list.length === 0) return null
