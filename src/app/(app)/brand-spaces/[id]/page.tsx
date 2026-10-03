@@ -6,6 +6,7 @@ import DiscoveryLink from './DiscoveryLink'
 import InviteLink from './InviteLink'
 import DuplicateBrandButton from './DuplicateBrandButton'
 import ShareBrandCard from './ShareBrandCard'
+import ShareBriefCard from './ShareBriefCard'
 import ClientItemRow from './ClientItemRow'
 import ClampText from '@/components/ClampText'
 import { brandColor } from '@/lib/brandColor'
@@ -271,6 +272,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
               </div>
             )}
             {role === 'agency' && <ShareBrandCard brandSpaceId={params.id} shareToken={brandSpace.shareToken} />}
+            {role === 'agency' && <ShareBriefCard brandSpaceId={params.id} brandName={brandSpace.name} intakeToken={brandSpace.intakeToken} />}
             {role === 'agency' && responseCount > 0 && (
               <div className="card">
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Discovery link</div>

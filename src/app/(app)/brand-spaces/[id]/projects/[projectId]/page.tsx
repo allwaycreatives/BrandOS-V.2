@@ -57,6 +57,16 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
         ))}
       </div>
 
+      {project.brief && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+            <div style={{ fontWeight: 600 }}>Client brief</div>
+            {project.briefFrom && <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>From {project.briefFrom}</div>}
+          </div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{project.brief}</div>
+        </div>
+      )}
+
       <form action={updateProject.bind(null, project.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 26, alignItems: 'end' }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
           Brief

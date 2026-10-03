@@ -16,6 +16,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Updates bell: owners and team members are notified when a client comments, requests changes or approves (email too once RESEND_API_KEY and EMAIL_FROM are set)
 - Share → copy loop: anyone with a board's share link can copy it into their own workspace (sign-up first if new). Images stay linked to the original files.
 - Your own templates: save any board, campaign or project once, use it for any brand in the workspace (Templates page)
+- Brief intake: a public form link per brand; a client's brief becomes a project in Brief stage with the brief attached, a first task and a notification
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -52,6 +53,6 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 ## Next (reviews)
 - WhatsApp notifications, a per-person switch for email, and notifications for invites and approvals on campaign content
 - Image/design proofs with pins on the image; timestamped comments that jump the video
-- Brief intake link that creates a project
+- Brief intake: custom questions per brand, file links, moving a brief from an 'inquiries' brand into a real client brand
 - Client-facing white-label (agency logo and colors on share and review pages): likely a paid-plan feature
 - Retainer packages / quotas

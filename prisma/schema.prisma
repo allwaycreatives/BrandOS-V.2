@@ -69,6 +69,7 @@ model BrandSpace {
   id             String   @id @default(cuid())
   organizationId String
   shareToken           String?  @unique // when set, anyone with the link can read the brand guide
+  intakeToken          String?  @unique // when set, clients can send a brief through a public form
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]
   notionEmbedUrl String?
@@ -212,6 +213,8 @@ model Project {
   description  String?
   status       String    @default("brief") // brief | in_progress | review | delivered
   dueDate      DateTime?
+  brief        String?   // what the client wrote on the intake form
+  briefFrom    String?   // who sent it, e.g. "Sam · sam@example.com"
   createdAt    DateTime @default(now())
 
   brandSpace    BrandSpace     @relation(fields: [brandSpaceId], references: [id])
