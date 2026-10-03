@@ -6,7 +6,7 @@ import { submitFeedback } from './actions'
 
 const KEY = 'brandos-reviewer-name'
 
-export default function ReviewForm({ token }: { token: string }) {
+export default function ReviewForm({ token, pin, onClearPin, nextPin }: { token: string; pin?: { x: number; y: number } | null; onClearPin?: () => void; nextPin?: number }) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [at, setAt] = useState('')
@@ -28,6 +28,10 @@ export default function ReviewForm({ token }: { token: string }) {
     fd.set('name', name)
     fd.set('at', at)
     fd.set('body', body)
+    if (pin) {
+      fd.set('pinX', String(pin.x))
+      fd.set('pinY', String(pin.y))
+    }
     try {
       const res = await submitFeedback(token, fd)
       if (!res.ok) {
@@ -38,6 +42,7 @@ export default function ReviewForm({ token }: { token: string }) {
         } catch {}
         setBody('')
         setAt('')
+        onClearPin?.()
         setMsg({ text: kind === 'approved' ? 'Thank you, approved.' : kind === 'changes_requested' ? 'Sent. The team will make the changes.' : 'Comment added.' })
         router.refresh()
       }
@@ -55,7 +60,13 @@ export default function ReviewForm({ token }: { token: string }) {
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" style={{ flex: 1, minWidth: 160 }} />
         <input value={at} onChange={(e) => setAt(e.target.value)} placeholder="Time in video, e.g. 0:42 (optional)" style={{ flex: 1, minWidth: 200 }} />
       </div>
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="What would you like to say or change?" style={{ width: '100%', resize: 'vertical' }} />
+      {pin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--accent)' }}>
+          <span>Pinned to the image{nextPin ? ` (pin ${nextPin})` : ''}</span>
+          <button type="button" onClick={onClearPin} style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, padding: 0, minHeight: 0 }}>Remove pin</button>
+        </div>
+      )}
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder={pin ? "What should change at this spot?" : "What would you like to say or change?"} style={{ width: '100%', resize: 'vertical' }} />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" onClick={() => send('comment')} disabled={busy}>Add comment</button>
         <button type="button" onClick={() => send('changes_requested')} disabled={busy} style={{ borderColor: 'var(--accent)' }}>Request changes</button>

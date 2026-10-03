@@ -4,6 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+// The open brand's tools, grouped so eleven items read as three.
+const GROUP_OF: Record<string, string> = {
+  Overview: '', Discovery: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand',
+  Projects: 'Work', Campaigns: 'Work', Ideas: 'Work', Calendar: 'Work', Tasks: 'Work',
+  Reviews: 'Clients', People: 'Clients',
+}
+const GROUPS = ['', 'Brand', 'Work', 'Clients']
+
 type SidebarBrand = { id: string; name: string; color: string; role?: string }
 
 export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
@@ -130,7 +138,16 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
               </Link>
               {isCurrent && brandItems.length > 0 && (
                 <div className="sidebar-sub" style={collapsed ? undefined : { marginLeft: 14, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
-                  {brandItems.map(renderLink)}
+                  {GROUPS.map((g) => {
+                    const items = brandItems.filter((i) => GROUP_OF[i.label] === g)
+                    if (items.length === 0) return null
+                    return (
+                      <div key={g || 'top'}>
+                        {g && !collapsed && <div className="sidebar-label" style={{ marginTop: 10, marginBottom: 2, fontSize: 10.5 }}>{g}</div>}
+                        {items.map(renderLink)}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

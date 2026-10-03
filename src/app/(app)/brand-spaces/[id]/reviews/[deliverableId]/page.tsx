@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import DeliverablePreview from '@/components/DeliverablePreview'
+import PinnableImage from '@/components/PinnableImage'
+import { getEmbed } from '@/lib/embed'
 import { REVIEW_STATUS, KIND_LABEL } from '../constants'
 import { postNewVersion, addTeamReply, resolveFeedback, resolveAllFeedback } from '../actions'
 import ReviewShare from '../ReviewShare'
@@ -20,6 +22,11 @@ export default async function DeliverablePage({ params }: { params: { id: string
     .findUnique({ where: { id: params.deliverableId }, include: { feedback: { orderBy: { createdAt: 'asc' } }, project: { select: { name: true } } } })
     .catch(() => null)
   if (!d || d.brandSpaceId !== params.id) notFound()
+
+  const isImage = getEmbed(d.url).kind === 'image'
+  const pinned = d.feedback.filter((f) => f.pinX != null && f.pinY != null && f.version === d.version && f.fromClient)
+  const pinNumber = new Map(pinned.map((f, i) => [f.id, i + 1]))
+  const pins = pinned.map((f, i) => ({ id: f.id, n: i + 1, x: f.pinX as number, y: f.pinY as number, resolved: f.resolved }))
 
   const openChanges = d.feedback.filter((f) => f.fromClient && f.kind === 'changes_requested' && !f.resolved).length
 
@@ -39,7 +46,7 @@ export default async function DeliverablePage({ params }: { params: { id: string
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 20, alignItems: 'start', marginBottom: 28 }}>
         <div>
-          <DeliverablePreview url={d.url} />
+          {isImage ? <PinnableImage src={d.url} pins={pins} /> : <DeliverablePreview url={d.url} />}
           {d.notes && <p style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', margin: '12px 0 0' }}>{d.notes}</p>}
         </div>
         <ReviewShare deliverableId={d.id} title={d.title} token={d.reviewToken} />
@@ -56,7 +63,7 @@ export default async function DeliverablePage({ params }: { params: { id: string
       <div style={{ marginBottom: 12 }}>
         {d.feedback.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>Nothing yet. When the client comments, it shows up here.</div>}
         {d.feedback.map((f) => (
-          <div key={f.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={f.id} id={`fb-${f.id}`} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 2 }}>
                 <span style={{ fontWeight: 600 }}>{f.authorName}</span>
@@ -64,6 +71,7 @@ export default async function DeliverablePage({ params }: { params: { id: string
                   {f.fromClient ? KIND_LABEL[f.kind] : 'Team'} · v{f.version} · {when(f.createdAt)}
                   {f.at ? ` · at ${f.at}` : ''}
                 </span>
+                {f.pinX != null && <span style={{ fontSize: 11.5, color: 'var(--accent)' }}>{pinNumber.has(f.id) ? `Pin ${pinNumber.get(f.id)}` : 'Pinned'}</span>}
               </div>
               {f.body && <div style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{f.body}</div>}
             </div>

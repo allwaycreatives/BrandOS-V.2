@@ -15,6 +15,11 @@ export async function submitFeedback(token: string, formData: FormData): Promise
   const name = String(formData.get('name') || '').trim().slice(0, 60)
   const body = String(formData.get('body') || '').trim().slice(0, 2000)
   const at = String(formData.get('at') || '').trim().slice(0, 20)
+  const rawX = formData.get('pinX')
+  const rawY = formData.get('pinY')
+  const px = Number(rawX)
+  const py = Number(rawY)
+  const hasPin = rawX !== null && rawY !== null && rawX !== '' && rawY !== '' && Number.isFinite(px) && Number.isFinite(py) && px >= 0 && px <= 100 && py >= 0 && py <= 100
   if (!name) return { ok: false, error: 'Please add your name so the team knows who this is from.' }
   if (kind !== 'approved' && !body) return { ok: false, error: 'Please write your comment first.' }
 
@@ -25,7 +30,7 @@ export async function submitFeedback(token: string, formData: FormData): Promise
   if (recent >= 30) return { ok: false, error: 'Too many messages just now. Please try again later.' }
 
   await db.deliverableFeedback.create({
-    data: { deliverableId: d.id, version: d.version, authorName: name, fromClient: true, kind, body, at: at || null },
+    data: { deliverableId: d.id, version: d.version, authorName: name, fromClient: true, kind, body, at: at || null, pinX: hasPin ? px : null, pinY: hasPin ? py : null },
   })
   if (kind === 'approved' || kind === 'changes_requested') {
     await db.deliverable.update({ where: { id: d.id }, data: { status: kind } })

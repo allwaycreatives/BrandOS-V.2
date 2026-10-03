@@ -361,6 +361,8 @@ model DeliverableFeedback {
   kind          String   // comment | changes_requested | approved
   body          String
   at            String?  // optional timestamp for video, like "0:42"
+  pinX          Float?   // where on an image proof the comment was pinned: % from the left
+  pinY          Float?   // % from the top
   resolved      Boolean  @default(false)
   createdAt     DateTime @default(now())
 

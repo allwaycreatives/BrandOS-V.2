@@ -5,6 +5,7 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { REVIEW_STATUS, KIND_LABEL } from './constants'
 import { createDeliverable } from './actions'
 import StyleSummary from './StyleSummary'
+import DeliverableUrlField from './DeliverableUrlField'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -42,7 +43,7 @@ export default async function ReviewsPage({ params }: { params: { id: string } }
         <input type="hidden" name="brandSpaceId" value={params.id} />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input name="title" required placeholder="What are you sending? e.g. Launch reel, cut 1" style={{ flex: 1, minWidth: 200 }} />
-          <input name="url" required placeholder="Link to it (YouTube, Drive, Frame.io, Dropbox...)" style={{ flex: 1, minWidth: 200 }} />
+          <DeliverableUrlField />
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input name="notes" placeholder="A note for the client (optional)" style={{ flex: 1, minWidth: 200 }} />

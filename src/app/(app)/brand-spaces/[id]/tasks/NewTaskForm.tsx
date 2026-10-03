@@ -64,45 +64,51 @@ export default function NewTaskForm({
   const createWithId = createTask.bind(null, brandSpaceId)
 
   return (
-    <form action={createWithId} className="card" style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <input name="title" required placeholder="What do you need? e.g. 'A title for our launch video'" />
-      <textarea name="description" rows={2} placeholder="Any extra detail (optional)" />
-
-      <div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Attach a file</div>
-        <input type="file" onChange={handleFileChange} disabled={uploading} style={{ fontSize: 12.5 }} />
-        {uploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
-        {uploadedUrl && !uploading && (
-          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {uploadedName} attached</div>
-        )}
-        {error && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{error}</div>}
+    <form action={createWithId} className="card" style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="qc-row">
+        <input name="title" required placeholder="What do you need? e.g. 'A title for our launch video'" className="qc-main" autoComplete="off" />
+        <button className="primary qc-go" type="submit" disabled={uploading || audioUploading}>Add task</button>
       </div>
 
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center' }}>— or —</div>
-      <input name="fileLinkFallback" placeholder="Paste a link instead, if that's easier" />
-      <input type="hidden" name="fileUrl" value={uploadedUrl} />
+      <details className="more-options">
+        <summary>More options: details, a file, or an assignee</summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+          <textarea name="description" rows={2} placeholder="Any extra detail (optional)" />
 
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
-          Video too big to transcribe? Attach just the audio here instead (optional)
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Attach a file</div>
+            <input type="file" onChange={handleFileChange} disabled={uploading} />
+            {uploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
+            {uploadedUrl && !uploading && (
+              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {uploadedName} attached</div>
+            )}
+            {error && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{error}</div>}
+          </div>
+
+          <input name="fileLinkFallback" placeholder="Or paste a link to the file instead" />
+          <input type="hidden" name="fileUrl" value={uploadedUrl} />
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              Large video? Attach just the audio instead so it can be transcribed (optional)
+            </div>
+            <input type="file" accept="audio/*" onChange={handleAudioFileChange} disabled={audioUploading} />
+            {audioUploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
+            {audioUploadedUrl && !audioUploading && (
+              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
+            )}
+            {audioError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{audioError}</div>}
+            <input type="hidden" name="audioUrl" value={audioUploadedUrl} />
+          </div>
+
+          <select name="assigneeUserId" defaultValue="" aria-label="Assign to">
+            <option value="">Unassigned</option>
+            {assigneeOptions.map((a) => (
+              <option key={a.id} value={a.id}>{a.label}</option>
+            ))}
+          </select>
         </div>
-        <input type="file" accept="audio/*" onChange={handleAudioFileChange} disabled={audioUploading} style={{ fontSize: 12.5 }} />
-        {audioUploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
-        {audioUploadedUrl && !audioUploading && (
-          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
-        )}
-        {audioError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{audioError}</div>}
-        <input type="hidden" name="audioUrl" value={audioUploadedUrl} />
-      </div>
-
-      <select name="assigneeUserId" defaultValue="">
-        <option value="">Unassigned</option>
-        {assigneeOptions.map((a) => (
-          <option key={a.id} value={a.id}>{a.label}</option>
-        ))}
-      </select>
-
-      <button className="primary" type="submit" disabled={uploading || audioUploading}>Add task</button>
+      </details>
     </form>
   )
 }
