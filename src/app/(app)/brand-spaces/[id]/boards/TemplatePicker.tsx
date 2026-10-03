@@ -23,7 +23,7 @@ export default function TemplatePicker({ brandSpaceId, templates }: { brandSpace
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
       {templates.map((t) => (
         <div key={t.key} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontWeight: 600 }}>{t.name}</div>

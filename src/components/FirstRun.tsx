@@ -90,7 +90,7 @@ export default function FirstRun({ templates }: { templates: TemplateItem[] }) {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 28, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 28, alignItems: 'start' }}>
         <div>
           {step === 0 && (
             <>

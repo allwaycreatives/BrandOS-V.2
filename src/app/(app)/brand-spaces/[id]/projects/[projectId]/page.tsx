@@ -67,7 +67,7 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
         </div>
       )}
 
-      <form action={updateProject.bind(null, project.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 26, alignItems: 'end' }}>
+      <form action={updateProject.bind(null, project.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10, marginBottom: 26, alignItems: 'end' }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
           Brief
           <input name="description" defaultValue={project.description ?? ''} placeholder="What is this project and what does done look like?" style={{ width: '100%', marginTop: 4 }} />
@@ -126,7 +126,7 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Boards</div>
       {boards.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12, marginBottom: 12 }}>
           {boards.map((b) => (
             <Link key={b.id} href={`/brand-spaces/${params.id}/boards/${b.id}`} className="card">
               <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{b.name}</div>

@@ -36,7 +36,7 @@ export default async function BrandProjectsPage({ params }: { params: { id: stri
       {projects.length === 0 ? (
         <div className="card-empty">No projects yet. Create one above.</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
           {projects.map((p) => (
             <ProjectCard key={p.id} project={p} brand={brand} progress={progress.get(p.id) ?? { total: 0, done: 0 }} />
           ))}

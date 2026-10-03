@@ -51,7 +51,7 @@ export default async function CampaignPage({ params }: { params: { id: string; c
         </div>
       </div>
 
-      <form action={update} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 24, alignItems: 'end' }}>
+      <form action={update} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10, marginBottom: 24, alignItems: 'end' }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
           Goal
           <input name="goal" defaultValue={campaign.goal ?? ''} placeholder="One measurable outcome, e.g. 500 new followers in 30 days" style={{ width: '100%', marginTop: 4 }} />
@@ -83,7 +83,7 @@ export default async function CampaignPage({ params }: { params: { id: string; c
         <div style={{ fontWeight: 600, fontSize: 14 }}>Content pipeline</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{items.length === 0 ? 'Nothing yet' : `${published} of ${items.length} published`}</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10, marginBottom: 12 }}>
         {STAGES.map((stage, si) => {
           const col = items.filter((i) => i.status === stage.key)
           return (

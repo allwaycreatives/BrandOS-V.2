@@ -77,7 +77,7 @@ export default async function BrandKitPage({ params }: { params: { id: string } 
             return (
               <div key={platform} style={{ marginTop: 28 }}>
                 <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 15 }}>{platform}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 10 }}>
                   {platformItems.map((item) => (
                     <OptionButton
                       key={item.id}

@@ -51,7 +51,7 @@ export default function BoardActions({ brandSpaceId, boardId, name, shareToken }
       <SaveTemplateButton kind="board" sourceId={boardId} defaultName={name} />
       <button type="button" className="primary" onClick={share} disabled={isPending}>Share</button>
       {open && (
-        <div className="card" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 320, zIndex: 20 }}>
+        <div className="card popover">
           <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>Share this board</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             Anyone with this link can view the board. They cannot edit it.

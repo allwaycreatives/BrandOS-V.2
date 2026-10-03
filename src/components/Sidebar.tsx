@@ -8,7 +8,24 @@ type SidebarBrand = { id: string; name: string; color: string; role?: string }
 
 export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsedPref, setCollapsed] = useState(false)
+  const [mobile, setMobile] = useState(false)
+  const [open, setOpen] = useState(false)
+  // On phones the sidebar is a drawer and always shows full labels.
+  const collapsed = collapsedPref && !mobile
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)')
+    const update = () => setMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  // Close the drawer whenever you go somewhere.
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed')
@@ -75,7 +92,10 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   }
 
   return (
-    <aside className="sidebar" style={{ width: collapsed ? 64 : 220 }}>
+    <>
+    <button type="button" className="mobile-menu-btn" aria-label="Open menu" onClick={() => setOpen(true)}>☰</button>
+    {open && <div className="sidebar-backdrop" onClick={() => setOpen(false)} />}
+    <aside className={`sidebar${open ? ' open' : ''}`} style={{ width: collapsed ? 64 : 220 }}>
       <div className="sidebar-brand" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
         <div className="logo-glow-wrap">
           <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 30, height: 30, objectFit: 'contain', flexShrink: 0 }} />
@@ -125,6 +145,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
 
       <button
         type="button"
+        className="sidebar-collapse-btn"
         onClick={toggleCollapsed}
         style={{
           margin: '0 6px 8px',
@@ -142,5 +163,6 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         {!collapsed && <span>by All Way Creatives</span>}
       </div>
     </aside>
+    </>
   )
 }

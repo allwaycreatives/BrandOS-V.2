@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter, Poppins } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import SplashScreen from '@/components/SplashScreen'
@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   title: 'BrandOS',
   description: 'The operating system for creators, brands, and the agencies serving them.',
   manifest: '/manifest.json',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0a0a0a',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

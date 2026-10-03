@@ -41,12 +41,23 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const dragState = useRef<DragState | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handlePointerDown(e: React.PointerEvent) {
     const target = e.target as HTMLElement
     if (target.closest('button, textarea, input, a')) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2) {
+      // Two fingers: pinch to zoom instead of dragging.
+      const [a, b] = Array.from(pointers.current.values())
+      pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
+      dragState.current = null
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      return
+    }
     const cardEl = target.closest('[data-card]') as HTMLElement | null
     if (cardEl && !readOnly) {
       dragState.current = { kind: 'card', id: cardEl.dataset.cardId as string, lastX: e.clientX, lastY: e.clientY, moved: false }
@@ -57,6 +68,16 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2 && pinchDist.current) {
+      const [a, b] = Array.from(pointers.current.values())
+      const d = Math.hypot(a.x - b.x, a.y - b.y)
+      if (d > 0) {
+        zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist.current)
+        pinchDist.current = d
+      }
+      return
+    }
     const drag = dragState.current
     if (!drag) return
     const dx = e.clientX - drag.lastX
@@ -71,7 +92,15 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     drag.lastY = e.clientY
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId)
+    if (pointers.current.size < 2) pinchDist.current = null
+    if (pointers.current.size === 1 && !dragState.current) {
+      // One finger left after a pinch: carry on as a pan, without a jump.
+      const [p] = Array.from(pointers.current.values())
+      dragState.current = { kind: 'pan', lastX: p.x, lastY: p.y }
+      return
+    }
     const drag = dragState.current
     if (drag?.kind === 'card' && drag.moved) {
       const card = cards.find((c) => c.id === drag.id)
@@ -203,7 +232,7 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
       </div>
 
       {!readOnly && (
-        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 5, display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10 }}>
+        <div className="canvas-tools">
           {tools.map((t) => (
             <button key={t.label} type="button" onClick={t.run} disabled={busy} title={`Add ${t.label.toLowerCase()}`} style={{ width: 54, padding: '7px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', background: 'transparent' }}>
               <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden="true">{t.glyph}</span>
@@ -216,10 +245,12 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
 
       <div
         ref={containerRef}
+        className="canvas-box"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{ position: 'relative', width: '100%', height: 'calc(100vh - 220px)', minHeight: 480, border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: 'grab', touchAction: 'none' }}
+        onPointerCancel={handlePointerUp}
+        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: 'grab', touchAction: 'none' }}
       >
         <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.09) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
           {cards.map((card) => {
@@ -283,7 +314,7 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
         )}
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
-        Scroll to zoom · drag empty space to move around{readOnly ? '' : ' · drag a card to move it · double-click to edit'}
+        Scroll or pinch to zoom · drag empty space to move around{readOnly ? '' : ' · drag a card to move it · double-click to edit'}
       </div>
     </div>
   )

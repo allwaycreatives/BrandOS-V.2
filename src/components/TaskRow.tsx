@@ -22,6 +22,7 @@ export default function TaskRow({
   return (
     <Link
       href={`/brand-spaces/${brand.id}/tasks`}
+      className="task-row"
       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}
     >
       <span style={{ width: 9, height: 9, borderRadius: '50%', background: brand.color, flexShrink: 0 }} />

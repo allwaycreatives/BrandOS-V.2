@@ -36,7 +36,7 @@ export default async function BrandCampaignsPage({ params }: { params: { id: str
       {campaigns.length === 0 ? (
         <div className="card-empty">No campaigns yet. Create one above, or start from the Campaign plan template on the Boards page.</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
           {campaigns.map((c) => (
             <CampaignCard key={c.id} campaign={c} brand={brand} progress={progress.get(c.id) ?? { total: 0, published: 0 }} />
           ))}

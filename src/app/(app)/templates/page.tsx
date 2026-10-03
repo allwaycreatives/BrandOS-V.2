@@ -40,7 +40,7 @@ export default async function TemplatesPage() {
         return (
           <div key={g.kind} style={{ marginBottom: 28 }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{g.title} · {list.length}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
               {list.map((t) => (
                 <div key={t.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16 }}>{t.name}</div>

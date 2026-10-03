@@ -49,7 +49,7 @@ export default async function BoardsListPage({ params }: { params: { id: string 
         </form>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
         {boards.length === 0 && !canEdit && <div className="card-empty">No boards have been shared here yet.</div>}
         {boards.map((board) => (
           <Link key={board.id} href={`/brand-spaces/${params.id}/boards/${board.id}`} className="card" style={{ position: 'relative', paddingTop: 34 }}>

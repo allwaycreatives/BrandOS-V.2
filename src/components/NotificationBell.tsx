@@ -26,7 +26,7 @@ export default function NotificationBell({ items, unread }: { items: Item[]; unr
       </button>
 
       {open && (
-        <div className="card" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 340, maxHeight: 420, overflowY: 'auto', zIndex: 30, padding: 0 }}>
+        <div className="card notif-dropdown">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontWeight: 600, fontSize: 13 }}>Updates</span>
             {unread > 0 && (

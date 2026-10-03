@@ -50,7 +50,7 @@ export default async function SharedBrandPage({ params }: { params: { token: str
       {kits.length > 0 && (
         <section style={{ marginBottom: 26 }}>
           <h2 style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 600, margin: '0 0 12px' }}>Platforms</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
             {kits.map((k, i) => (
               <div key={i} className="card">
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>{k.platform}</div>

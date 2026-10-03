@@ -37,7 +37,7 @@ export default async function DeliverablePage({ params }: { params: { id: string
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, alignItems: 'start', marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 20, alignItems: 'start', marginBottom: 28 }}>
         <div>
           <DeliverablePreview url={d.url} />
           {d.notes && <p style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', margin: '12px 0 0' }}>{d.notes}</p>}

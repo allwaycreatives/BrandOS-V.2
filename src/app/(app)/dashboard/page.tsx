@@ -85,7 +85,7 @@ export default async function HomePage() {
       {!isClientOnly && brands.length === 0 && <FirstRun templates={TEMPLATE_LIST} />}
 
       {!isClientOnly && brands.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12, marginBottom: 28 }}>
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13.5 }}>New task</div>
             <form action={quickCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -195,7 +195,7 @@ export default async function HomePage() {
             <div style={{ fontWeight: 600, fontSize: 14 }}>Projects</div>
             <Link href="/projects" style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>See all</Link>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
             {activeProjects.map((p) => (
               <ProjectCard key={p.id} project={p} brand={brandById.get(p.brandSpaceId)!} progress={projectProgress.get(p.id) ?? { total: 0, done: 0 }} />
             ))}
@@ -209,7 +209,7 @@ export default async function HomePage() {
             <div style={{ fontWeight: 600, fontSize: 14 }}>Campaigns</div>
             <Link href="/campaigns" style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>See all</Link>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
             {activeCampaigns.map((c) => (
               <CampaignCard key={c.id} campaign={c} brand={brandById.get(c.brandSpaceId)!} progress={campaignProgress.get(c.id) ?? { total: 0, published: 0 }} />
             ))}
@@ -220,7 +220,7 @@ export default async function HomePage() {
       {brands.length > 0 && (
         <div>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>{isClientOnly ? 'Your brand' : 'Your brands'}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
             {brands.map((b) => {
               const open = openByBrand.get(b.id) ?? 0
               return (

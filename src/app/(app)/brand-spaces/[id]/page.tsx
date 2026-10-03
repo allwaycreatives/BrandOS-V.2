@@ -77,7 +77,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         </div>
       )}
       {(audience || style) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           {audience && (
             <div>
               <div style={label}>Audience</div>
@@ -247,7 +247,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
       {brandSummaryCard}
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Work</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 12, marginBottom: 32 }}>
         <Tile href={`${base}/tasks`} label="Tasks" value={openTasks} caption={overdueTasks.length > 0 ? `${overdueTasks.length}+ overdue` : 'open'} hot={overdueTasks.length > 0} />
         <Tile href={`${base}/campaigns`} label="Campaigns" value={activeCampaigns} caption="active" />
         <Tile href={`${base}/projects`} label="Projects" value={activeProjects} caption="in progress" />
@@ -261,7 +261,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
       {showTeam && (
         <>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Team &amp; sharing</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
             {canInvite && (
               <div className="card">
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Invite someone</div>

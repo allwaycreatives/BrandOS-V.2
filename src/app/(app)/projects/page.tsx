@@ -41,7 +41,7 @@ export default async function AllProjectsPage() {
         return (
           <div key={stage.key} style={{ marginBottom: 26 }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{stage.label} · {list.length}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
               {list.map((p) => (
                 <ProjectCard key={p.id} project={p} brand={brandById.get(p.brandSpaceId)!} progress={progress.get(p.id) ?? { total: 0, done: 0 }} />
               ))}

@@ -43,7 +43,7 @@ export default async function AllCampaignsPage() {
         return (
           <div key={status} style={{ marginBottom: 26 }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{HEADING[status]} · {list.length}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12 }}>
               {list.map((c) => (
                 <CampaignCard key={c.id} campaign={c} brand={brandById.get(c.brandSpaceId)!} progress={progress.get(c.id) ?? { total: 0, published: 0 }} />
               ))}

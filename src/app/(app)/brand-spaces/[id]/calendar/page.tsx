@@ -42,7 +42,7 @@ export default async function CalendarPage({ params }: { params: { id: string } 
         </form>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 12, overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(min(100%, 180px), 1fr))', gap: 12, overflowX: 'auto' }}>
         {COLUMNS.map((col, colIndex) => {
           const colItems = items.filter((i) => i.status === col.key)
           return (
