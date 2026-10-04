@@ -64,8 +64,22 @@ export default async function HomePage() {
   const brandById = new Map(brands.map((b) => [b.id, b]))
   const totalOpen = openCounts.reduce((n, c) => n + c._count._all, 0)
 
+  // For clients: the work waiting on them, one tap from the review page.
+  const waitingOnYou = isClientOnly
+    ? await db.deliverable
+        .findMany({
+          where: { brandSpaceId: { in: brands.map((b) => b.id) }, status: 'in_review', reviewToken: { not: null } },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+          select: { id: true, title: true, version: true, reviewToken: true, brandSpaceId: true },
+        })
+        .catch(() => [])
+    : []
+
   const sub = isClientOnly
-    ? "What we're working on together."
+    ? waitingOnYou.length > 0
+    ? `${waitingOnYou.length} ${waitingOnYou.length === 1 ? 'item is' : 'items are'} waiting for your feedback.`
+    : "What we're working on together."
     : brands.length === 0
     ? "Let's set up your first brand."
     : dueSoon.length > 0
@@ -112,7 +126,7 @@ export default async function HomePage() {
               <Link key={r.id} href={`/brand-spaces/${r.brandSpaceId}/reviews/${r.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
                 {b && <span style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />}
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                <span style={{ fontSize: 11.5, color: changes ? 'var(--accent)' : 'var(--text-muted)' }}>{changes ? 'Changes requested' : 'Waiting on client'}</span>
+                <span style={{ fontSize: 11.5, color: changes ? 'var(--accent-text)' : 'var(--text-muted)' }}>{changes ? 'Changes requested' : 'Waiting on client'}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--text-muted)', minWidth: 70, textAlign: 'right' }}>{b?.name}</span>
               </Link>
             )
@@ -145,6 +159,22 @@ export default async function HomePage() {
               <CampaignCard key={c.id} campaign={c} brand={brandById.get(c.brandSpaceId)!} progress={campaignProgress.get(c.id) ?? { total: 0, published: 0 }} />
             ))}
           </div>
+        </div>
+      )}
+
+      {isClientOnly && waitingOnYou.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Waiting for your feedback</div>
+          {waitingOnYou.map((d) => (
+            <Link key={d.id} href={`/review/${d.reviewToken}`} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: brandById.get(d.brandSpaceId)?.color, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 600 }}>{d.title}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brandById.get(d.brandSpaceId)?.name} · version {d.version}</span>
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--accent-text)', fontWeight: 600 }}>Review →</span>
+            </Link>
+          ))}
         </div>
       )}
 

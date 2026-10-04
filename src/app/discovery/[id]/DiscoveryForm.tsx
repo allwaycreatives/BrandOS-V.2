@@ -229,7 +229,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
                   textAlign: 'left',
                   borderColor: selected ? 'var(--accent)' : undefined,
                   background: selected ? 'var(--accent-dim)' : undefined,
-                  color: selected ? 'var(--accent)' : undefined,
+                  color: selected ? 'var(--accent-text)' : undefined,
                 }}
               >
                 {option}
@@ -253,7 +253,7 @@ export default function DiscoveryForm({ brandSpaceId }: { brandSpaceId: string }
                   borderRadius: 999,
                   borderColor: selected ? 'var(--accent)' : undefined,
                   background: selected ? 'var(--accent-dim)' : undefined,
-                  color: selected ? 'var(--accent)' : undefined,
+                  color: selected ? 'var(--accent-text)' : undefined,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 6,

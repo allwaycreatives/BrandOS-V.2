@@ -135,7 +135,7 @@ export default function FirstRun({ templates }: { templates: TemplateItem[] }) {
                       <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid var(--border-strong)', background: on ? 'var(--accent)' : 'transparent', flexShrink: 0, marginTop: 1 }} />
                       <span>
                         <span style={{ fontWeight: 600, fontSize: 13.5 }}>{t.name}</span>
-                        {rec && <span style={{ fontSize: 11, color: 'var(--accent)', marginLeft: 8 }}>Recommended</span>}
+                        {rec && <span style={{ fontSize: 11, color: 'var(--accent-text)', marginLeft: 8 }}>Recommended</span>}
                         <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{t.description}</span>
                       </span>
                     </button>

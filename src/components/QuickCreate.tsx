@@ -58,7 +58,7 @@ export default function QuickCreate({ brands }: { brands: Brand[] }) {
               borderRadius: 999,
               background: tab === t.key ? 'var(--accent-dim)' : 'transparent',
               borderColor: tab === t.key ? 'var(--accent)' : 'var(--border-strong)',
-              color: tab === t.key ? 'var(--accent)' : 'var(--text-secondary)',
+              color: tab === t.key ? 'var(--accent-text)' : 'var(--text-secondary)',
               fontWeight: tab === t.key ? 600 : 400,
             }}
           >

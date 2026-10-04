@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import ThemeToggle from '@/components/ThemeToggle'
 import { db } from '@/lib/db'
 import BriefForm from './BriefForm'
 
@@ -11,6 +12,7 @@ export default async function BriefPage({ params }: { params: { token: string } 
 
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '40px 16px 60px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Brief</div>
       <h1 style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 600, margin: '0 0 8px' }}>Send a brief to {brand.name}</h1>
       <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 22px' }}>

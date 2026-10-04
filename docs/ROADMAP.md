@@ -19,6 +19,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Brief intake: a public form link per brand; a client's brief becomes a project in Brief stage with the brief attached, a first task and a notification
 - Pinned comments on image proofs: clients click the exact spot, pins are numbered and match the thread; teams can upload image proofs (up to 15 MB) or paste a link
 - Sidebar grouped into Brand / Work / Clients under the open brand; Tasks form tucked into 'More options'
+- Light and dark mode (toggle in the top bar and on client pages, remembered per device, dark by default); thin, quiet scrollbars; logo glow removed
+- Clients' home lists what is waiting for their feedback, one tap from the review page
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -58,3 +60,9 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Brief intake: custom questions per brand, file links, moving a brief from an 'inquiries' brand into a real client brand
 - Client-facing white-label (agency logo and colors on share and review pages): likely a paid-plan feature
 - Retainer packages / quotas
+
+## Theme notes for the developer
+- Colors are CSS variables in `src/app/globals.css` (`:root` for dark, `:root[data-theme="light"]` for light). Use `--accent` for fills and `--accent-text` for accent-coloured text (it is darker in light mode so it stays readable).
+- Clerk's own pop-ups (avatar menu, sign-in pages) do not follow the theme yet; they need Clerk's `appearance` setting.
+- Board paper cards stay white in both themes on purpose.
+- Default is dark; to follow the device setting instead, change THEME_SCRIPT in `src/app/layout.tsx`.

@@ -35,7 +35,7 @@ export default function DeliverableUrlField() {
         <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Uploading...' : 'Upload image'}</button>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
       </div>
-      {err && <span style={{ fontSize: 12, color: 'var(--accent)' }}>{err}</span>}
+      {err && <span style={{ fontSize: 12, color: 'var(--accent-text)' }}>{err}</span>}
     </div>
   )
 }

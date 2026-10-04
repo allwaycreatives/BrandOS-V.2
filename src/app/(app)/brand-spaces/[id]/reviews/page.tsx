@@ -63,7 +63,7 @@ export default async function ReviewsPage({ params }: { params: { id: string } }
         <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{deliverables.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Deliverables</div></div>
         <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{approved.length}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Approved</div></div>
         <div className="card"><div style={{ fontSize: 22, fontWeight: 600 }}>{avgRounds}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Avg versions to approval</div></div>
-        <div className="card"><div style={{ fontSize: 22, fontWeight: 600, color: openChanges ? 'var(--accent)' : undefined }}>{openChanges}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Changes to address</div></div>
+        <div className="card"><div style={{ fontSize: 22, fontWeight: 600, color: openChanges ? 'var(--accent-text)' : undefined }}>{openChanges}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Changes to address</div></div>
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Deliverables</div>
@@ -78,7 +78,7 @@ export default async function ReviewsPage({ params }: { params: { id: string } }
                 {d.project && <span style={{ fontSize: 11.5, color: 'var(--text-muted)', marginLeft: 8 }}>{d.project.name}</span>}
               </span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>v{d.version}</span>
-              <span style={{ fontSize: 12, color: d.status === 'changes_requested' ? 'var(--accent)' : 'var(--text-secondary)', minWidth: 120, textAlign: 'right' }}>
+              <span style={{ fontSize: 12, color: d.status === 'changes_requested' ? 'var(--accent-text)' : 'var(--text-secondary)', minWidth: 120, textAlign: 'right' }}>
                 {REVIEW_STATUS[d.status] ?? d.status}
                 {open > 0 ? ` · ${open}` : ''}
               </span>
@@ -94,7 +94,7 @@ export default async function ReviewsPage({ params }: { params: { id: string } }
           {recent.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No feedback yet.</div>}
           {recent.map((f) => (
             <Link key={f.id} href={`/brand-spaces/${params.id}/reviews/${f.deliverableId}`} style={{ display: 'block', padding: '9px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
-              <div style={{ fontSize: 11.5, color: f.kind === 'changes_requested' && !f.resolved ? 'var(--accent)' : 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11.5, color: f.kind === 'changes_requested' && !f.resolved ? 'var(--accent-text)' : 'var(--text-muted)' }}>
                 {f.authorName} · {KIND_LABEL[f.kind]} · {f.title} · {when(f.createdAt)}
               </div>
               {f.body && <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>{f.body.length > 140 ? `${f.body.slice(0, 140)}…` : f.body}</div>}

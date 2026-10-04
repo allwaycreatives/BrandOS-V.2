@@ -252,7 +252,7 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
         onPointerCancel={handlePointerUp}
         style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: 'grab', touchAction: 'none' }}
       >
-        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.09) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
           {cards.map((card) => {
             const editing = editingId === card.id
             const common: React.CSSProperties = { position: 'absolute', left: card.positionX, top: card.positionY, width: WIDTH[card.type] ?? 210, cursor: readOnly ? 'default' : 'move' }

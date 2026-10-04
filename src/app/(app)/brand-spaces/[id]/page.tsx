@@ -28,7 +28,7 @@ function Tile({ href, label, value, caption, hot }: { href: string; label: strin
   return (
     <Link href={href} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '14px 16px' }}>
       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.15, color: hot ? 'var(--accent)' : undefined }}>{value}</span>
+      <span style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.15, color: hot ? 'var(--accent-text)' : undefined }}>{value}</span>
       <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{caption}</span>
     </Link>
   )
@@ -61,7 +61,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
 
   const brandSummaryCard = latestResponse ? (
     <div className="card" style={{ marginBottom: 28, padding: '22px 24px' }}>
-      <div style={{ ...label, color: 'var(--accent)', fontWeight: 600, marginBottom: 12 }}>Brand identity</div>
+      <div style={{ ...label, color: 'var(--accent-text)', fontWeight: 600, marginBottom: 12 }}>Brand identity</div>
       {knownFor && (
         <div style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.3, fontWeight: 600, marginBottom: 14 }}>
           <ClampText text={knownFor} limit={170} />
@@ -98,7 +98,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
       )}
       {role === 'agency' && (
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 16, fontSize: 12.5 }}>
-          <Link href={`/brand-spaces/${params.id}/discovery`} style={{ color: 'var(--accent)' }}>
+          <Link href={`/brand-spaces/${params.id}/discovery`} style={{ color: 'var(--accent-text)' }}>
             View full discovery →
           </Link>
           <Link href={`/brand-spaces/${params.id}/discovery/template`} style={{ color: 'var(--text-secondary)' }}>
@@ -237,7 +237,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Needs attention</div>
           {attention.map((a) => (
             <Link key={a.key} href={a.href} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--accent)', minWidth: 110 }}>{a.tag}</span>
+              <span style={{ fontSize: 11.5, color: 'var(--accent-text)', minWidth: 110 }}>{a.tag}</span>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
             </Link>
           ))}

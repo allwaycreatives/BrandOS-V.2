@@ -61,7 +61,7 @@ export default function ReviewForm({ token, pin, onClearPin, nextPin }: { token:
         <input value={at} onChange={(e) => setAt(e.target.value)} placeholder="Time in video, e.g. 0:42 (optional)" style={{ flex: 1, minWidth: 200 }} />
       </div>
       {pin && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--accent)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--accent-text)' }}>
           <span>Pinned to the image{nextPin ? ` (pin ${nextPin})` : ''}</span>
           <button type="button" onClick={onClearPin} style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, padding: 0, minHeight: 0 }}>Remove pin</button>
         </div>
@@ -72,7 +72,7 @@ export default function ReviewForm({ token, pin, onClearPin, nextPin }: { token:
         <button type="button" onClick={() => send('changes_requested')} disabled={busy} style={{ borderColor: 'var(--accent)' }}>Request changes</button>
         <button type="button" className="primary" onClick={() => send('approved')} disabled={busy}>Approve</button>
       </div>
-      {msg && <div style={{ fontSize: 12.5, color: msg.bad ? 'var(--accent)' : 'var(--text-secondary)' }}>{msg.text}</div>}
+      {msg && <div style={{ fontSize: 12.5, color: msg.bad ? 'var(--accent-text)' : 'var(--text-secondary)' }}>{msg.text}</div>}
     </div>
   )
 }

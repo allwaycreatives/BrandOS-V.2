@@ -29,7 +29,7 @@ export default function TaskRow({
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
       <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{STATUS_LABEL[status] ?? status}</span>
       {dueDate && (
-        <span style={{ fontSize: 11.5, color: overdue ? 'var(--accent)' : 'var(--text-secondary)', minWidth: 48, textAlign: 'right' }}>
+        <span style={{ fontSize: 11.5, color: overdue ? 'var(--accent-text)' : 'var(--text-secondary)', minWidth: 48, textAlign: 'right' }}>
           {formatDue(dueDate)}
         </span>
       )}

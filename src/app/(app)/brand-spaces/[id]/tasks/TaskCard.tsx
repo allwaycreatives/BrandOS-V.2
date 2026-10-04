@@ -107,7 +107,7 @@ export default function TaskCard({
       <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
         {task.assignee && <span>Assigned to {task.assignee.name || task.assignee.email}</span>}
         {task.fileUrl && (
-          <a href={task.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+          <a href={task.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)' }}>
             View file
           </a>
         )}
@@ -131,7 +131,7 @@ export default function TaskCard({
 
       {task.aiFeedback && (
         <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid #5c3f1a' }}>
-          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--accent-text)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
             AI feedback on the hook & structure
           </div>
           <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{task.aiFeedback}</div>
@@ -154,13 +154,13 @@ export default function TaskCard({
 
       {clips.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--accent-text)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 8 }}>
             Suggested clips
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {clips.map((clip, i) => (
               <div key={i} style={{ padding: 10, borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid #5c3f1a' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-text)', marginBottom: 4 }}>
                   {clip.startTime} – {clip.endTime}
                 </div>
                 <div style={{ fontSize: 12.5, marginBottom: 4 }}>{clip.reason}</div>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import ThemeToggle from '@/components/ThemeToggle'
 import { db } from '@/lib/db'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
@@ -35,6 +36,7 @@ export default async function SharedBrandPage({ params }: { params: { token: str
 
   return (
     <main style={{ maxWidth: 760, margin: '0 auto', padding: '40px 16px 60px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Brand guide</div>
       <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 600, margin: '0 0 28px' }}>{brand.name}</h1>
 
@@ -66,7 +68,7 @@ export default async function SharedBrandPage({ params }: { params: { token: str
       )}
 
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 40 }}>
-        View only · Made with <Link href="/" style={{ color: 'var(--accent)' }}>Brand OS</Link>
+        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand OS</Link>
       </div>
     </main>
   )

@@ -70,7 +70,7 @@ export default function BriefForm({ token, brandName }: { token: string; brandNa
       <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0 }} />
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="primary" type="submit" disabled={busy}>{busy ? 'Sending...' : 'Send brief'}</button>
-        {error && <span style={{ fontSize: 12.5, color: 'var(--accent)' }}>{error}</span>}
+        {error && <span style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>{error}</span>}
       </div>
     </form>
   )

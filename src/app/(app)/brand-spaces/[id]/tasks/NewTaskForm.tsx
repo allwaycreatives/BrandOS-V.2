@@ -80,7 +80,7 @@ export default function NewTaskForm({
             <input type="file" onChange={handleFileChange} disabled={uploading} />
             {uploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
             {uploadedUrl && !uploading && (
-              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {uploadedName} attached</div>
+              <div style={{ fontSize: 12, color: 'var(--accent-text)', marginTop: 6 }}>✓ {uploadedName} attached</div>
             )}
             {error && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{error}</div>}
           </div>
@@ -95,7 +95,7 @@ export default function NewTaskForm({
             <input type="file" accept="audio/*" onChange={handleAudioFileChange} disabled={audioUploading} />
             {audioUploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
             {audioUploadedUrl && !audioUploading && (
-              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
+              <div style={{ fontSize: 12, color: 'var(--accent-text)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
             )}
             {audioError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{audioError}</div>}
             <input type="hidden" name="audioUrl" value={audioUploadedUrl} />

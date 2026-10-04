@@ -26,8 +26,8 @@ export default function SaveTemplateButton({ kind, sourceId, defaultName }: { ki
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
       <button type="button" onClick={save} disabled={isPending}>{isPending ? 'Saving...' : 'Save as template'}</button>
       {msg && (
-        <span style={{ fontSize: 12, color: msg.ok ? 'var(--text-secondary)' : 'var(--accent)' }}>
-          {msg.text} {msg.ok && <Link href="/templates" style={{ color: 'var(--accent)' }}>See templates</Link>}
+        <span style={{ fontSize: 12, color: msg.ok ? 'var(--text-secondary)' : 'var(--accent-text)' }}>
+          {msg.text} {msg.ok && <Link href="/templates" style={{ color: 'var(--accent-text)' }}>See templates</Link>}
         </span>
       )}
     </span>

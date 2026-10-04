@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import ThemeToggle from '@/components/ThemeToggle'
 import { db } from '@/lib/db'
 import DeliverablePreview from '@/components/DeliverablePreview'
 import ReviewWorkspace from './ReviewWorkspace'
@@ -23,6 +24,7 @@ export default async function ReviewPage({ params }: { params: { token: string }
 
   return (
     <main style={{ maxWidth: 760, margin: '0 auto', padding: '32px 16px 60px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>For review · {d.brandSpace.name}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <h1 style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 600, margin: 0 }}>{d.title}</h1>
@@ -43,8 +45,8 @@ export default async function ReviewPage({ params }: { params: { token: string }
                     {f.fromClient ? KIND_LABEL[f.kind] : 'Team'} · v{f.version} · {when(f.createdAt)}
                     {f.at ? ` · at ${f.at}` : ''}
                   </span>
-                  {f.pinX != null && <span style={{ fontSize: 11.5, color: 'var(--accent)' }}>{pinNumber.has(f.id) ? `Pin ${pinNumber.get(f.id)}` : 'Pinned'}</span>}
-                  {f.fromClient && f.kind === 'changes_requested' && f.resolved && <span style={{ fontSize: 11.5, color: 'var(--accent)' }}>Addressed</span>}
+                  {f.pinX != null && <span style={{ fontSize: 11.5, color: 'var(--accent-text)' }}>{pinNumber.has(f.id) ? `Pin ${pinNumber.get(f.id)}` : 'Pinned'}</span>}
+                  {f.fromClient && f.kind === 'changes_requested' && f.resolved && <span style={{ fontSize: 11.5, color: 'var(--accent-text)' }}>Addressed</span>}
                 </div>
                 {f.body && <div style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{f.body}</div>}
               </div>

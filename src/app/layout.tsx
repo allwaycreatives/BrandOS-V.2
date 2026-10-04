@@ -22,10 +22,16 @@ export const viewport: Viewport = {
   themeColor: '#0a0a0a',
 }
 
+// Sets the saved theme before the page paints, so there is no flash. Dark unless you chose light.
+const THEME_SCRIPT = "(function(){try{var t=localStorage.getItem('brandos-theme');if(t!=='light'&&t!=='dark'){t='dark'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}})()"
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" afterSignInUrl="/dashboard" afterSignUpUrl="/dashboard">
-      <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
+      <html lang="en" className={`${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        </head>
         <body>
           <ServiceWorkerRegister />
           <OfflineSyncManager />

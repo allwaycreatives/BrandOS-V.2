@@ -49,7 +49,7 @@ export default async function DiscoverySummaryPage({ params }: { params: { id: s
             return (
               <div key={q.id} className="card">
                 {q.section && (
-                  <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 4 }}>{q.section}</div>
+                  <div style={{ fontSize: 10, color: 'var(--accent-text)', marginBottom: 4 }}>{q.section}</div>
                 )}
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
                   {q.prompt}

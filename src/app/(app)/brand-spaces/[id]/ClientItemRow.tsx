@@ -55,7 +55,7 @@ export default function ClientItemRow({
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{statusLabel}</span>
-          <span style={{ fontSize: 11, color: 'var(--accent)' }}>{expanded ? 'Hide' : 'Show more'}</span>
+          <span style={{ fontSize: 11, color: 'var(--accent-text)' }}>{expanded ? 'Hide' : 'Show more'}</span>
         </span>
       </div>
 

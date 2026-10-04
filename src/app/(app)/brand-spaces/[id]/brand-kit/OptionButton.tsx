@@ -39,7 +39,7 @@ export default function OptionButton({
       onClick={() => startTransition(() => selectBrandKitItem(brandSpaceId, itemId, platform))}
     >
       {isSelected && (
-        <span style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+        <span style={{ color: 'var(--accent-text)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
           SELECTED
         </span>
       )}

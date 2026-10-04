@@ -35,7 +35,7 @@ export default function CopyBoardButton({ token, brands }: { token: string; bran
       <button type="button" className="primary" onClick={copy} disabled={isPending}>
         {isPending ? 'Copying...' : brands.length === 1 ? `Copy to ${brands[0].name}` : 'Copy to my workspace'}
       </button>
-      {error && <span style={{ fontSize: 12.5, color: 'var(--accent)' }}>{error}</span>}
+      {error && <span style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>{error}</span>}
     </div>
   )
 }

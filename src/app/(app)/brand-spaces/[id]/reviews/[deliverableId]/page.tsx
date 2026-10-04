@@ -38,7 +38,7 @@ export default async function DeliverablePage({ params }: { params: { id: string
 
       <div style={{ marginTop: 8, marginBottom: 16, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h1 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, margin: 0 }}>{d.title}</h1>
-        <div style={{ fontSize: 12.5, color: d.status === 'changes_requested' ? 'var(--accent)' : 'var(--text-secondary)' }}>
+        <div style={{ fontSize: 12.5, color: d.status === 'changes_requested' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
           Version {d.version} · {REVIEW_STATUS[d.status] ?? d.status}
           {d.project ? ` · ${d.project.name}` : ''}
         </div>
@@ -67,11 +67,11 @@ export default async function DeliverablePage({ params }: { params: { id: string
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 2 }}>
                 <span style={{ fontWeight: 600 }}>{f.authorName}</span>
-                <span style={{ fontSize: 11.5, color: f.kind === 'changes_requested' && f.fromClient && !f.resolved ? 'var(--accent)' : 'var(--text-muted)' }}>
+                <span style={{ fontSize: 11.5, color: f.kind === 'changes_requested' && f.fromClient && !f.resolved ? 'var(--accent-text)' : 'var(--text-muted)' }}>
                   {f.fromClient ? KIND_LABEL[f.kind] : 'Team'} · v{f.version} · {when(f.createdAt)}
                   {f.at ? ` · at ${f.at}` : ''}
                 </span>
-                {f.pinX != null && <span style={{ fontSize: 11.5, color: 'var(--accent)' }}>{pinNumber.has(f.id) ? `Pin ${pinNumber.get(f.id)}` : 'Pinned'}</span>}
+                {f.pinX != null && <span style={{ fontSize: 11.5, color: 'var(--accent-text)' }}>{pinNumber.has(f.id) ? `Pin ${pinNumber.get(f.id)}` : 'Pinned'}</span>}
               </div>
               {f.body && <div style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{f.body}</div>}
             </div>

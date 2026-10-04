@@ -42,7 +42,7 @@ export default function NotificationBell({ items, unread }: { items: Item[]; unr
                 setOpen(false)
                 markRead(n.id).then(() => router.refresh())
               }}
-              style={{ display: 'block', padding: '10px 14px', borderBottom: '1px solid var(--border)', background: n.read ? 'transparent' : 'rgba(255,255,255,0.03)' }}
+              style={{ display: 'block', padding: '10px 14px', borderBottom: '1px solid var(--border)', background: n.read ? 'transparent' : 'var(--hover-bg)' }}
             >
               <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
               {n.body && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{n.body}</div>}

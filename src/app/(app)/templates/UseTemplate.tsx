@@ -39,7 +39,7 @@ export default function UseTemplate({ templateId, brands }: { templateId: string
         {isPending ? 'Working...' : brands.length === 1 ? `Use for ${brands[0].name}` : 'Use it'}
       </button>
       <button type="button" onClick={remove} disabled={isPending} style={{ marginLeft: 'auto', fontSize: 12 }}>Delete</button>
-      {error && <span style={{ fontSize: 12.5, color: 'var(--accent)' }}>{error}</span>}
+      {error && <span style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>{error}</span>}
     </div>
   )
 }

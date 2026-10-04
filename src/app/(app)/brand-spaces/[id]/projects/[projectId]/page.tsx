@@ -112,7 +112,7 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
         {deliverables.map((dl) => (
           <Link key={dl.id} href={`/brand-spaces/${params.id}/reviews/${dl.id}`} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
             <span style={{ flex: 1 }}>{dl.title}</span>
-            <span style={{ fontSize: 12, color: dl.status === 'changes_requested' ? 'var(--accent)' : 'var(--text-secondary)' }}>v{dl.version} · {REVIEW_STATUS[dl.status] ?? dl.status}</span>
+            <span style={{ fontSize: 12, color: dl.status === 'changes_requested' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>v{dl.version} · {REVIEW_STATUS[dl.status] ?? dl.status}</span>
           </Link>
         ))}
       </div>

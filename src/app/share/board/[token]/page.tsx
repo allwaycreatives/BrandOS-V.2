@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import ThemeToggle from '@/components/ThemeToggle'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
@@ -26,6 +27,7 @@ export default async function SharedBoardPage({ params }: { params: { token: str
 
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
         <h1 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, margin: 0 }}>{board.name}</h1>
         {userId ? (
@@ -38,7 +40,7 @@ export default async function SharedBoardPage({ params }: { params: { token: str
         )}
       </div>
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-        View only · Made with <Link href="/" style={{ color: 'var(--accent)' }}>Brand OS</Link>. Copy it to make it your own.
+        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand OS</Link>. Copy it to make it your own.
       </div>
       <BoardCanvas
         boardId={board.id}
