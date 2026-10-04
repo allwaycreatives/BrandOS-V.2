@@ -12,7 +12,7 @@ const GROUP_OF: Record<string, string> = {
 }
 const GROUPS = ['', 'Brand', 'Work', 'Clients']
 
-type SidebarBrand = { id: string; name: string; color: string; role?: string }
+type SidebarBrand = { id: string; name: string; color: string; role?: string; parentId?: string | null }
 
 export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const pathname = usePathname()
@@ -49,6 +49,10 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
 
   const brandSpaceMatch = pathname.match(/\/brand-spaces\/([^/]+)/)
   const brandSpaceId = brandSpaceMatch?.[1]
+
+  // Founder brands sit just under the shared brand they belong to.
+  const roots = brands.filter((b) => !b.parentId || !brands.some((x) => x.id === b.parentId))
+  const ordered = roots.flatMap((r) => [r, ...brands.filter((c) => c.parentId === r.id)])
 
   const mainItems = [
     { label: 'Home', href: '/dashboard', icon: '⌂' },
@@ -123,10 +127,11 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
 
         {!collapsed && <div className="sidebar-label" style={{ marginTop: 18 }}>Brands</div>}
         {collapsed && <div style={{ height: 14 }} />}
-        {brands.map((b) => {
+        {ordered.map((b) => {
           const isCurrent = brandSpaceId === b.id
+          const isChild = !!b.parentId && roots.some((r) => r.id === b.parentId)
           return (
-            <div key={b.id}>
+            <div key={b.id} style={{ marginLeft: !collapsed && isChild ? 12 : 0 }}>
               <Link
                 href={`/brand-spaces/${b.id}`}
                 title={collapsed ? b.name : undefined}

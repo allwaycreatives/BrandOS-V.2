@@ -8,15 +8,16 @@ export type BrandSummary = {
   name: string
   role: 'owner' | 'team_member' | 'client'
   color: string
+  parentId: string | null
 }
 
 // Every brand the person can open: ones in their own workspace, plus ones they were invited to.
 export async function getUserBrands(userId: string, organizationId: string): Promise<BrandSummary[]> {
   const owned = await db.brandSpace
-    .findMany({ where: { organizationId }, select: { id: true, name: true } })
+    .findMany({ where: { organizationId }, select: { id: true, name: true, parentId: true } })
     .catch(() => [])
   const invited = await db.brandSpaceAccess
-    .findMany({ where: { userId }, include: { brandSpace: { select: { id: true, name: true } } } })
+    .findMany({ where: { userId }, include: { brandSpace: { select: { id: true, name: true, parentId: true } } } })
     .catch(() => [])
 
   const list: BrandSummary[] = owned.map((b) => ({ ...b, role: 'owner' as const, color: brandColor(b.name) }))
@@ -27,6 +28,7 @@ export async function getUserBrands(userId: string, organizationId: string): Pro
       name: a.brandSpace.name,
       role: a.role === 'client' ? 'client' : 'team_member',
       color: brandColor(a.brandSpace.name),
+      parentId: a.brandSpace.parentId,
     })
   }
   return list

@@ -68,6 +68,7 @@ model Membership {
 model BrandSpace {
   id             String   @id @default(cuid())
   organizationId String
+  parentId       String?  // a founder's personal brand points at the shared brand it belongs to
   shareToken           String?  @unique // when set, anyone with the link can read the brand guide
   intakeToken          String?  @unique // when set, clients can send a brief through a public form
   name           String
@@ -91,6 +92,8 @@ model BrandSpace {
   deliverables         Deliverable[]
   styleSummary         String?  // what this client likes and keeps changing
   styleSummaryAt       DateTime?
+  parent               BrandSpace?  @relation("BrandFamily", fields: [parentId], references: [id], onDelete: SetNull)
+  children             BrandSpace[] @relation("BrandFamily")
 }
 
 model Board {

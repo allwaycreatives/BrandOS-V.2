@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { quickCreateTask, createBrandSpace } from '@/app/actions'
 import { createIdea } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
 import { createCampaign } from '@/app/(app)/brand-spaces/[id]/campaigns/actions'
@@ -84,6 +85,11 @@ export default function QuickCreate({ brands }: { brands: Brand[] }) {
         </button>
       </form>
       {msg && <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 10 }}>{msg}</div>}
+      {tab === 'brand' && (
+        <div style={{ fontSize: 12.5, marginTop: 10 }}>
+          <Link href="/setup/founders" style={{ color: 'var(--accent-text)' }}>Building a brand around two or more founders? Use the founder setup →</Link>
+        </div>
+      )}
     </div>
   )
 }

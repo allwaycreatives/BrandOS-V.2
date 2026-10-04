@@ -31,7 +31,7 @@ export const STARTER_PACKS: StarterPack[] = [
     nameTitle: 'Name your personal brand',
     nameHelp: 'Usually your own name. You can rename it later.',
     namePlaceholder: 'Your name',
-    templates: ['brand-bible', 'campaign-plan'],
+    templates: ['brand-bible', 'founder-profile'],
     taskSuggestion: 'Write one sentence on what I want to be known for',
   },
   {

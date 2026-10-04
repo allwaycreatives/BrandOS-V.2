@@ -119,6 +119,57 @@ export const TEMPLATES: Record<string, Template> = {
       },
     ],
   },
+  'brand-architecture': {
+    name: 'Brand architecture',
+    description: 'For founders building one brand together: decide what is shared and what stays personal, platform by platform.',
+    boards: [
+      {
+        name: 'Brand architecture',
+        cards: [
+          h('The decision', 40, 30),
+          n('Shared brand = one name, one look and one voice that both founders stand behind.\nPersonal profiles = each founder\'s own story and voice, built on the shared pillars.', 40, 80),
+          h('Three questions', 40, 220),
+          n('1. Do people buy from the team, or from each founder? If the team, lead with the shared brand.', 40, 270),
+          n('2. Where does each founder\'s audience already live? Keep personal profiles there.', 270, 270),
+          n('3. What if one founder leaves? Anything that must stay with the company belongs on the shared brand.', 500, 270),
+          h('Platform map (examples, change them)', 40, 420),
+          h('Platform', 40, 470), h('Shared brand', 270, 470), h('Founder 1', 500, 470), h('Founder 2', 730, 470),
+          n('Instagram', 40, 520), n('Home base: the shared look, launches, behind the scenes', 270, 520), n('Personal story and day-to-day takes', 500, 520), n('Personal story and day-to-day takes', 730, 520),
+          n('YouTube', 40, 620), n('Long-form: the main show or flagship content', 270, 620), n('Occasional guest appearance', 500, 620), n('Occasional guest appearance', 730, 620),
+          n('LinkedIn', 40, 720), n('Company news and hiring', 270, 720), n('Lead here, in your own voice', 500, 720), n('Lead here, in your own voice', 730, 720),
+          n('TikTok', 40, 820), n('Short clips cut from the long-form', 270, 820), n('Optional, only if you enjoy it', 500, 820), n('Optional, only if you enjoy it', 730, 820),
+          n('X', 40, 920), n('Announcements only', 270, 920), n('Personal takes and conversations', 500, 920), n('Personal takes and conversations', 730, 920),
+          h('Rules we agree on', 40, 1050),
+          n('Who posts what, who approves it, how we credit each other, and how often we cross-post.', 40, 1100),
+        ],
+      },
+    ],
+  },
+  'founder-profile': {
+    name: 'Founder profile',
+    description: 'One founder\'s story, voice and platforms, built on top of the shared brand.',
+    boards: [
+      {
+        name: 'Founder profile',
+        cards: [
+          h('My story', 40, 30),
+          n('Why I started, what I have been through, and the moment that shaped how I work.', 40, 80),
+          h('What I am known for', 300, 30),
+          n('The one thing people should say about me when I am not in the room.', 300, 80),
+          h('How my voice differs', 560, 30),
+          n('Where I sound different from the shared brand: more direct, more personal, more playful?', 560, 80),
+          h('My platforms', 40, 260),
+          n('Where I show up as myself, and how often.', 40, 310),
+          h('Three content angles', 300, 260),
+          n('Angle 1', 300, 310), n('Angle 2', 300, 390), n('Angle 3', 300, 470),
+          h('What I will not talk about', 560, 260),
+          n('Topics, people and opinions I keep off the record.', 560, 310),
+          h('How I support the shared brand', 40, 460),
+          n('When I share the brand\'s posts, when I stay quiet, and how I mention my co-founder.', 40, 510),
+        ],
+      },
+    ],
+  },
 }
 
 export const TEMPLATE_LIST = Object.entries(TEMPLATES).map(([key, t]) => ({

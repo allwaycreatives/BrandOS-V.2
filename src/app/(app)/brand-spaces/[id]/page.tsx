@@ -10,6 +10,9 @@ import ShareBriefCard from './ShareBriefCard'
 import ClientItemRow from './ClientItemRow'
 import ClampText from '@/components/ClampText'
 import { brandColor } from '@/lib/brandColor'
+import { getOrCreateCurrentUser } from '@/lib/auth'
+import { getUserBrands } from '@/lib/brands'
+import BrandFamilyCard from './BrandFamilyCard'
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Waiting to start',
@@ -203,6 +206,13 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     db.task.findMany({ where: { ...bs, status: { not: 'done' }, dueDate: { lt: startOfToday } }, orderBy: { dueDate: 'asc' }, take: 3, select: { id: true, title: true } }).catch(() => []),
   ])
 
+  // Brand family: the shared brand this one belongs to, and any founder brands under it.
+  const { user, organizationId } = await getOrCreateCurrentUser()
+  const allBrands = await getUserBrands(user.id, organizationId)
+  const parent = allBrands.find((b) => b.id === brandSpace.parentId)
+  const children = allBrands.filter((b) => b.parentId === params.id)
+  const familyOptions = allBrands.filter((b) => b.role === 'owner' && b.id !== params.id && !b.parentId).map((b) => ({ id: b.id, name: b.name }))
+
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   const summaryParts = [
     openTasks > 0 && plural(openTasks, 'open task', 'open tasks'),
@@ -221,6 +231,11 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     <div>
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
+          {parent && (
+            <Link href={`/brand-spaces/${parent.id}`} style={{ display: 'inline-block', fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              Part of {parent.name}
+            </Link>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ width: 14, height: 14, borderRadius: '50%', background: brandColor(brandSpace.name), flexShrink: 0 }} />
             <h1 style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{brandSpace.name}</h1>
@@ -245,6 +260,23 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
       )}
 
       {brandSummaryCard}
+
+      {children.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Founders &amp; linked brands</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+            {children.map((c) => (
+              <Link key={c.id} href={`/brand-spaces/${c.id}`} className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color }} />
+                  <span style={{ fontWeight: 600 }}>{c.name}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Personal brand</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Work</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 12, marginBottom: 32 }}>
@@ -272,6 +304,9 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
               </div>
             )}
             {role === 'agency' && <ShareBrandCard brandSpaceId={params.id} shareToken={brandSpace.shareToken} />}
+            {role === 'agency' && children.length === 0 && (familyOptions.length > 0 || brandSpace.parentId) && (
+              <BrandFamilyCard brandSpaceId={params.id} parentId={brandSpace.parentId} options={familyOptions} />
+            )}
             {role === 'agency' && <ShareBriefCard brandSpaceId={params.id} brandName={brandSpace.name} intakeToken={brandSpace.intakeToken} />}
             {role === 'agency' && responseCount > 0 && (
               <div className="card">

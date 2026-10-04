@@ -191,7 +191,7 @@ export default async function HomePage() {
                     <span style={{ fontWeight: 600 }}>{b.name}</span>
                   </div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                    {ROLE_LABEL[b.role]}
+                    {b.parentId && brandById.get(b.parentId) ? `Part of ${brandById.get(b.parentId)?.name}` : ROLE_LABEL[b.role]}
                     {b.role !== 'client' && ` · ${open} open ${open === 1 ? 'task' : 'tasks'}`}
                   </div>
                 </Link>

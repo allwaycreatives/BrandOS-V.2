@@ -21,6 +21,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Sidebar grouped into Brand / Work / Clients under the open brand; Tasks form tucked into 'More options'
 - Light and dark mode (toggle in the top bar and on client pages, remembered per device, dark by default); thin, quiet scrollbars; logo glow removed
 - Clients' home lists what is waiting for their feedback, one tap from the review page
+- Founder brands: founder setup (one shared brand + a personal brand per founder, linked), Brand architecture and Founder profile templates, link existing brands into a family, founders shown under the shared brand
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -53,6 +54,9 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Chat/inbox, time tracking, invoicing, Gantt charts (until customers ask)
 - Per-industry versions of the product (one product, starter packs instead)
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
+
+## Next (brand families)
+- A combined calendar and campaign view across a shared brand and its founders; shared discovery answers that founders can inherit
 
 ## Next (reviews)
 - WhatsApp notifications, a per-person switch for email, and notifications for invites and approvals on campaign content
