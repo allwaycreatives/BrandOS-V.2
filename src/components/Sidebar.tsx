@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 // The open brand's tools, grouped so eleven items read as three.
 const GROUP_OF: Record<string, string> = {
-  Overview: '', Discovery: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand',
+  Overview: '', Discovery: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand', Family: 'Brand',
   Projects: 'Work', Campaigns: 'Work', Ideas: 'Work', Calendar: 'Work', Tasks: 'Work',
   Reviews: 'Clients', People: 'Clients',
 }
@@ -63,6 +63,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     { label: 'Templates', href: '/templates', icon: '❏' },
   ]
 
+  const hasFamily = !!brandSpaceId && (brands.some((b) => b.parentId === brandSpaceId) || !!brands.find((b) => b.id === brandSpaceId)?.parentId)
   const allBrandItems = brandSpaceId
     ? [
         { label: 'Overview', href: `/brand-spaces/${brandSpaceId}`, icon: '◧' },
@@ -76,13 +77,14 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         { label: 'Boards', href: `/brand-spaces/${brandSpaceId}/boards`, icon: '▤' },
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
         { label: 'People', href: `/brand-spaces/${brandSpaceId}/people`, icon: '☺' },
+        ...(hasFamily ? [{ label: 'Family', href: `/brand-spaces/${brandSpaceId}/family`, icon: '❖' }] : []),
       ]
     : []
 
   // Show only what this person can actually open.
   const currentRole = brands.find((b) => b.id === brandSpaceId)?.role
   const brandItems = allBrandItems.filter((item) => {
-    if (currentRole === 'client') return !['Projects', 'Campaigns', 'Ideas', 'Reviews', 'People'].includes(item.label)
+    if (currentRole === 'client') return !['Projects', 'Campaigns', 'Ideas', 'Reviews', 'People', 'Family'].includes(item.label)
     if (item.label === 'People') return currentRole === 'owner'
     return true
   })

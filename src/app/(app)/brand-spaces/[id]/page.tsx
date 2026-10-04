@@ -211,6 +211,40 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
   const allBrands = await getUserBrands(user.id, organizationId)
   const parent = allBrands.find((b) => b.id === brandSpace.parentId)
   const children = allBrands.filter((b) => b.parentId === params.id)
+  // A founder brand with no discovery of its own starts from the shared brand's identity.
+  const inherited =
+    !latestResponse && parent
+      ? await db.discoveryResponse.findFirst({ where: { brandSpaceId: parent.id }, orderBy: { submittedAt: 'desc' } }).catch(() => null)
+      : null
+  const pa = (inherited?.answersJson as Record<string, string | string[]>) || {}
+  const pKnown = typeof pa.known_for === 'string' ? pa.known_for : ''
+  const pTones = Array.isArray(pa.tone_words) ? pa.tone_words : []
+  const inheritedCard =
+    parent && inherited && (pKnown || pTones.length > 0) ? (
+      <div className="card" style={{ marginBottom: 28, padding: '22px 24px' }}>
+        <div style={{ ...label, color: 'var(--accent-text)', fontWeight: 600, marginBottom: 12 }}>From {parent.name}</div>
+        {pKnown && (
+          <div style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.3, fontWeight: 600, marginBottom: 14 }}>
+            <ClampText text={pKnown} limit={170} />
+          </div>
+        )}
+        {pTones.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+            {pTones.map((t) => (
+              <span key={t} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 999, border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}>{t}</span>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.55, marginBottom: 14, maxWidth: 560 }}>
+          This is the shared brand&apos;s identity, shown as a starting point. Send {brandSpace.name} their own discovery link to capture their personal voice.
+        </div>
+        <div style={{ maxWidth: 320, marginBottom: 12 }}>
+          <DiscoveryLink brandSpaceId={params.id} />
+        </div>
+        <Link href={`/brand-spaces/${parent.id}`} style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>View {parent.name} →</Link>
+      </div>
+    ) : null
+
   const familyOptions = allBrands.filter((b) => b.role === 'owner' && b.id !== params.id && !b.parentId).map((b) => ({ id: b.id, name: b.name }))
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -259,11 +293,14 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         </div>
       )}
 
-      {brandSummaryCard}
+      {inheritedCard ?? brandSummaryCard}
 
       {children.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Founders &amp; linked brands</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Founders &amp; linked brands</div>
+            <Link href={`/brand-spaces/${params.id}/family`} style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>Posting map →</Link>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
             {children.map((c) => (
               <Link key={c.id} href={`/brand-spaces/${c.id}`} className="card">
