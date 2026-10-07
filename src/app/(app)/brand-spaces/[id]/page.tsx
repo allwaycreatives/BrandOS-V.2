@@ -13,6 +13,7 @@ import { brandColor } from '@/lib/brandColor'
 import { getOrCreateCurrentUser } from '@/lib/auth'
 import { getUserBrands } from '@/lib/brands'
 import BrandFamilyCard from './BrandFamilyCard'
+import FacesCard, { type FaceItem, type LinkedBrandItem } from './FacesCard'
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Waiting to start',
@@ -245,6 +246,23 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
       </div>
     ) : null
 
+  // The faces of a company brand. Brands linked under it with the older founder setup have no face
+  // record, so they are shown too, without repeating anyone who is already listed as a face.
+  const isCompany = !brandSpace.parentId
+  const faceRows = isCompany ? await db.brandFace.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'asc' } }).catch(() => []) : []
+  const usedChildIds = new Set<string>()
+  const faceItems: FaceItem[] = faceRows.map((f) => {
+    let brand = f.personalBrandId ? allBrands.find((b) => b.id === f.personalBrandId) : undefined
+    if (!brand) {
+      // A same-named linked brand that no face points at yet counts as this person's brand.
+      brand = children.find((c) => !usedChildIds.has(c.id) && !faceRows.some((o) => o.personalBrandId === c.id) && c.name.trim().toLowerCase() === f.name.trim().toLowerCase())
+    }
+    if (brand) usedChildIds.add(brand.id)
+    return { id: f.id, name: f.name, role: f.role, brand: brand ? { id: brand.id, color: brand.color } : null }
+  })
+  const extraBrands: LinkedBrandItem[] = children.filter((c) => !usedChildIds.has(c.id)).map((c) => ({ id: c.id, name: c.name, color: c.color }))
+  const showFaces = isCompany && (role === 'agency' || faceItems.length > 0 || extraBrands.length > 0)
+
   const familyOptions = allBrands.filter((b) => b.role === 'owner' && b.id !== params.id && !b.parentId).map((b) => ({ id: b.id, name: b.name }))
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -295,25 +313,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
 
       {inheritedCard ?? brandSummaryCard}
 
-      {children.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Founders &amp; linked brands</div>
-            <Link href={`/brand-spaces/${params.id}/family`} style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>Posting map →</Link>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
-            {children.map((c) => (
-              <Link key={c.id} href={`/brand-spaces/${c.id}`} className="card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color }} />
-                  <span style={{ fontWeight: 600 }}>{c.name}</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Personal brand</div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      {showFaces && <FacesCard brandSpaceId={params.id} brandName={brandSpace.name} canEdit={role === 'agency'} faces={faceItems} extras={extraBrands} />}
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Work</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 12, marginBottom: 32 }}>
@@ -364,6 +364,12 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
             )}
           </div>
         </>
+      )}
+
+      {role === 'agency' && (
+        <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <Link href={`${base}/delete`} style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Delete this brand…</Link>
+        </div>
       )}
     </div>
   )

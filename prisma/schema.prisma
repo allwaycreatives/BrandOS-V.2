@@ -94,6 +94,25 @@ model BrandSpace {
   styleSummaryAt       DateTime?
   parent               BrandSpace?  @relation("BrandFamily", fields: [parentId], references: [id], onDelete: SetNull)
   children             BrandSpace[] @relation("BrandFamily")
+  faces                BrandFace[]  @relation("BrandFaces")
+  facesLinkedHere      BrandFace[]  @relation("FacePersonalBrand")
+}
+
+// A person who represents a company brand (a founder, say). Their own personal brand is optional and
+// comes later: personalBrandId is set when "Start their personal brand" is used. Deleting the company
+// removes its faces; deleting a personal brand just clears the link.
+model BrandFace {
+  id              String   @id @default(cuid())
+  brandSpaceId    String
+  name            String
+  role            String?
+  personalBrandId String?
+  createdAt       DateTime @default(now())
+
+  brandSpace    BrandSpace  @relation("BrandFaces", fields: [brandSpaceId], references: [id], onDelete: Cascade)
+  personalBrand BrandSpace? @relation("FacePersonalBrand", fields: [personalBrandId], references: [id], onDelete: SetNull)
+
+  @@index([brandSpaceId])
 }
 
 model Board {

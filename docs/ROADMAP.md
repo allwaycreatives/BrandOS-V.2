@@ -23,6 +23,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Clients' home lists what is waiting for their feedback, one tap from the review page
 - Founder brands: founder setup (one shared brand + a personal brand per founder, linked), Brand architecture and Founder profile templates, link existing brands into a family, founders shown under the shared brand
 - Family view: posting map (planned/published content per platform per brand) and a combined content pipeline; founders start from the shared brand's identity until they have their own discovery
+- Company-first founder setup: the company brand leads and founders are its "faces" (name, optional role). Each face can get a personal brand later with one button ("Start their personal brand", Founder profile board included). Setup offers company-first (default) or company + personal brands now
+- Delete brand (owner only): type the brand's name to confirm, see exactly what will be deleted, removed in one all-or-nothing step. Personal brands under a deleted company stay, unlinked. Uploaded files stay in storage
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -57,6 +59,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
 
 ## Next (brand families)
+- Duplicating a company brand does not copy its faces yet
 - Family-wide campaigns (one campaign that spans the shared brand and founders); guidance when a founder doubles up on a platform the shared brand covers
 
 ## Next (reviews)
