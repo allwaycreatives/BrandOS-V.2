@@ -11,7 +11,7 @@ export function safeUrl(raw: string): string | null {
   }
 }
 
-export type Embed = { kind: 'youtube' | 'vimeo' | 'image' | 'link'; src: string; host: string }
+export type Embed = { kind: 'youtube' | 'vimeo' | 'drive' | 'image' | 'link'; src: string; host: string }
 
 export function getEmbed(url: string): Embed {
   let u: URL
@@ -36,6 +36,17 @@ export function getEmbed(url: string): Embed {
     const id = u.pathname.match(/^\/(\d+)/)?.[1]
     if (id) return { kind: 'vimeo', src: `https://player.vimeo.com/video/${id}`, host }
   }
+  if (host === 'drive.google.com') {
+    // The file must be shared as "Anyone with the link can view" or the client sees a Google access page.
+    const id = u.pathname.match(/^\/file\/d\/([\w-]+)/)?.[1] || ((u.pathname === '/open' || u.pathname === '/uc') && u.searchParams.get('id')) || ''
+    if (id) return { kind: 'drive', src: `https://drive.google.com/file/d/${id}/preview`, host }
+  }
   if (/\.(png|jpe?g|gif|webp|avif|svg)$/i.test(u.pathname)) return { kind: 'image', src: url, host }
   return { kind: 'link', src: url, host }
+}
+
+// Short vertical video (Reels, TikTok, Shorts) is shown in a 9:16 frame; everything else in a wide frame.
+export function isVerticalPost(platform: string, url: string): boolean {
+  if (/youtube\.com\/shorts\//i.test(url)) return true
+  return ['Instagram', 'TikTok'].includes(platform)
 }

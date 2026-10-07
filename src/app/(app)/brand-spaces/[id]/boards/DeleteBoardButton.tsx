@@ -14,7 +14,7 @@ export default function DeleteBoardButton({ brandSpaceId, boardId }: { brandSpac
       onClick={(e) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!confirm('Delete this board and everything on it?')) return
+        if (!confirm('Delete this board, everything on it, and any boards inside it?')) return
         startTransition(async () => {
           await deleteBoard(brandSpaceId, boardId)
           router.refresh()

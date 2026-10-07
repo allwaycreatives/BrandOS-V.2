@@ -32,6 +32,7 @@ export async function deleteBrandSpace(brandSpaceId: string, typedName: string):
         await tx.board.deleteMany({ where: bs })
 
         // Planning: things that sit inside campaigns and projects go before the campaigns and projects.
+        await tx.calendarItemFeedback.deleteMany({ where: { item: bs } })
         await tx.calendarItem.deleteMany({ where: bs })
         await tx.task.deleteMany({ where: bs })
         await tx.campaign.deleteMany({ where: bs })

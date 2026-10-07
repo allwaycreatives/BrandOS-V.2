@@ -4,7 +4,7 @@ import { db } from './db'
 // The delete action walks through the same list, so what the owner sees is what gets removed.
 export async function getDeleteSummary(brandSpaceId: string) {
   const bs = { brandSpaceId }
-  const [boards, boardCards, projects, campaigns, tasks, contentItems, ideas, deliverables, feedback, discoveryAnswers, discoveryTemplates, brandKitItems, hasProfile, people, invites, comments, notifications, faces, unlinked] =
+  const [boards, boardCards, projects, campaigns, tasks, contentItems, postFeedback, ideas, deliverables, feedback, discoveryAnswers, discoveryTemplates, brandKitItems, hasProfile, people, invites, comments, notifications, faces, unlinked] =
     await Promise.all([
       db.board.count({ where: bs }),
       db.boardCard.count({ where: { board: bs } }),
@@ -12,6 +12,7 @@ export async function getDeleteSummary(brandSpaceId: string) {
       db.campaign.count({ where: bs }),
       db.task.count({ where: bs }),
       db.calendarItem.count({ where: bs }),
+      db.calendarItemFeedback.count({ where: { item: bs } }),
       db.idea.count({ where: bs }),
       db.deliverable.count({ where: bs }),
       db.deliverableFeedback.count({ where: { deliverable: bs } }),
@@ -28,7 +29,7 @@ export async function getDeleteSummary(brandSpaceId: string) {
     ])
 
   return {
-    boards, boardCards, projects, campaigns, tasks, contentItems, ideas, deliverables, feedback,
+    boards, boardCards, projects, campaigns, tasks, contentItems, postFeedback, ideas, deliverables, feedback,
     discoveryAnswers, discoveryTemplates, brandKitItems, hasProfile: hasProfile > 0, people, invites,
     comments, notifications, faces,
     // Personal brands under this one are NOT deleted. They are unlinked and stay as they are.

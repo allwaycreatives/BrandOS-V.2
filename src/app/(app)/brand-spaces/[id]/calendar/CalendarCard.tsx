@@ -9,6 +9,7 @@ export default function CalendarCard({
   itemId,
   title,
   platform,
+  date,
   canMoveBack,
   canMoveForward,
 }: {
@@ -16,6 +17,7 @@ export default function CalendarCard({
   itemId: string
   title: string
   platform: string
+  date?: string
   canMoveBack: boolean
   canMoveForward: boolean
 }) {
@@ -25,7 +27,7 @@ export default function CalendarCard({
     <div className="card" style={{ opacity: isPending ? 0.6 : 1 }}>
       <Link href={`/brand-spaces/${brandSpaceId}/calendar/${itemId}`}>
         <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>{title}</div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 10 }}>{platform}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 10 }}>{platform}{date ? ` · ${date}` : ''}</div>
       </Link>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <button

@@ -4,7 +4,7 @@ import { getEmbed } from '@/lib/embed'
 export default function DeliverablePreview({ url }: { url: string }) {
   const e = getEmbed(url)
 
-  if (e.kind === 'youtube' || e.kind === 'vimeo') {
+  if (e.kind === 'youtube' || e.kind === 'vimeo' || e.kind === 'drive') {
     return (
       <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000' }}>
         <iframe

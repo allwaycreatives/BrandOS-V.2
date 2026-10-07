@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
-import { addBoardCardAt, moveBoardCard, deleteBoardCard, updateBoardCard } from '../actions'
+import { addBoardCardAt, moveBoardCard, deleteBoardCard, updateBoardCard, refreshLinkPreview } from '../actions'
 
-type Card = { id: string; type: string; content: string; positionX: number; positionY: number }
+type Card = { id: string; type: string; content: string; meta: string | null; positionX: number; positionY: number }
+type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
 type DragState =
   | { kind: 'card'; id: string; lastX: number; lastY: number; moved: boolean }
@@ -12,7 +13,7 @@ type DragState =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 210, color: 140 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 240, color: 140 }
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -24,6 +25,16 @@ const PAPER: React.CSSProperties = {
 function parseColor(content: string) {
   const [hex = '#888888', role = '', use = ''] = content.split('|')
   return { hex, role, use }
+}
+
+function parseMeta(raw: string | null): Meta {
+  if (!raw) return {}
+  try {
+    const m = JSON.parse(raw)
+    return m && typeof m === 'object' ? m : {}
+  } catch {
+    return {}
+  }
 }
 
 function hostOf(url: string) {
@@ -40,6 +51,7 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set())
   const dragState = useRef<DragState | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchDist = useRef<number | null>(null)
@@ -135,6 +147,27 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  // Link cards made before previews existed get their thumbnail the first time an editor opens the board.
+  useEffect(() => {
+    if (readOnly) return
+    const missing = initialCards.filter((c) => c.type === 'link' && c.meta == null).slice(0, 12)
+    if (missing.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      for (const c of missing) {
+        try {
+          const meta = await refreshLinkPreview(c.id)
+          if (cancelled) return
+          setCards((prev) => prev.map((x) => (x.id === c.id ? { ...x, meta } : x)))
+        } catch {}
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function zoomButton(factor: number) {
     const rect = containerRef.current?.getBoundingClientRect()
     if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
@@ -157,10 +190,15 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     }
   }
 
-  function addLink() {
+  async function addLink() {
     const raw = prompt('Paste a link')?.trim()
     if (!raw) return
-    addCard('link', /^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+    setBusy(true)
+    try {
+      await addCard('link', /^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   function askColor(current = { hex: '#', role: '', use: '' }) {
@@ -198,8 +236,15 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
       return
     }
     if (text === card.content) return
-    setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, content: text } : c)))
-    updateBoardCard(card.id, text).catch(() => {})
+    setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, content: text, ...(card.type === 'link' ? { meta: null } : {}) } : c)))
+    setBrokenImages((prev) => {
+      const next = new Set(prev)
+      next.delete(card.id)
+      return next
+    })
+    updateBoardCard(card.id, text)
+      .then((saved) => setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, content: saved.content, meta: saved.meta } : c))))
+      .catch(() => alert('Could not save that change. Please try again.'))
   }
 
   function startEdit(card: Card) {
@@ -281,12 +326,39 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
                   <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', userSelect: 'none' }}>{card.content}</div>
                 ))}
                 {card.type === 'image' && <img src={card.content} alt="" draggable={false} style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
-                {card.type === 'link' && (
-                  <a href={card.content} target="_blank" rel="noreferrer" style={{ display: 'block', color: '#1a1a1a' }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{hostOf(card.content)}</div>
-                    <div style={{ fontSize: 11, color: '#666', wordBreak: 'break-all' }}>{card.content}</div>
-                  </a>
-                )}
+                {card.type === 'link' && (() => {
+                  const meta = parseMeta(card.meta)
+                  const showImage = !!meta.image && !brokenImages.has(card.id)
+                  const pending = card.meta == null
+                  return (
+                    <div>
+                      {showImage && (
+                        <div style={{ position: 'relative', margin: '-12px -12px 10px', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
+                          <img
+                            src={meta.image}
+                            alt=""
+                            draggable={false}
+                            referrerPolicy="no-referrer"
+                            onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))}
+                            style={{ display: 'block', width: '100%', maxHeight: 170, objectFit: 'cover' }}
+                          />
+                          {meta.kind === 'video' && (
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, paddingLeft: 3 }}>▶</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', userSelect: 'none' }}>
+                        {meta.title || hostOf(card.content)}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', userSelect: 'none' }}>{pending ? 'Loading preview…' : meta.site || hostOf(card.content)}</span>
+                        <a href={card.content} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: '#1a1a1a', fontWeight: 600, flexShrink: 0 }}>Open ↗</a>
+                      </div>
+                    </div>
+                  )
+                })()}
                 {card.type === 'color' && (() => {
                   const { hex, role, use } = parseColor(card.content)
                   return (

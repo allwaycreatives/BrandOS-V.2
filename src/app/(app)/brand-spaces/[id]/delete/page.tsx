@@ -30,7 +30,7 @@ export default async function DeleteBrandPage({ params }: { params: { id: string
     s.projects > 0 && n(s.projects, 'project', 'projects'),
     s.campaigns > 0 && n(s.campaigns, 'campaign', 'campaigns'),
     s.tasks > 0 && n(s.tasks, 'task', 'tasks'),
-    s.contentItems > 0 && `${n(s.contentItems, 'calendar item', 'calendar items')}`,
+    s.contentItems > 0 && `${n(s.contentItems, 'calendar item', 'calendar items')}${s.postFeedback > 0 ? ` with ${n(s.postFeedback, 'client comment', 'client comments')}` : ''}. The client plan link will stop working`,
     s.ideas > 0 && n(s.ideas, 'idea', 'ideas'),
     s.deliverables > 0 && `${n(s.deliverables, 'review', 'reviews')} with ${n(s.feedback, 'piece of client feedback', 'pieces of client feedback')}. Their review links will stop working`,
     (s.discoveryAnswers > 0 || s.discoveryTemplates > 0) && `Discovery: ${n(s.discoveryAnswers, 'answer set', 'answer sets')} and ${n(s.discoveryTemplates, 'question set', 'question sets')}`,

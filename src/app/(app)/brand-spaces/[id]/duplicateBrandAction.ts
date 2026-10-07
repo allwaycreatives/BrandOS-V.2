@@ -22,14 +22,21 @@ export async function duplicateBrandSpace(brandSpaceId: string) {
   })
 
   const boards = await db.board.findMany({ where: { brandSpaceId }, include: { cards: true }, orderBy: { createdAt: 'asc' } })
+  // Pass 1: copy every board. Pass 2: put each copy inside the copy of the board it was inside.
+  const newIdOf = new Map<string, string>()
   for (const b of boards) {
-    await db.board.create({
+    const created = await db.board.create({
       data: {
         brandSpaceId: copy.id,
         name: b.name,
         cards: { create: b.cards.map((c) => ({ type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY })) },
       },
     })
+    newIdOf.set(b.id, created.id)
+  }
+  for (const b of boards) {
+    const parent = b.parentBoardId ? newIdOf.get(b.parentBoardId) : undefined
+    if (parent) await db.board.update({ where: { id: newIdOf.get(b.id) as string }, data: { parentBoardId: parent } })
   }
 
   const templates = await db.discoveryTemplate.findMany({ where: { brandSpaceId }, include: { versions: true } })

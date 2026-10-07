@@ -71,6 +71,8 @@ model BrandSpace {
   parentId       String?  // a founder's personal brand points at the shared brand it belongs to
   shareToken           String?  @unique // when set, anyone with the link can read the brand guide
   intakeToken          String?  @unique // when set, clients can send a brief through a public form
+  planToken            String?  @unique // when set, anyone with the link can view the content plan and approve posts
+  planNote             String?  // the "direction" note shown at the top of the client plan
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]
   notionEmbedUrl String?
@@ -121,11 +123,16 @@ model Board {
   projectId    String?
   name         String   @default("Moodboard")
   shareToken   String?  @unique // when set, anyone with the link can view this board (read-only)
+  parentBoardId String? // set when this board lives inside another board
   createdAt    DateTime @default(now())
 
   brandSpace BrandSpace  @relation(fields: [brandSpaceId], references: [id])
   cards      BoardCard[]
   project    Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent     Board?      @relation("BoardNesting", fields: [parentBoardId], references: [id], onDelete: SetNull)
+  children   Board[]     @relation("BoardNesting")
+
+  @@index([brandSpaceId])
 }
 
 model BoardCard {
@@ -135,6 +142,7 @@ model BoardCard {
   content   String
   positionX Float    @default(0)
   positionY Float    @default(0)
+  meta      String?  // link cards: saved preview as JSON (title, image). null = not fetched yet, {} = nothing found
   createdAt DateTime @default(now())
 
   board Board @relation(fields: [boardId], references: [id])
@@ -260,11 +268,33 @@ model CalendarItem {
   keyMessage    String?
   script        String?
   caption       String?
+  thumbnailUrl  String?  // cover image shown next to the video on the client plan
+  clientStatus  String   @default("pending") // pending | changes_requested | approved (what the client decided)
   createdAt     DateTime @default(now())
 
-  brandSpace BrandSpace @relation(fields: [brandSpaceId], references: [id])
-  project    Project?   @relation(fields: [projectId], references: [id])
-  campaign   Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  brandSpace BrandSpace             @relation(fields: [brandSpaceId], references: [id])
+  project    Project?               @relation(fields: [projectId], references: [id])
+  campaign   Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  feedback   CalendarItemFeedback[]
+
+  @@index([brandSpaceId])
+}
+
+// A comment, change request or approval from the client (or a team reply) on one planned post.
+model CalendarItemFeedback {
+  id         String   @id @default(cuid())
+  itemId     String
+  authorName String
+  fromClient Boolean  @default(true)
+  kind       String   // comment | changes_requested | approved
+  body       String
+  at         String?  // optional video timestamp, like "0:42"
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  item CalendarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
 }
 
 model Task {

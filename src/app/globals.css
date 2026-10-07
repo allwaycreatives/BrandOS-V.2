@@ -525,3 +525,18 @@ input[type="file"]::file-selector-button {
 *::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
 .sidebar::-webkit-scrollbar-thumb { background-color: transparent; }
 .sidebar:hover::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); }
+
+/* ---- Content plan (team view): a week per row, a day per cell ---- */
+.plan-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.plan-day { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; min-height: 104px; display: flex; flex-direction: column; gap: 6px; }
+.plan-day.is-over { border-color: var(--accent); background: var(--accent-dim); }
+.plan-day.is-today { border-color: var(--accent-border); }
+.plan-post { background: var(--bg-app); border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 8px; cursor: grab; }
+.plan-post:active { cursor: grabbing; }
+.plan-post.is-idea { opacity: 0.6; border-style: dashed; }
+@media (max-width: 820px) {
+  .plan-week { grid-template-columns: 1fr; }
+  .plan-day.is-empty { display: none; }
+  .plan-day { min-height: 0; }
+  .plan-post { cursor: default; }
+}

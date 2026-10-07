@@ -16,9 +16,9 @@ export default async function BoardsListPage({ params }: { params: { id: string 
 
   const boards = await db.board
     .findMany({
-      where: { brandSpaceId: params.id },
+      where: { brandSpaceId: params.id, parentBoardId: null },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { cards: true } } },
+      include: { _count: { select: { cards: true, children: true } } },
     })
     .catch(() => [])
 
@@ -58,6 +58,7 @@ export default async function BoardsListPage({ params }: { params: { id: string 
             <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{board.name}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
               {board._count.cards} {board._count.cards === 1 ? 'card' : 'cards'}
+              {board._count.children > 0 ? ` · ${board._count.children} ${board._count.children === 1 ? 'board' : 'boards'} inside` : ''}
               {board.shareToken ? ' · shared' : ''}
             </div>
           </Link>

@@ -25,6 +25,9 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Family view: posting map (planned/published content per platform per brand) and a combined content pipeline; founders start from the shared brand's identity until they have their own discovery
 - Company-first founder setup: the company brand leads and founders are its "faces" (name, optional role). Each face can get a personal brand later with one button ("Start their personal brand", Founder profile board included). Setup offers company-first (default) or company + personal brands now
 - Delete brand (owner only): type the brand's name to confirm, see exactly what will be deleted, removed in one all-or-nothing step. Personal brands under a deleted company stay, unlinked. Uploaded files stay in storage
+- Content plan: Calendar has a Plan view (a week per row, drag a post to a new day) next to the Production board. Share one no-account link; the client scrolls the plan week by week, opens a post to see the video in a 9:16 frame with thumbnail and caption beside it, and comments, requests changes or approves. Team gets an update, replies in the post, and sends it back for approval. Videos stay in the owner's Drive/YouTube/Vimeo; Brand OS stores only links
+- Boards inside boards (up to 4 levels), with breadcrumbs, "Boards inside" strip, and delete/duplicate that follow the nesting
+- Link cards show a thumbnail and title (YouTube, Vimeo, Drive, direct images, and any site's own preview image); older links fill in when a board is opened
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
