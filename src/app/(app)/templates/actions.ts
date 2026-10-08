@@ -21,7 +21,7 @@ export type TemplatePayload = {
 }
 
 const cardsOf = (cards: { type: string; content: string; positionX: number; positionY: number }[]): CardSnap[] =>
-  cards.map((c) => ({ type: c.type, content: c.content, x: c.positionX, y: c.positionY }))
+  cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, x: c.positionX, y: c.positionY }))
 
 async function requireEdit(brandSpaceId: string) {
   const access = await assertBrandSpaceAccess(brandSpaceId)

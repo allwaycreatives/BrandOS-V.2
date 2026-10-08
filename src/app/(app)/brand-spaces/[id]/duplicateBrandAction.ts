@@ -22,21 +22,27 @@ export async function duplicateBrandSpace(brandSpaceId: string) {
   })
 
   const boards = await db.board.findMany({ where: { brandSpaceId }, include: { cards: true }, orderBy: { createdAt: 'asc' } })
-  // Pass 1: copy every board. Pass 2: put each copy inside the copy of the board it was inside.
+  // Pass 1: copy every board (without its board tiles). Pass 2: put each copy inside the copy of the board it was inside,
+  // and re-make the board tiles so each one opens the COPY of its board.
   const newIdOf = new Map<string, string>()
   for (const b of boards) {
     const created = await db.board.create({
       data: {
         brandSpaceId: copy.id,
         name: b.name,
-        cards: { create: b.cards.map((c) => ({ type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY })) },
+        cards: { create: b.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY })) },
       },
     })
     newIdOf.set(b.id, created.id)
   }
   for (const b of boards) {
+    const newId = newIdOf.get(b.id) as string
     const parent = b.parentBoardId ? newIdOf.get(b.parentBoardId) : undefined
-    if (parent) await db.board.update({ where: { id: newIdOf.get(b.id) as string }, data: { parentBoardId: parent } })
+    if (parent) await db.board.update({ where: { id: newId }, data: { parentBoardId: parent } })
+    for (const tile of b.cards.filter((c) => c.type === 'board')) {
+      const target = newIdOf.get(tile.content)
+      if (target) await db.boardCard.create({ data: { boardId: newId, type: 'board', content: target, positionX: tile.positionX, positionY: tile.positionY } })
+    }
   }
 
   const templates = await db.discoveryTemplate.findMany({ where: { brandSpaceId }, include: { versions: true } })

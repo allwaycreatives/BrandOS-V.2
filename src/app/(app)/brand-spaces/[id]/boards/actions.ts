@@ -11,7 +11,7 @@ import { getLinkPreview, metaToJson } from '@/lib/linkPreview'
 import { MAX_BOARD_DEPTH } from './constants'
 
 
-const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color']
+const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board']
 
 // Clients can view boards but not change them.
 async function requireEdit(brandSpaceId: string) {
@@ -81,7 +81,11 @@ export async function deleteBoard(brandSpaceId: string, boardId: string) {
   const board = await boardForEdit(boardId)
   if (board.brandSpaceId !== brandSpaceId) throw new Error('Board not found.')
   const ids = await boardAndDescendantIds(boardId)
-  await db.$transaction([db.boardCard.deleteMany({ where: { boardId: { in: ids } } }), db.board.deleteMany({ where: { id: { in: ids } } })])
+  await db.$transaction([
+    db.boardCard.deleteMany({ where: { boardId: { in: ids } } }),
+    db.boardCard.deleteMany({ where: { type: 'board', content: { in: ids } } }),
+    db.board.deleteMany({ where: { id: { in: ids } } }),
+  ])
   revalidatePath(`/brand-spaces/${brandSpaceId}/boards`)
   if (board.parentBoardId) revalidatePath(`/brand-spaces/${brandSpaceId}/boards/${board.parentBoardId}`)
 }
@@ -100,9 +104,56 @@ export async function addBoardCardAt(boardId: string, type: string, content: str
     meta = metaToJson(await getLinkPreview(url))
   }
 
+  // A board tile: this creates the new board inside this one, and the tile on the canvas opens it.
+  if (type === 'board') {
+    const name = text.trim().slice(0, 120)
+    if (!name) throw new Error('Please give the board a name.')
+    if ((await boardDepth(boardId)) >= MAX_BOARD_DEPTH) throw new Error(`Boards can go ${MAX_BOARD_DEPTH} levels deep.`)
+    const made = await db.$transaction(async (tx) => {
+      const child = await tx.board.create({ data: { brandSpaceId: board.brandSpaceId, name, parentBoardId: boardId } })
+      const tile = await tx.boardCard.create({ data: { boardId, type: 'board', content: child.id, positionX: x, positionY: y } })
+      return { child, tile }
+    })
+    revalidatePath(`/brand-spaces/${board.brandSpaceId}/boards`)
+    return { id: made.tile.id, type: 'board', content: made.child.id, meta: null, positionX: x, positionY: y, inner: { id: made.child.id, name: made.child.name, cards: 0, boards: 0 } }
+  }
+
   const card = await db.boardCard.create({ data: { boardId, type, content: text, meta, positionX: x, positionY: y } })
   revalidatePath(`/brand-spaces/${board.brandSpaceId}/boards`)
-  return { id: card.id, type: card.type, content: card.content, meta: card.meta, positionX: card.positionX, positionY: card.positionY }
+  return { id: card.id, type: card.type, content: card.content, meta: card.meta, positionX: card.positionX, positionY: card.positionY, inner: null }
+}
+
+// Renames the board a tile opens.
+export async function renameBoardTile(cardId: string, name: string): Promise<{ name: string }> {
+  const card = await cardForEdit(cardId)
+  if (card.type !== 'board') throw new Error('That is not a board.')
+  const clean = name.trim().slice(0, 120)
+  if (!clean) throw new Error('Please give the board a name.')
+  const child = await db.board.findUnique({ where: { id: card.content } })
+  if (!child || child.parentBoardId !== card.boardId) throw new Error('Board not found.')
+  await db.board.update({ where: { id: child.id }, data: { name: clean } })
+  return { name: clean }
+}
+
+// Boards created before tiles existed sit inside a board without a tile. This gives each one a tile, in a row below the rest.
+export async function adoptInnerBoards(boardId: string) {
+  const board = await boardForEdit(boardId)
+  const [kids, tiles, cards] = await Promise.all([
+    db.board.findMany({ where: { parentBoardId: boardId }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { cards: true, children: true } } } }),
+    db.boardCard.findMany({ where: { boardId, type: 'board' }, select: { content: true } }),
+    db.boardCard.findMany({ where: { boardId }, select: { positionY: true } }),
+  ])
+  const tiled = new Set(tiles.map((t) => t.content))
+  const loose = kids.filter((k) => !tiled.has(k.id))
+  const baseY = cards.length ? Math.max(...cards.map((c) => c.positionY)) + 160 : 40
+  const out = []
+  for (let i = 0; i < loose.length; i++) {
+    const k = loose[i]
+    const tile = await db.boardCard.create({ data: { boardId, type: 'board', content: k.id, positionX: 40 + i * 230, positionY: baseY } })
+    out.push({ id: tile.id, type: 'board', content: k.id, meta: null, positionX: tile.positionX, positionY: tile.positionY, inner: { id: k.id, name: k.name, cards: k._count.cards, boards: k._count.children } })
+  }
+  if (out.length) revalidatePath(`/brand-spaces/${board.brandSpaceId}/boards/${boardId}`)
+  return out
 }
 
 // Returns the card's saved link preview (if it is a link), so the screen can update without a reload.
@@ -137,7 +188,20 @@ export async function moveBoardCard(cardId: string, x: number, y: number) {
 }
 
 export async function deleteBoardCard(cardId: string) {
-  await cardForEdit(cardId)
+  const card = await cardForEdit(cardId)
+  if (card.type === 'board') {
+    // Removing a board tile deletes the board it opens, and everything inside that.
+    const child = await db.board.findUnique({ where: { id: card.content } })
+    if (child && child.parentBoardId === card.boardId) {
+      const ids = await boardAndDescendantIds(child.id)
+      await db.$transaction([
+        db.boardCard.deleteMany({ where: { boardId: { in: ids } } }),
+        db.boardCard.deleteMany({ where: { type: 'board', content: { in: ids } } }),
+        db.board.deleteMany({ where: { id: { in: ids } } }),
+      ])
+      return
+    }
+  }
   await db.boardCard.delete({ where: { id: cardId } })
 }
 
@@ -153,12 +217,17 @@ export async function duplicateBoard(boardId: string) {
         brandSpaceId: src.brandSpaceId,
         parentBoardId,
         name: isRoot ? `${src.name} (copy)` : src.name,
-        cards: { create: src.cards.map((c) => ({ type: c.type, content: c.content, meta: c.meta, positionX: c.positionX, positionY: c.positionY })) },
+        // Board tiles are re-made below so that each one opens the COPY of its board, never the original.
+        cards: { create: src.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, meta: c.meta, positionX: c.positionX, positionY: c.positionY })) },
       },
     })
     if (depth < MAX_BOARD_DEPTH + 2) {
       const kids = await tx.board.findMany({ where: { parentBoardId: sourceId }, orderBy: { createdAt: 'asc' }, select: { id: true } })
-      for (const k of kids) await copyTree(tx, k.id, copy.id, false, depth + 1)
+      for (const k of kids) {
+        const newKidId = await copyTree(tx, k.id, copy.id, false, depth + 1)
+        const tile = src.cards.find((c) => c.type === 'board' && c.content === k.id)
+        if (tile) await tx.boardCard.create({ data: { boardId: copy.id, type: 'board', content: newKidId, positionX: tile.positionX, positionY: tile.positionY } })
+      }
     }
     return copy.id
   }

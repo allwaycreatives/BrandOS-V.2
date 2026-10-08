@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
-import { addBoardCardAt, moveBoardCard, deleteBoardCard, updateBoardCard, refreshLinkPreview } from '../actions'
+import { useRouter } from 'next/navigation'
+import { addBoardCardAt, moveBoardCard, deleteBoardCard, updateBoardCard, refreshLinkPreview, renameBoardTile, adoptInnerBoards } from '../actions'
 
 type Card = { id: string; type: string; content: string; meta: string | null; positionX: number; positionY: number }
+type Inner = { id: string; name: string; cards: number; boards: number }
 type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
 type DragState =
@@ -13,7 +15,7 @@ type DragState =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 240, color: 140 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 240, color: 140, board: 200 }
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -45,8 +47,26 @@ function hostOf(url: string) {
   }
 }
 
-export default function BoardCanvas({ boardId, cards: initialCards, readOnly = false }: { boardId: string; cards: Card[]; readOnly?: boolean }) {
+export default function BoardCanvas({
+  boardId,
+  brandSpaceId = '',
+  cards: initialCards,
+  readOnly = false,
+  inner: initialInner = {},
+  needsAdopt = false,
+  canNest = false,
+}: {
+  boardId: string
+  brandSpaceId?: string
+  cards: Card[]
+  readOnly?: boolean
+  inner?: Record<string, Inner>
+  needsAdopt?: boolean
+  canNest?: boolean
+}) {
+  const router = useRouter()
   const [cards, setCards] = useState(initialCards)
+  const [inner, setInner] = useState(initialInner)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -168,6 +188,19 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Boards made inside this one before tiles existed get their tile the first time an editor opens it.
+  useEffect(() => {
+    if (!needsAdopt || readOnly) return
+    adoptInnerBoards(boardId)
+      .then((made) => {
+        if (made.length === 0) return
+        setCards((prev) => [...prev, ...made.map(({ inner: _i, ...c }) => c)])
+        setInner((prev) => ({ ...prev, ...Object.fromEntries(made.map((m) => [m.inner.id, m.inner])) }))
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function zoomButton(factor: number) {
     const rect = containerRef.current?.getBoundingClientRect()
     if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
@@ -182,11 +215,12 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     const x = cx - w / 2 + (Math.random() - 0.5) * 60
     const y = cy - 50 + (Math.random() - 0.5) * 60
     try {
-      const created = await addBoardCardAt(boardId, type, content, x, y)
+      const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
+      if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
-    } catch {
-      alert('Could not add that card. Please try again.')
+    } catch (err) {
+      alert(err instanceof Error && /levels deep|name/.test(err.message) ? err.message : 'Could not add that card. Please try again.')
     }
   }
 
@@ -247,7 +281,20 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
       .catch(() => alert('Could not save that change. Please try again.'))
   }
 
+  function openBoard(card: Card) {
+    if (brandSpaceId) router.push(`/brand-spaces/${brandSpaceId}/boards/${card.content}`)
+  }
+
+  function renameTile(card: Card) {
+    const current = inner[card.content]?.name ?? ''
+    const next = prompt('Rename this board', current)?.trim()
+    if (!next || next === current) return
+    setInner((prev) => ({ ...prev, [card.content]: { ...(prev[card.content] as Inner), name: next } }))
+    renameBoardTile(card.id, next).catch(() => alert('Could not rename that board. Please try again.'))
+  }
+
   function startEdit(card: Card) {
+    if (card.type === 'board') return openBoard(card)
     if (readOnly) return
     if (card.type === 'note' || card.type === 'heading') return setEditingId(card.id)
     if (card.type === 'link') {
@@ -265,6 +312,9 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
     { label: 'Title', glyph: 'T', run: () => addCard('heading', '') },
     { label: 'Image', glyph: '▣', run: () => fileRef.current?.click() },
     { label: 'Link', glyph: '∞', run: addLink },
+    ...(canNest
+      ? [{ label: 'Board', glyph: '▤', run: () => { const name = prompt('Name this board (for example: Inspirations)')?.trim(); if (name) addCard('board', name) } }]
+      : []),
     { label: 'Color', glyph: '●', run: () => { const v = askColor(); if (v) addCard('color', v) } },
   ]
 
@@ -302,7 +352,11 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
             const editing = editingId === card.id
             const common: React.CSSProperties = { position: 'absolute', left: card.positionX, top: card.positionY, width: WIDTH[card.type] ?? 210, cursor: readOnly ? 'default' : 'move' }
             const del = !readOnly && (
-              <button type="button" aria-label="Delete card" onClick={() => { setCards((p) => p.filter((c) => c.id !== card.id)); deleteBoardCard(card.id).catch(() => {}) }} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, padding: 0, borderRadius: '50%', fontSize: 12, lineHeight: '18px', background: 'var(--bg-card)' }}>×</button>
+              <button type="button" aria-label="Delete card" onClick={() => {
+                if (card.type === 'board' && !confirm('Delete this board and everything inside it?')) return
+                setCards((p) => p.filter((c) => c.id !== card.id))
+                deleteBoardCard(card.id).catch(() => {})
+              }} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, padding: 0, borderRadius: '50%', fontSize: 12, lineHeight: '18px', background: 'var(--bg-card)' }}>×</button>
             )
 
             if (card.type === 'heading') {
@@ -313,6 +367,28 @@ export default function BoardCanvas({ boardId, cards: initialCards, readOnly = f
                   ) : (
                     <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.25, whiteSpace: 'pre-wrap', userSelect: 'none' }}>{card.content}</div>
                   )}
+                  {del}
+                </div>
+              )
+            }
+
+            if (card.type === 'board') {
+              const info = inner[card.content]
+              return (
+                <div key={card.id} data-card data-card-id={card.id} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, overflow: 'visible' }}>
+                  <div style={{ height: 46, borderRadius: '6px 6px 0 0', background: '#f1ece2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#8a7a5c', userSelect: 'none' }} aria-hidden="true">▤</div>
+                  <div style={{ padding: '10px 12px 12px' }}>
+                    <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.25, overflowWrap: 'anywhere', userSelect: 'none' }}>{info?.name ?? 'Board'}</div>
+                    <div style={{ fontSize: 11, color: '#666', margin: '3px 0 8px', userSelect: 'none' }}>
+                      {info ? `${info.cards} ${info.cards === 1 ? 'card' : 'cards'}${info.boards > 0 ? ` · ${info.boards} ${info.boards === 1 ? 'board' : 'boards'} inside` : ''}` : ''}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <a href={`/brand-spaces/${brandSpaceId}/boards/${card.content}`} style={{ fontSize: 12, fontWeight: 600, color: '#1a1a1a' }}>Open →</a>
+                      {!readOnly && (
+                        <button type="button" onClick={() => renameTile(card)} style={{ fontSize: 11, padding: '2px 6px', background: 'transparent', color: '#555', border: '1px solid #ddd' }}>Rename</button>
+                      )}
+                    </div>
+                  </div>
                   {del}
                 </div>
               )

@@ -4,8 +4,6 @@ import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import BoardCanvas from './BoardCanvas'
 import BoardActions from './BoardActions'
-import DeleteBoardButton from '../DeleteBoardButton'
-import { createBoard } from '../actions'
 import { MAX_BOARD_DEPTH } from '../constants'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
@@ -23,6 +21,10 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
     .findMany({ where: { parentBoardId: board.id }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { cards: true, children: true } } } })
     .catch(() => [])
 
+  // What each board tile on the canvas shows: the name of the board it opens, and how much is in it.
+  const tiled = new Set(cards.filter((c) => c.type === 'board').map((c) => c.content))
+  const inner = Object.fromEntries(inside.map((b) => [b.id, { id: b.id, name: b.name, cards: b._count.cards, boards: b._count.children }]))
+
   // The trail back up: All boards › Parent › This board.
   const trail: { id: string; name: string }[] = []
   let up = board.parentBoardId
@@ -34,7 +36,6 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
   }
   const depth = trail.length + 1
   const boardsHref = `/brand-spaces/${params.id}/boards`
-  const createInside = createBoard.bind(null, params.id)
 
   return (
     <div>
@@ -53,36 +54,13 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
         {!readOnly && <BoardActions brandSpaceId={params.id} boardId={board.id} name={board.name} shareToken={board.shareToken} />}
       </div>
 
-      {(inside.length > 0 || (!readOnly && depth < MAX_BOARD_DEPTH)) && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Boards inside {board.name}</div>
-          {inside.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: 10, marginBottom: 10 }}>
-              {inside.map((b) => (
-                <Link key={b.id} href={`${boardsHref}/${b.id}`} className="card" style={{ position: 'relative', paddingTop: readOnly ? 12 : 30 }}>
-                  {!readOnly && <DeleteBoardButton brandSpaceId={params.id} boardId={b.id} />}
-                  <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{b.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    {b._count.cards} {b._count.cards === 1 ? 'card' : 'cards'}
-                    {b._count.children > 0 ? ` · ${b._count.children} ${b._count.children === 1 ? 'board' : 'boards'} inside` : ''}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-          {!readOnly && depth < MAX_BOARD_DEPTH && (
-            <form action={createInside} style={{ display: 'flex', gap: 8 }}>
-              <input type="hidden" name="parentBoardId" value={board.id} />
-              <input name="name" required placeholder="New board inside this one" style={{ flex: 1 }} />
-              <button type="submit">Add board</button>
-            </form>
-          )}
-        </div>
-      )}
-
       <BoardCanvas
         boardId={board.id}
+        brandSpaceId={params.id}
         readOnly={readOnly}
+        inner={inner}
+        needsAdopt={!readOnly && inside.some((b) => !tiled.has(b.id))}
+        canNest={depth < MAX_BOARD_DEPTH}
         cards={cards.map((c) => ({ id: c.id, type: c.type, content: c.content, meta: c.meta, positionX: c.positionX, positionY: c.positionY }))}
       />
     </div>
