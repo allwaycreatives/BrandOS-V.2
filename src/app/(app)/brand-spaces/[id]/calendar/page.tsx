@@ -6,6 +6,7 @@ import { createCalendarItem } from './actions'
 import CalendarCard from './CalendarCard'
 import PlanBoard, { type PlanItem } from './PlanBoard'
 import PlanShare from './PlanShare'
+import ShootPlanner from './ShootPlanner'
 import { PLATFORMS } from '../campaigns/constants'
 import { addDays, dayKey, dayLabel, lastDayOf, monthKeyOf, monthTitle, mondayOf, todayKey, visibleToClient } from '@/lib/plan'
 import { parseStrategy } from '@/lib/strategy'
@@ -62,7 +63,7 @@ export default async function CalendarPage({ params, searchParams }: { params: {
   const field = view === 'production' ? 'production' : 'publish'
   const planItems: PlanItem[] = items.map((i) => {
     const d = field === 'production' ? i.productionDate : i.scheduledDate
-    return { id: i.id, title: i.title, platform: i.platform, status: i.status, date: d ? dayKey(d) : null, clientStatus: i.clientStatus, pillar: i.pillar, priority: i.priority }
+    return { id: i.id, title: i.title, platform: i.platform, status: i.status, date: d ? dayKey(d) : null, clientStatus: i.clientStatus, pillar: i.pillar, priority: i.priority, time: i.publishTime }
   })
   // Posts dated outside this grid are not shown here; undated posts always are (under "No date").
   const visibleStart = planItems.filter((i) => !i.date || (i.date >= start && i.date < gridEnd))
@@ -70,6 +71,14 @@ export default async function CalendarPage({ params, searchParams }: { params: {
   const nextMonth = monthKeyOf(addDays(lastDay, 1))
   const monthHref = (m: string) => `${base}?${view === 'production' ? 'view=production&' : ''}m=${m}`
   const waiting = items.filter((i) => visibleToClient(i.status) && i.clientStatus === 'pending').length
+  const shootDays = new Map<string, number>()
+  if (view === 'production') {
+    for (const i of items) {
+      if (!i.productionDate) continue
+      const k = dayKey(i.productionDate)
+      if (monthKeyOf(k) === monthKey) shootDays.set(k, (shootDays.get(k) ?? 0) + 1)
+    }
+  }
   const targets = view === 'publish' ? strategy.platforms.filter((p) => p.perWeek > 0).map((p) => ({ name: p.name, perWeek: p.perWeek })) : []
 
   // By platform: strategy platforms first (primary, secondary, supporting), then any other platform in use.
@@ -186,6 +195,19 @@ export default async function CalendarPage({ params, searchParams }: { params: {
 
       {isPlan && (
         <>
+          {!isClient && view === 'production' && <ShootPlanner brandSpaceId={params.id} monthKey={monthKey} monthName={monthTitle(monthKey)} />}
+          {view === 'production' && shootDays.size > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Shoot days in {monthTitle(monthKey)}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {Array.from(shootDays).sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => (
+                  <Link key={k} href={`/brand-spaces/${params.id}/shoot/${k}`} style={tab(false)}>
+                    {dayLabel(k)} · {n} {n === 1 ? 'post' : 'posts'} →
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           {!isClient && view === 'publish' && <PlanShare brandSpaceId={params.id} brandName={brandSpace!.name} token={brandSpace!.planToken} note={brandSpace!.planNote || ''} waiting={waiting} />}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>

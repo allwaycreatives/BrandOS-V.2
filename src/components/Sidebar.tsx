@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 // The open brand's tools, grouped so eleven items read as three.
 const GROUP_OF: Record<string, string> = {
-  Overview: '', Discovery: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand', Family: 'Brand',
+  Overview: '', Discovery: 'Brand', Strategy: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand', Family: 'Brand',
   Projects: 'Work', Campaigns: 'Work', Ideas: 'Work', Calendar: 'Work', Tasks: 'Work',
   Reviews: 'Clients', People: 'Clients',
 }
@@ -57,6 +57,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   const mainItems = [
     { label: 'Home', href: '/dashboard', icon: '⌂' },
     { label: 'My tasks', href: '/tasks', icon: '☑' },
+    { label: 'All calendars', href: '/calendar', icon: '▦' },
     { label: 'Projects', href: '/projects', icon: '▣' },
     { label: 'Campaigns', href: '/campaigns', icon: '◈' },
     { label: 'Ideas', href: '/ideas', icon: '✧' },

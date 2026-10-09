@@ -124,6 +124,7 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
         {row('Priority', select(v.priority, (x) => set('priority', x), PRIORITIES.map((p) => ({ value: p.key, label: p.label }))))}
         {row('Status', select(v.status, (x) => set('status', x), STATUS_OPTIONS.map((s) => ({ value: s.key, label: s.label }))))}
         {row('Publish date', <input type="date" value={v.scheduledDate} onChange={(e) => set('scheduledDate', e.target.value)} />)}
+        {row('Publish time', <input type="time" value={v.publishTime} onChange={(e) => set('publishTime', e.target.value)} />)}
         {row('Production date', <input type="date" value={v.productionDate} onChange={(e) => set('productionDate', e.target.value)} />)}
         {row(
           'Hook',

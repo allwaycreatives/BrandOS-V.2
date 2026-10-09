@@ -9,6 +9,7 @@ import { getProjectProgress } from '@/lib/projects'
 import TaskRow from '@/components/TaskRow'
 import FirstRun from '@/components/FirstRun'
 import QuickCreate from '@/components/QuickCreate'
+import TodayPanel from '@/components/TodayPanel'
 import { TEMPLATE_LIST } from '../brand-spaces/[id]/boards/templates'
 
 const ROLE_LABEL = { owner: 'Your brand', team_member: 'Team member', client: 'Client' } as const
@@ -96,6 +97,8 @@ export default async function HomePage() {
       {!isClientOnly && brands.length === 0 && <FirstRun templates={TEMPLATE_LIST} />}
 
       {!isClientOnly && brands.length > 0 && <QuickCreate brands={workBrands.map((b) => ({ id: b.id, name: b.name }))} />}
+
+      {!isClientOnly && workBrands.length > 0 && <TodayPanel brands={workBrands.map((b) => ({ id: b.id, name: b.name, color: b.color }))} />}
 
       {!isClientOnly && dueSoon.length > 0 && (
         <div style={{ marginBottom: 28 }}>

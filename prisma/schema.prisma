@@ -273,6 +273,7 @@ model CalendarItem {
   contentType   String?  // format: short_video | long_video | carousel | image | text | story | live | article
   priority      String   @default("normal") // high | normal | low
   productionDate DateTime? // when it is made; scheduledDate stays the PUBLISH date
+  publishTime   String?  // optional time of day to publish, "HH:MM"
   pillar        String?  // a pillar name from the brand's content strategy
   series        String?  // a series name from the brand's content strategy
   hookOptions   String[] @default([]) // several hook ideas; `hook` holds the chosen one

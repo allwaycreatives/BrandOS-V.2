@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { scheduleCalendarItem } from './actions'
 import { addDays, gridDayLabel, mondayOf, monthKeyOf, todayKey, weekdayShort, weekLabel } from '@/lib/plan'
 
-export type PlanItem = { id: string; title: string; platform: string; status: string; date: string | null; clientStatus: string; pillar: string | null; priority: string }
+export type PlanItem = { id: string; title: string; platform: string; status: string; date: string | null; clientStatus: string; pillar: string | null; priority: string; time?: string | null }
 export type PlatformTarget = { name: string; perWeek: number }
 
 const DocIcon = ({ accent }: { accent?: boolean }) => (
@@ -88,7 +88,7 @@ export default function PlanBoard({
     >
       <Link href={`/brand-spaces/${brandSpaceId}/calendar/${i.id}`} draggable={false}>
         <DocIcon accent={i.priority === 'high'} />
-        <span className="t">{i.title || 'Untitled'}</span>
+        <span className="t">{dateField === 'publish' && i.time ? `${i.time} · ` : ''}{i.title || 'Untitled'}</span>
       </Link>
       {i.clientStatus === 'approved' && i.status !== 'idea' && <span style={{ fontSize: 11, color: 'var(--accent-text)' }} aria-label="Approved">✓</span>}
       {i.clientStatus === 'changes_requested' && i.status !== 'idea' && <span style={{ fontSize: 11, color: 'var(--accent-text)' }} aria-label="Changes requested">↺</span>}

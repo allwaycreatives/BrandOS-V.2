@@ -7,6 +7,7 @@ import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
 import { safeUrl } from '@/lib/embed'
 import { parseDay } from '@/lib/plan'
 import { CONTENT_TYPES, PRIORITIES } from '@/lib/contentOptions'
+import { cleanRule, planShoots, type ShootRule } from '@/lib/production'
 
 const STATUSES = ['idea', 'planned', 'in_production', 'scheduled', 'published'] as const
 type Status = (typeof STATUSES)[number]
@@ -78,6 +79,7 @@ export type ItemDetails = {
   assetUrl: string
   thumbnailUrl: string
   scheduledDate: string // publish date, YYYY-MM-DD or ''
+  publishTime: string // HH:MM or ''
   productionDate: string // YYYY-MM-DD or ''
   status: string
   contentType: string
@@ -112,6 +114,8 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
   if (data.thumbnailUrl.trim() && !thumb) return { ok: false, error: 'The thumbnail link does not look right.' }
   const date = data.scheduledDate.trim() ? parseDay(data.scheduledDate.trim()) : null
   if (data.scheduledDate.trim() && !date) return { ok: false, error: 'The publish date is not valid.' }
+  const time = data.publishTime.trim()
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return { ok: false, error: 'The publish time is not valid.' }
   const prodDate = data.productionDate.trim() ? parseDay(data.productionDate.trim()) : null
   if (data.productionDate.trim() && !prodDate) return { ok: false, error: 'The production date is not valid.' }
   if (data.contentType && !CONTENT_TYPES.some((t) => t.key === data.contentType)) return { ok: false, error: 'That format is not valid.' }
@@ -136,6 +140,7 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
       assetUrl: asset,
       thumbnailUrl: thumb,
       scheduledDate: date,
+      publishTime: time || null,
       productionDate: prodDate,
       status: data.status,
       contentType: data.contentType || null,
@@ -164,6 +169,46 @@ export async function deleteCalendarItem(brandSpaceId: string, itemId: string): 
   } catch {
     return { ok: false }
   }
+}
+
+// Plans the shoot days for one month of posts. With apply=false it only reports what WOULD happen.
+export async function planProduction(
+  brandSpaceId: string,
+  month: string,
+  rule: ShootRule,
+  overwrite: boolean,
+  apply: boolean
+): Promise<{ ok: boolean; error?: string; perDay?: { day: string; count: number }[]; unmatched?: number; kept?: number; applied?: number }> {
+  try {
+    await requireTeam(brandSpaceId)
+  } catch {
+    return { ok: false, error: 'You do not have access to change this calendar.' }
+  }
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: 'That month is not valid.' }
+  const clean = cleanRule(rule)
+  if (!clean) return { ok: false, error: 'Please fill in the shoot days for this option.' }
+
+  const from = parseDay(`${month}-01`)
+  if (!from) return { ok: false, error: 'That month is not valid.' }
+  const to = new Date(from)
+  to.setUTCMonth(to.getUTCMonth() + 1)
+
+  const posts = await db.calendarItem.findMany({
+    where: { brandSpaceId, status: { not: 'published' }, scheduledDate: { gte: from, lt: to } },
+    select: { id: true, scheduledDate: true, productionDate: true },
+  })
+  const plan = planShoots(
+    clean,
+    posts.map((p) => ({ id: p.id, publish: (p.scheduledDate as Date).toISOString().slice(0, 10), production: p.productionDate ? p.productionDate.toISOString().slice(0, 10) : null })),
+    overwrite
+  )
+  if (!apply) return { ok: true, perDay: plan.perDay, unmatched: plan.unmatched, kept: plan.kept }
+
+  const byDay = new Map<string, string[]>()
+  for (const a of plan.assignments) byDay.set(a.day, [...(byDay.get(a.day) ?? []), a.id])
+  await db.$transaction(Array.from(byDay, ([day, ids]) => db.calendarItem.updateMany({ where: { id: { in: ids }, brandSpaceId }, data: { productionDate: parseDay(day) } })))
+  refresh(brandSpaceId)
+  return { ok: true, perDay: plan.perDay, unmatched: plan.unmatched, kept: plan.kept, applied: plan.assignments.length }
 }
 
 // One idea, one version per platform. Copies the idea (title, pillar, series, objective, message, hook) but NOT the

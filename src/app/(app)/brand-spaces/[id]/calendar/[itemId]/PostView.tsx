@@ -40,6 +40,7 @@ export default async function PostView({ brandSpaceId, itemId }: { brandSpaceId:
             assetUrl: item.assetUrl || '',
             thumbnailUrl: item.thumbnailUrl || '',
             scheduledDate: item.scheduledDate ? dayKey(item.scheduledDate) : '',
+            publishTime: item.publishTime || '',
             productionDate: item.productionDate ? dayKey(item.productionDate) : '',
             status: item.status,
             contentType: item.contentType || '',
