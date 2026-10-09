@@ -94,6 +94,7 @@ export default async function CalendarPage({ params, searchParams }: { params: {
           <Link href={`${base}?view=production`} style={tab(view === 'production')}>Production</Link>
           <Link href={`${base}?view=platform`} style={tab(view === 'platform')}>By platform</Link>
           <Link href={`${base}?view=board`} style={tab(view === 'board')}>Status board</Link>
+          {!isClient && <Link href={`/brand-spaces/${params.id}/import`} style={tab(false)}>Import</Link>}
         </div>
       </div>
 

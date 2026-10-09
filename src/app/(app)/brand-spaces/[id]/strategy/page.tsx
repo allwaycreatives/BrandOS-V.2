@@ -27,6 +27,9 @@ export default async function StrategyPage({ params }: { params: { id: string } 
         <div className="topbar-greeting">Content strategy</div>
         <div className="topbar-sub">The decisions that guide what gets made. Posts in the calendar are tagged with these pillars and series.</div>
       </div>
+      <div style={{ marginBottom: 16 }}>
+        <Link href={`/brand-spaces/${params.id}/import?kind=strategy`} style={{ fontSize: 13, color: 'var(--accent-text)' }}>Fill this in from ChatGPT →</Link>
+      </div>
       <StrategyForm brandSpaceId={params.id} initial={parseStrategy(brandSpace!.strategy)} />
     </div>
   )
