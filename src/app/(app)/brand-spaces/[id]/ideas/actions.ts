@@ -52,6 +52,23 @@ export async function promoteIdea(ideaId: string, to: 'campaign' | 'project') {
   redirect(target)
 }
 
+// Copies an idea from a personal brand into the company brand it sits under, so it can feed the business.
+// The company's copy says where it came from. The original leaves the open list (status "sent"), so nothing is counted twice.
+export async function sendIdeaToCompany(ideaId: string) {
+  const idea = await ideaForEdit(ideaId)
+  if (idea.status !== 'open') return
+  const from = await db.brandSpace.findUnique({ where: { id: idea.brandSpaceId }, select: { name: true, parentId: true } })
+  if (!from?.parentId) return
+  await requireEdit(from.parentId) // the person must be allowed to add ideas to the company too
+  const origin = `From ${from.name}'s brand.`
+  await db.$transaction([
+    db.idea.create({ data: { brandSpaceId: from.parentId, title: idea.title, notes: idea.notes ? `${origin} ${idea.notes}`.slice(0, 2000) : origin } }),
+    db.idea.update({ where: { id: ideaId }, data: { status: 'sent' } }),
+  ])
+  refresh(idea.brandSpaceId)
+  refresh(from.parentId)
+}
+
 export async function archiveIdea(ideaId: string) {
   const idea = await ideaForEdit(ideaId)
   await db.idea.update({ where: { id: ideaId }, data: { status: 'archived' } })

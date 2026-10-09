@@ -1,6 +1,6 @@
-import { createIdea, promoteIdea, archiveIdea, deleteIdea } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
+import { createIdea, promoteIdea, archiveIdea, deleteIdea, sendIdeaToCompany } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
 
-type Brand = { id: string; name: string; color: string }
+type Brand = { id: string; name: string; color: string; parentId?: string | null }
 type Idea = { id: string; brandSpaceId: string; title: string; notes: string | null }
 
 const small: React.CSSProperties = { padding: '3px 10px', fontSize: 12 }
@@ -35,6 +35,7 @@ export default function IdeaList({ ideas, brands, fixedBrandId }: { ideas: Idea[
 
       {ideas.map((idea) => {
         const brand = brandById.get(idea.brandSpaceId)
+        const company = brand?.parentId ? brandById.get(brand.parentId) : undefined
         return (
           <div key={idea.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
@@ -50,6 +51,11 @@ export default function IdeaList({ ideas, brands, fixedBrandId }: { ideas: Idea[
               <form action={promoteIdea.bind(null, idea.id, 'project')}>
                 <button type="submit" style={small}>Make it a project</button>
               </form>
+              {company && (
+                <form action={sendIdeaToCompany.bind(null, idea.id)}>
+                  <button type="submit" style={small}>Send to {company.name}</button>
+                </form>
+              )}
               <form action={archiveIdea.bind(null, idea.id)}>
                 <button type="submit" style={small}>Archive</button>
               </form>

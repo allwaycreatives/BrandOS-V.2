@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveCustomTemplate, revertToDefaultTemplate } from './actions'
+import { saveCustomTemplate, revertToDefaultTemplate, suggestDiscoveryQuestions } from './actions'
 
 type Row = { section: string; prompt: string; helper: string }
 
@@ -17,6 +17,10 @@ export default function TemplateBuilder({
   const [rows, setRows] = useState<Row[]>([{ section: '', prompt: '', helper: '' }])
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const [about, setAbout] = useState('')
+  const [focus, setFocus] = useState<'brand' | 'marketing' | 'both'>('both')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestMsg, setSuggestMsg] = useState<{ text: string; bad: boolean } | null>(null)
 
   function updateRow(index: number, field: keyof Row, value: string) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
@@ -32,6 +36,24 @@ export default function TemplateBuilder({
 
   function removeRow(index: number) {
     setRows((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function suggest() {
+    const hasWork = rows.some((r) => r.prompt.trim())
+    if (hasWork && !confirm('This replaces the questions you have written so far. Continue?')) return
+    setSuggesting(true)
+    setSuggestMsg(null)
+    try {
+      const res = await suggestDiscoveryQuestions(brandSpaceId, about, focus)
+      if (!res.ok || !res.questions) return setSuggestMsg({ text: res.error || 'Something went wrong.', bad: true })
+      setRows(res.questions)
+      if (!name.trim()) setName('Deeper discovery')
+      setSuggestMsg({ text: `${res.questions.length} questions drafted below. Read them, edit or remove any, then save.`, bad: false })
+    } catch {
+      setSuggestMsg({ text: 'Something went wrong. Please try again.', bad: true })
+    } finally {
+      setSuggesting(false)
+    }
   }
 
   function handleSave() {
@@ -60,6 +82,23 @@ export default function TemplateBuilder({
           </button>
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Let me suggest the questions</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>
+          Describe the business, or paste what you know about it. I will draft questions that fit it, building on any answers they have already given. You review and edit everything before it goes anywhere.
+        </div>
+        <textarea rows={5} value={about} onChange={(e) => setAbout(e.target.value)} placeholder="What the business does, who runs it, who it serves, what you want to find out..." style={{ width: '100%', marginBottom: 8 }} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={focus} onChange={(e) => setFocus(e.target.value as 'brand' | 'marketing' | 'both')} aria-label="Focus">
+            <option value="brand">Focus: brand</option>
+            <option value="marketing">Focus: marketing</option>
+            <option value="both">Focus: brand + marketing</option>
+          </select>
+          <button type="button" className="primary" onClick={suggest} disabled={suggesting}>{suggesting ? 'Writing questions... (about 20 seconds)' : 'Suggest questions'}</button>
+        </div>
+        {suggestMsg && <div style={{ fontSize: 12.5, marginTop: 10, color: suggestMsg.bad ? 'var(--accent-text)' : 'var(--text-secondary)' }}>{suggestMsg.text}</div>}
+      </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Questionnaire name</div>

@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { generateText } from '@/lib/ai'
+import { assertBrandSpaceAccess } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
 type DiscoveryAnswers = Record<string, string | string[]>
@@ -17,7 +18,14 @@ const PLATFORM_GUIDANCE: Record<string, string> = {
 
 type LongFormQuestion = { id: string; section?: string; prompt: string; helper?: string }
 
+// Only the workspace owner and team members can change or generate a brand kit. Clients never can.
+async function requireTeam(brandSpaceId: string) {
+  const access = await assertBrandSpaceAccess(brandSpaceId)
+  if (!access || access.role === 'client') throw new Error('You do not have access to change this brand kit.')
+}
+
 export async function generateBrandKit(brandSpaceId: string) {
+  await requireTeam(brandSpaceId)
   const response = await db.discoveryResponse.findFirst({
     where: { brandSpaceId },
     orderBy: { submittedAt: 'desc' },
@@ -153,15 +161,18 @@ Return ONLY valid JSON, no other text, in exactly this shape:
 }
 
 export async function selectBrandKitItem(brandSpaceId: string, itemId: string, platform: string) {
+  await requireTeam(brandSpaceId)
   await db.brandKitItem.updateMany({
     where: { brandSpaceId, platform, type: 'platform_kit' },
     data: { isSelected: false },
   })
-  await db.brandKitItem.update({ where: { id: itemId }, data: { isSelected: true } })
+  // Tied to this brand, so an item id from another brand can never be selected here.
+  await db.brandKitItem.updateMany({ where: { id: itemId, brandSpaceId, platform, type: 'platform_kit' }, data: { isSelected: true } })
   revalidatePath(`/brand-spaces/${brandSpaceId}/brand-kit`)
 }
 
 export async function setPlatformPriority(brandSpaceId: string, orderedPlatforms: string[]) {
+  await requireTeam(brandSpaceId)
   await db.brandSpace.update({
     where: { id: brandSpaceId },
     data: { platformPriority: orderedPlatforms },

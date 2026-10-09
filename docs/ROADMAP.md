@@ -28,6 +28,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Content plan: Calendar has a Plan view (a week per row, drag a post to a new day) next to the Production board. Share one no-account link; the client scrolls the plan week by week, opens a post to see the video in a 9:16 frame with thumbnail and caption beside it, and comments, requests changes or approves. Team gets an update, replies in the post, and sends it back for approval. Videos stay in the owner's Drive/YouTube/Vimeo; Brand OS stores only links
 - Boards inside boards, Milanote style: a Board tile on the canvas (next to Note, Title, Image, Link) that opens its own board with the same layout. Up to 4 levels, breadcrumbs back up, rename on the tile; deleting a tile deletes the board inside it; duplicate board/brand copies the whole tree and points tiles at the copies. Shared board links and saved templates leave board tiles out
 - Link cards show a thumbnail and title (YouTube, Vimeo, Drive, direct images, and any site's own preview image); older links fill in when a board is opened
+- Discovery: "Suggest questions" in the custom questionnaire builder drafts a second round for the specific business (from a description, the faces, and earlier answers); the owner edits before anything is saved. The summary shows every round, newest first
+- Send an idea to the company: an idea in a personal brand can be copied into its company brand with one tap ("From {Name}'s brand" is noted on the copy)
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
