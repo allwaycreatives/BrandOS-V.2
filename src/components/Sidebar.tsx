@@ -68,6 +68,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     ? [
         { label: 'Overview', href: `/brand-spaces/${brandSpaceId}`, icon: '◧' },
         { label: 'Discovery', href: `/brand-spaces/${brandSpaceId}/discovery`, icon: '◎' },
+        { label: 'Strategy', href: `/brand-spaces/${brandSpaceId}/strategy`, icon: '◇' },
         { label: 'Brand Kit', href: `/brand-spaces/${brandSpaceId}/brand-kit`, icon: '✦' },
         { label: 'Projects', href: `/brand-spaces/${brandSpaceId}/projects`, icon: '▣' },
         { label: 'Campaigns', href: `/brand-spaces/${brandSpaceId}/campaigns`, icon: '◈' },
@@ -84,7 +85,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   // Show only what this person can actually open.
   const currentRole = brands.find((b) => b.id === brandSpaceId)?.role
   const brandItems = allBrandItems.filter((item) => {
-    if (currentRole === 'client') return !['Projects', 'Campaigns', 'Ideas', 'Reviews', 'People', 'Family'].includes(item.label)
+    if (currentRole === 'client') return !['Strategy', 'Projects', 'Campaigns', 'Ideas', 'Reviews', 'People', 'Family'].includes(item.label)
     if (item.label === 'People') return currentRole === 'owner'
     return true
   })

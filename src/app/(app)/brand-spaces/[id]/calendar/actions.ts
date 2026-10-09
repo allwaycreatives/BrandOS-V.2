@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
 import { safeUrl } from '@/lib/embed'
 import { parseDay } from '@/lib/plan'
+import { CONTENT_TYPES, PRIORITIES } from '@/lib/contentOptions'
 
 const STATUSES = ['idea', 'planned', 'in_production', 'scheduled', 'published'] as const
 type Status = (typeof STATUSES)[number]
@@ -37,8 +38,10 @@ export async function createCalendarItem(brandSpaceId: string, formData: FormDat
   const status = STATUSES.includes(String(formData.get('status')) as Status) ? (String(formData.get('status')) as Status) : 'idea'
   if (!title) return
 
+  const day = date ? parseDay(date) : null
+  const onProduction = String(formData.get('dateField') || '') === 'production'
   await db.calendarItem.create({
-    data: { brandSpaceId, title, platform: platform || 'Instagram', status, scheduledDate: date ? parseDay(date) : null },
+    data: { brandSpaceId, title, platform: platform || 'Instagram', status, ...(onProduction ? { productionDate: day } : { scheduledDate: day }) },
   })
   refresh(brandSpaceId)
 }
@@ -52,12 +55,12 @@ export async function moveCalendarItem(brandSpaceId: string, itemId: string, dir
 }
 
 // Used by drag and drop on the plan. null puts the post back in "not scheduled yet".
-export async function scheduleCalendarItem(brandSpaceId: string, itemId: string, day: string | null): Promise<{ ok: boolean; error?: string }> {
+export async function scheduleCalendarItem(brandSpaceId: string, itemId: string, day: string | null, field: 'publish' | 'production' = 'publish'): Promise<{ ok: boolean; error?: string }> {
   try {
     await itemOf(brandSpaceId, itemId)
     const date = day ? parseDay(day) : null
     if (day && !date) return { ok: false, error: 'That date is not valid.' }
-    await db.calendarItem.update({ where: { id: itemId }, data: { scheduledDate: date } })
+    await db.calendarItem.update({ where: { id: itemId }, data: field === 'production' ? { productionDate: date } : { scheduledDate: date } })
     refresh(brandSpaceId, itemId)
     return { ok: true }
   } catch {
@@ -73,8 +76,19 @@ export type ItemDetails = {
   caption: string
   assetUrl: string
   thumbnailUrl: string
-  scheduledDate: string // YYYY-MM-DD or ''
+  scheduledDate: string // publish date, YYYY-MM-DD or ''
+  productionDate: string // YYYY-MM-DD or ''
   status: string
+  contentType: string
+  priority: string
+  pillar: string
+  series: string
+  hookOptions: string[]
+  objective: string
+  cta: string
+  productionNotes: string
+  successMetric: string
+  notes: string
 }
 
 export async function updateCalendarItemDetails(brandSpaceId: string, itemId: string, data: ItemDetails): Promise<{ ok: boolean; error?: string }> {
@@ -94,7 +108,13 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
   const thumb = data.thumbnailUrl.trim() ? safeUrl(data.thumbnailUrl) : null
   if (data.thumbnailUrl.trim() && !thumb) return { ok: false, error: 'The thumbnail link does not look right.' }
   const date = data.scheduledDate.trim() ? parseDay(data.scheduledDate.trim()) : null
-  if (data.scheduledDate.trim() && !date) return { ok: false, error: 'That date is not valid.' }
+  if (data.scheduledDate.trim() && !date) return { ok: false, error: 'The publish date is not valid.' }
+  const prodDate = data.productionDate.trim() ? parseDay(data.productionDate.trim()) : null
+  if (data.productionDate.trim() && !prodDate) return { ok: false, error: 'The production date is not valid.' }
+  if (data.contentType && !CONTENT_TYPES.some((t) => t.key === data.contentType)) return { ok: false, error: 'That format is not valid.' }
+  if (!PRIORITIES.some((p) => p.key === data.priority)) return { ok: false, error: 'That priority is not valid.' }
+  const hookOptions = (Array.isArray(data.hookOptions) ? data.hookOptions : []).map((h) => String(h).trim().slice(0, 300)).filter(Boolean).slice(0, 12)
+  const opt = (v: string, n: number) => (v ? String(v).trim().slice(0, n) || null : null)
 
   const caption = data.caption.trim() || null
   // If the client already approved this post and the thing they approved changes, it needs approving again.
@@ -112,7 +132,18 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
       assetUrl: asset,
       thumbnailUrl: thumb,
       scheduledDate: date,
+      productionDate: prodDate,
       status: data.status,
+      contentType: data.contentType || null,
+      priority: data.priority,
+      pillar: opt(data.pillar, 80),
+      series: opt(data.series, 80),
+      hookOptions,
+      objective: opt(data.objective, 1000),
+      cta: opt(data.cta, 500),
+      productionNotes: opt(data.productionNotes, 3000),
+      successMetric: opt(data.successMetric, 500),
+      notes: opt(data.notes, 3000),
       ...(reopen ? { clientStatus: 'pending' } : {}),
     },
   })
@@ -128,6 +159,38 @@ export async function deleteCalendarItem(brandSpaceId: string, itemId: string): 
     return { ok: true }
   } catch {
     return { ok: false }
+  }
+}
+
+// One idea, one version per platform. Copies the idea (title, pillar, series, objective, message, hook) but NOT the
+// caption, script, video or dates, because each platform's version should be developed for that platform.
+export async function makeVersion(brandSpaceId: string, itemId: string, platform: string): Promise<{ ok: boolean; error?: string; itemId?: string }> {
+  try {
+    const item = await itemOf(brandSpaceId, itemId)
+    const target = platform.trim().slice(0, 40)
+    if (!target) return { ok: false, error: 'Please choose a platform.' }
+    const copy = await db.calendarItem.create({
+      data: {
+        brandSpaceId,
+        title: item.title,
+        platform: target,
+        status: 'idea',
+        pillar: item.pillar,
+        series: item.series,
+        objective: item.objective,
+        keyMessage: item.keyMessage,
+        hook: item.hook,
+        hookOptions: item.hookOptions,
+        priority: item.priority,
+        campaignId: item.campaignId,
+        projectId: item.projectId,
+        notes: `Version of "${item.title}" (${item.platform}). Develop it for ${target}.`,
+      },
+    })
+    refresh(brandSpaceId, copy.id)
+    return { ok: true, itemId: copy.id }
+  } catch {
+    return { ok: false, error: 'Could not make the version. Please try again.' }
   }
 }
 

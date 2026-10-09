@@ -73,6 +73,7 @@ model BrandSpace {
   intakeToken          String?  @unique // when set, clients can send a brief through a public form
   planToken            String?  @unique // when set, anyone with the link can view the content plan and approve posts
   planNote             String?  // the "direction" note shown at the top of the client plan
+  strategy             Json?    // content strategy: mission, season, pillars, platform roles and targets, series
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]
   notionEmbedUrl String?
@@ -269,6 +270,17 @@ model CalendarItem {
   script        String?
   caption       String?
   thumbnailUrl  String?  // cover image shown next to the video on the client plan
+  contentType   String?  // format: short_video | long_video | carousel | image | text | story | live | article
+  priority      String   @default("normal") // high | normal | low
+  productionDate DateTime? // when it is made; scheduledDate stays the PUBLISH date
+  pillar        String?  // a pillar name from the brand's content strategy
+  series        String?  // a series name from the brand's content strategy
+  hookOptions   String[] @default([]) // several hook ideas; `hook` holds the chosen one
+  objective     String?  // what this piece is for and who it is for
+  cta           String?  // call to action
+  productionNotes String? // B-roll, filming, props, design notes
+  successMetric String?  // how we will know it worked
+  notes         String?  // team-only notes
   clientStatus  String   @default("pending") // pending | changes_requested | approved (what the client decided)
   createdAt     DateTime @default(now())
 

@@ -52,6 +52,19 @@ export async function promoteIdea(ideaId: string, to: 'campaign' | 'project') {
   redirect(target)
 }
 
+// Turns an idea into a planned post: the weekly "pick the strongest ideas" step. It opens the new post to fill in the brief.
+export async function makePostFromIdea(ideaId: string, formData: FormData) {
+  const idea = await ideaForEdit(ideaId)
+  if (idea.status !== 'open') return
+  const platform = String(formData.get('platform') || '').trim().slice(0, 40) || 'Instagram'
+  const post = await db.calendarItem.create({
+    data: { brandSpaceId: idea.brandSpaceId, title: idea.title, platform, status: 'planned', notes: idea.notes ? idea.notes.slice(0, 3000) : null },
+  })
+  await db.idea.update({ where: { id: ideaId }, data: { status: 'promoted' } })
+  refresh(idea.brandSpaceId)
+  redirect(`/brand-spaces/${idea.brandSpaceId}/calendar/${post.id}`)
+}
+
 // Copies an idea from a personal brand into the company brand it sits under, so it can feed the business.
 // The company's copy says where it came from. The original leaves the open list (status "sent"), so nothing is counted twice.
 export async function sendIdeaToCompany(ideaId: string) {

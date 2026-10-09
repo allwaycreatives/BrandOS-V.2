@@ -1,4 +1,4 @@
-import { createIdea, promoteIdea, archiveIdea, deleteIdea, sendIdeaToCompany } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
+import { createIdea, promoteIdea, archiveIdea, deleteIdea, sendIdeaToCompany, makePostFromIdea } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
 
 type Brand = { id: string; name: string; color: string; parentId?: string | null }
 type Idea = { id: string; brandSpaceId: string; title: string; notes: string | null }
@@ -45,6 +45,14 @@ export default function IdeaList({ ideas, brands, fixedBrandId }: { ideas: Idea[
             </div>
             {idea.notes && <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>{idea.notes}</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: idea.notes ? 0 : 8 }}>
+              <form action={makePostFromIdea.bind(null, idea.id)} style={{ display: 'flex', gap: 4 }}>
+                <select name="platform" aria-label="Platform" style={{ fontSize: 12, padding: '2px 4px' }}>
+                  {['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'X', 'Facebook'].map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </select>
+                <button type="submit" style={small}>Make it a post</button>
+              </form>
               <form action={promoteIdea.bind(null, idea.id, 'campaign')}>
                 <button type="submit" style={small}>Make it a campaign</button>
               </form>

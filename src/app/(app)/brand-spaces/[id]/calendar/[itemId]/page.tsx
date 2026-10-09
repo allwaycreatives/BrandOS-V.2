@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import CalendarItemForm from './CalendarItemForm'
+import MakeVersion from './MakeVersion'
+import { parseStrategy } from '@/lib/strategy'
 import { addPostReply, sendBackForApproval } from '../actions'
 import { dayKey, CLIENT_STATUS_TEAM, KIND_WORD, visibleToClient } from '@/lib/plan'
 
@@ -49,12 +51,26 @@ export default async function CalendarItemPage({ params }: { params: { id: strin
             assetUrl: item.assetUrl || '',
             thumbnailUrl: item.thumbnailUrl || '',
             scheduledDate: item.scheduledDate ? dayKey(item.scheduledDate) : '',
+            productionDate: item.productionDate ? dayKey(item.productionDate) : '',
             status: item.status,
+            contentType: item.contentType || '',
+            priority: item.priority,
+            pillar: item.pillar || '',
+            series: item.series || '',
+            hookOptions: item.hookOptions,
+            objective: item.objective || '',
+            cta: item.cta || '',
+            productionNotes: item.productionNotes || '',
+            successMetric: item.successMetric || '',
+            notes: item.notes || '',
           }}
+          strategy={parseStrategy(access.brandSpace.strategy)}
         />
       ) : (
         <div className="card" style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{item.caption || 'No caption yet.'}</div>
       )}
+
+      {canEdit && <MakeVersion brandSpaceId={params.id} itemId={item.id} platform={item.platform} />}
 
       <div className="card" style={{ marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>

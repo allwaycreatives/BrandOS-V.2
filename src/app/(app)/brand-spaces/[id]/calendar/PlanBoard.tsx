@@ -5,11 +5,12 @@ import { useState } from 'react'
 import { scheduleCalendarItem } from './actions'
 import { addDays, dayNumber, mondayOf, todayKey, weekdayShort, weekLabel, CLIENT_STATUS_TEAM } from '@/lib/plan'
 
-export type PlanItem = { id: string; title: string; platform: string; status: string; date: string | null; clientStatus: string }
+export type PlanItem = { id: string; title: string; platform: string; status: string; date: string | null; clientStatus: string; pillar: string | null; priority: string }
+export type PlatformTarget = { name: string; perWeek: number }
 
 // A week per row, a day per cell. Drag a post onto a day to schedule it, or back to the tray to unschedule it.
 // (Dragging needs a mouse or trackpad. On a phone, open the post and set its date there.)
-export default function PlanBoard({ brandSpaceId, initialItems, start, weeks }: { brandSpaceId: string; initialItems: PlanItem[]; start: string; weeks: number }) {
+export default function PlanBoard({ brandSpaceId, initialItems, start, weeks, dateField = 'publish', targets = [] }: { brandSpaceId: string; initialItems: PlanItem[]; start: string; weeks: number; dateField?: 'publish' | 'production'; targets?: PlatformTarget[] }) {
   const [items, setItems] = useState(initialItems)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overKey, setOverKey] = useState<string | null>(null)
@@ -25,7 +26,7 @@ export default function PlanBoard({ brandSpaceId, initialItems, start, weeks }: 
     if (!before || before.date === day) return
     setMsg(null)
     setItems((all) => all.map((i) => (i.id === id ? { ...i, date: day } : i)))
-    const res = await scheduleCalendarItem(brandSpaceId, id, day)
+    const res = await scheduleCalendarItem(brandSpaceId, id, day, dateField)
     if (!res.ok) {
       setItems((all) => all.map((i) => (i.id === id ? { ...i, date: before.date } : i)))
       setMsg(res.error || 'Could not move this post.')
@@ -61,7 +62,7 @@ export default function PlanBoard({ brandSpaceId, initialItems, start, weeks }: 
       }}
     >
       <Link href={`/brand-spaces/${brandSpaceId}/calendar/${i.id}`} draggable={false} style={{ display: 'block' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{i.platform}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{i.platform}{i.pillar ? ` · ${i.pillar}` : ''}{i.priority === 'high' ? ' · High priority' : ''}</div>
         <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, margin: '2px 0 4px', overflowWrap: 'anywhere' }}>{i.title}</div>
         <div style={{ fontSize: 11, color: i.clientStatus === 'approved' ? 'var(--accent-text)' : 'var(--text-muted)' }}>
           {i.status === 'idea' ? 'Idea · hidden from client' : CLIENT_STATUS_TEAM[i.clientStatus] ?? i.clientStatus}
@@ -77,7 +78,7 @@ export default function PlanBoard({ brandSpaceId, initialItems, start, weeks }: 
     <div>
       <div {...cellProps('tray')} className={`plan-day${overKey === 'tray' ? ' is-over' : ''}`} style={{ marginBottom: 20, minHeight: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-          Not scheduled yet <span style={{ color: 'var(--text-muted)' }}>({unscheduled.length})</span>
+          {dateField === 'production' ? 'No production date yet' : 'Not scheduled yet'} <span style={{ color: 'var(--text-muted)' }}>({unscheduled.length})</span>
         </div>
         {unscheduled.length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Every post has a date. Drag a post here to take its date off.</div>
@@ -90,7 +91,23 @@ export default function PlanBoard({ brandSpaceId, initialItems, start, weeks }: 
 
       {rows.map((monday) => (
         <div key={monday} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Week of {weekLabel(monday)}</div>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 6 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)' }}>Week of {weekLabel(monday)}</div>
+            {targets.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {targets.map((t) => {
+                  const end = addDays(monday, 6)
+                  const planned = items.filter((i) => i.platform === t.name && i.status !== 'idea' && i.date && i.date >= monday && i.date <= end).length
+                  const short = t.perWeek >= 1 && planned < t.perWeek
+                  return (
+                    <span key={t.name} style={{ color: short ? 'var(--accent-text)' : undefined }}>
+                      {t.name} {planned} of {t.perWeek}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
           <div className="plan-week">
             {Array.from({ length: 7 }, (_, d) => {
               const key = addDays(monday, d)

@@ -30,6 +30,8 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Link cards show a thumbnail and title (YouTube, Vimeo, Drive, direct images, and any site's own preview image); older links fill in when a board is opened
 - Discovery: "Suggest questions" in the custom questionnaire builder drafts a second round for the specific business (from a description, the faces, and earlier answers); the owner edits before anything is saved. The summary shows every round, newest first
 - Send an idea to the company: an idea in a personal brand can be copied into its company brand with one tap ("From {Name}'s brand" is noted on the copy)
+- Content strategy page per brand (mission, season, pillars with a core pillar, platform roles with weekly targets, series). Posts carry a full brief: format, priority, pillar, series, publish AND production dates, hook options with a chosen hook, objective, call to action, production notes, success metric, team notes; the brief adapts to the format (a text post has no production plan)
+- Calendar views: Publishing, Production, By platform, Status board; weekly target check against each platform's target; "Make a version for another platform"; "Make it a post" on ideas
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -64,6 +66,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
 
 ## Next (brand families)
+- Visual & Production Bible template (10 pages, built from nested boards) and a "structure only" option when duplicating a brand (copy the system, not the strategy)
 - Duplicating a company brand does not copy its faces yet
 - Family-wide campaigns (one campaign that spans the shared brand and founders); guidance when a founder doubles up on a platform the shared brand covers
 
