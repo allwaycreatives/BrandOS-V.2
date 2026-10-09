@@ -69,6 +69,7 @@ export async function scheduleCalendarItem(brandSpaceId: string, itemId: string,
 }
 
 export type ItemDetails = {
+  title: string
   platform: string
   hook: string
   keyMessage: string
@@ -99,6 +100,8 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
     return { ok: false, error: 'You do not have access to change this post.' }
   }
 
+  const title = data.title.trim().slice(0, 200)
+  if (!title) return { ok: false, error: 'The post needs a title.' }
   const platform = data.platform.trim().slice(0, 40)
   if (!platform) return { ok: false, error: 'Please choose a platform.' }
   if (!STATUSES.includes(data.status as Status)) return { ok: false, error: 'That status is not valid.' }
@@ -124,6 +127,7 @@ export async function updateCalendarItemDetails(brandSpaceId: string, itemId: st
   await db.calendarItem.update({
     where: { id: itemId },
     data: {
+      title,
       platform,
       hook: data.hook.trim() || null,
       keyMessage: data.keyMessage.trim() || null,

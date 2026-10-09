@@ -32,6 +32,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Send an idea to the company: an idea in a personal brand can be copied into its company brand with one tap ("From {Name}'s brand" is noted on the copy)
 - Content strategy page per brand (mission, season, pillars with a core pillar, platform roles with weekly targets, series). Posts carry a full brief: format, priority, pillar, series, publish AND production dates, hook options with a chosen hook, objective, call to action, production notes, success metric, team notes; the brief adapts to the format (a text post has no production plan)
 - Calendar views: Publishing, Production, By platform, Status board; weekly target check against each platform's target; "Make a version for another platform"; "Make it a post" on ideas
+- Notion-style calendar: a clean month grid of small title chips (today circled, "No date (N)" tray, drag to reschedule); clicking a post opens it as a panel over the calendar (a direct link or refresh opens it as a full page). The post is a big editable title, a properties list, then the content brief, with a sticky save bar and an unsaved-changes guard
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -66,6 +67,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
 
 ## Next (brand families)
+- Import: a ready-made prompt for ChatGPT plus paste-and-preview import of posts and strategy; production-day presets with a shoot sheet; all-brands calendar and a Today panel on Home
 - Visual & Production Bible template (10 pages, built from nested boards) and a "structure only" option when duplicating a brand (copy the system, not the strategy)
 - Duplicating a company brand does not copy its faces yet
 - Family-wide campaigns (one campaign that spans the shared brand and founders); guidance when a founder doubles up on a platform the shared brand covers

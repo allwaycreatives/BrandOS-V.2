@@ -7,7 +7,7 @@ import CalendarCard from './CalendarCard'
 import PlanBoard, { type PlanItem } from './PlanBoard'
 import PlanShare from './PlanShare'
 import { PLATFORMS } from '../campaigns/constants'
-import { addDays, dayKey, dayLabel, mondayOf, todayKey, visibleToClient, weekLabel } from '@/lib/plan'
+import { addDays, dayKey, dayLabel, lastDayOf, monthKeyOf, monthTitle, mondayOf, todayKey, visibleToClient } from '@/lib/plan'
 import { parseStrategy } from '@/lib/strategy'
 
 const COLUMNS = [
@@ -18,10 +18,9 @@ const COLUMNS = [
   { key: 'published', label: 'Published' },
 ]
 
-const WEEKS = 4
 type View = 'publish' | 'production' | 'platform' | 'board'
 
-export default async function CalendarPage({ params, searchParams }: { params: { id: string }; searchParams: { view?: string; w?: string } }) {
+export default async function CalendarPage({ params, searchParams }: { params: { id: string }; searchParams: { view?: string; m?: string } }) {
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access
@@ -54,18 +53,23 @@ export default async function CalendarPage({ params, searchParams }: { params: {
   }
 
   // Plan data: the date shown is the publish date or the production date, depending on the view.
-  const wParam = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.w || '') ? (searchParams.w as string) : todayKey()
-  const start = mondayOf(wParam)
+  const monthKey = /^\d{4}-\d{2}$/.test(searchParams.m || '') ? (searchParams.m as string) : monthKeyOf(todayKey())
+  const firstDay = `${monthKey}-01`
+  const lastDay = lastDayOf(monthKey)
+  const start = mondayOf(firstDay)
+  const weeks = Math.ceil((Math.round((Date.parse(lastDay) - Date.parse(start)) / 86400000) + 1) / 7)
+  const gridEnd = addDays(start, weeks * 7)
   const field = view === 'production' ? 'production' : 'publish'
   const planItems: PlanItem[] = items.map((i) => {
     const d = field === 'production' ? i.productionDate : i.scheduledDate
     return { id: i.id, title: i.title, platform: i.platform, status: i.status, date: d ? dayKey(d) : null, clientStatus: i.clientStatus, pillar: i.pillar, priority: i.priority }
   })
-  const end = addDays(start, WEEKS * 7)
-  const hiddenEarlier = planItems.filter((i) => i.date && i.date < start).length
-  const hiddenLater = planItems.filter((i) => i.date && i.date >= end).length
+  // Posts dated outside this grid are not shown here; undated posts always are (under "No date").
+  const visibleStart = planItems.filter((i) => !i.date || (i.date >= start && i.date < gridEnd))
+  const prevMonth = monthKeyOf(addDays(firstDay, -1))
+  const nextMonth = monthKeyOf(addDays(lastDay, 1))
+  const monthHref = (m: string) => `${base}?${view === 'production' ? 'view=production&' : ''}m=${m}`
   const waiting = items.filter((i) => visibleToClient(i.status) && i.clientStatus === 'pending').length
-  const visibleStart = planItems.filter((i) => !i.date || (i.date >= start && i.date < end))
   const targets = view === 'publish' ? strategy.platforms.filter((p) => p.perWeek > 0).map((p) => ({ name: p.name, perWeek: p.perWeek })) : []
 
   // By platform: strategy platforms first (primary, secondary, supporting), then any other platform in use.
@@ -183,25 +187,20 @@ export default async function CalendarPage({ params, searchParams }: { params: {
         <>
           {!isClient && view === 'publish' && <PlanShare brandSpaceId={params.id} brandName={brandSpace!.name} token={brandSpace!.planToken} note={brandSpace!.planNote || ''} waiting={waiting} />}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-            <Link href={`${base}?${view === 'production' ? 'view=production&' : ''}w=${addDays(start, -WEEKS * 7)}`} style={tab(false)}>← Earlier</Link>
-            <Link href={view === 'production' ? `${base}?view=production` : base} style={tab(false)}>This week</Link>
-            <Link href={`${base}?${view === 'production' ? 'view=production&' : ''}w=${addDays(start, WEEKS * 7)}`} style={tab(false)}>Later →</Link>
-            <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{weekLabel(start)} and the next {WEEKS - 1} weeks</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 22, fontWeight: 600, marginRight: 8 }}>{monthTitle(monthKey)}</div>
+            <Link href={monthHref(prevMonth)} style={tab(false)} aria-label="Previous month">←</Link>
+            <Link href={view === 'production' ? `${base}?view=production` : base} style={tab(false)}>Today</Link>
+            <Link href={monthHref(nextMonth)} style={tab(false)} aria-label="Next month">→</Link>
           </div>
-          {(hiddenEarlier > 0 || hiddenLater > 0) && (
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-              {hiddenEarlier > 0 && `${hiddenEarlier} dated ${hiddenEarlier === 1 ? 'post is' : 'posts are'} earlier. `}
-              {hiddenLater > 0 && `${hiddenLater} dated ${hiddenLater === 1 ? 'post is' : 'posts are'} later.`}
-            </div>
-          )}
           {/* key makes the board reset when you step to other weeks, switch views, or add a post */}
           <PlanBoard
-            key={`${view}:${start}:${visibleStart.map((i) => `${i.id}${i.date}${i.status}${i.clientStatus}${i.pillar}${i.priority}`).join('|')}`}
+            key={`${view}:${monthKey}:${visibleStart.map((i) => `${i.id}${i.date}${i.status}${i.clientStatus}${i.pillar}${i.priority}`).join('|')}`}
             brandSpaceId={params.id}
             initialItems={visibleStart}
             start={start}
-            weeks={WEEKS}
+            weeks={weeks}
+            monthKey={monthKey}
             dateField={field}
             targets={targets}
           />

@@ -28,6 +28,15 @@ export const dayLabel = (key: string) => fmt(key, { weekday: 'short', day: 'nume
 export const dayLong = (key: string) => fmt(key, { weekday: 'long', day: 'numeric', month: 'long' })
 export const weekdayShort = (key: string) => fmt(key, { weekday: 'short' })
 export const dayNumber = (key: string) => fmt(key, { day: 'numeric' })
+export const monthKeyOf = (key: string) => key.slice(0, 7)
+export const monthTitle = (monthKey: string) => (parseDay(`${monthKey}-01`) as Date).toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'long', year: 'numeric' })
+export const lastDayOf = (monthKey: string) => {
+  const d = parseDay(`${monthKey}-01`) as Date
+  d.setUTCMonth(d.getUTCMonth() + 1, 0)
+  return dayKey(d)
+}
+// A day's number for the calendar grid; the first of a month also shows the month, like "1 Nov".
+export const gridDayLabel = (key: string) => (key.endsWith('-01') ? fmt(key, { day: 'numeric', month: 'short' }) : dayNumber(key))
 export const weekLabel = (mondayKey: string) => `${fmt(mondayKey, { day: 'numeric', month: 'short' })} – ${fmt(addDays(mondayKey, 6), { day: 'numeric', month: 'short' })}`
 
 // What the client sees: every post that is not still an idea.

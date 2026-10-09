@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { upload } from '@vercel/blob/client'
 import { updateCalendarItemDetails, deleteCalendarItem, type ItemDetails } from '../actions'
 import { PLATFORMS } from '../../campaigns/constants'
 import { CONTENT_TYPES, PRIORITIES, typeOf } from '@/lib/contentOptions'
+import { setDirty } from '@/lib/dirtyFlag'
 import type { Strategy } from '@/lib/strategy'
 
 const STATUS_OPTIONS = [
@@ -16,15 +17,29 @@ const STATUS_OPTIONS = [
   { key: 'published', label: 'Published' },
 ]
 
-export default function CalendarItemForm({ brandSpaceId, itemId, initial, strategy }: { brandSpaceId: string; itemId: string; initial: ItemDetails; strategy: Strategy }) {
+type TextKey = 'hook' | 'cta' | 'objective' | 'keyMessage' | 'caption' | 'successMetric' | 'notes' | 'script' | 'productionNotes' | 'assetUrl'
+
+// A post, laid out like a Notion page: the title, a list of properties, then the content brief.
+export default function CalendarItemForm({ brandSpaceId, itemId, initial, strategy, clientLine }: { brandSpaceId: string; itemId: string; initial: ItemDetails; strategy: Strategy; clientLine: string }) {
   const router = useRouter()
   const [v, setV] = useState(initial)
+  const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(initial))
   const [isPending, startTransition] = useTransition()
-  const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [justSaved, setJustSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof ItemDetails>(key: K, val: ItemDetails[K]) => setV((x) => ({ ...x, [key]: val }))
+
+  const dirty = JSON.stringify(v) !== savedSnapshot
+  useEffect(() => {
+    setDirty(dirty)
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+  useEffect(() => () => setDirty(false), [])
 
   const type = typeOf(v.contentType)
   const isText = v.contentType === 'text' || v.contentType === 'article'
@@ -37,9 +52,10 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
     startTransition(async () => {
       const res = await updateCalendarItemDetails(brandSpaceId, itemId, v)
       if (!res.ok) return setError(res.error || 'Could not save.')
-      setSaved(true)
+      setSavedSnapshot(JSON.stringify(v))
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 1500)
       router.refresh()
-      setTimeout(() => setSaved(false), 1500)
     })
   }
 
@@ -66,134 +82,102 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
     startTransition(async () => {
       const res = await deleteCalendarItem(brandSpaceId, itemId)
       if (res.ok) {
+        setDirty(false)
         router.push(`/brand-spaces/${brandSpaceId}/calendar`)
         router.refresh()
       } else setError('Could not delete this post.')
     })
   }
 
-  const label = (text: string, hint?: string) => (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{text}</div>
-      {hint && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{hint}</div>}
+  const row = (name: string, control: React.ReactNode) => (
+    <div className="prop-row">
+      <div className="prop-label">{name}</div>
+      <div>{control}</div>
     </div>
   )
-  const section = (title: string, children: React.ReactNode) => (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div style={{ fontWeight: 600, marginBottom: 12 }}>{title}</div>
-      {children}
+  const input = (key: TextKey, placeholder = '') => <input style={{ width: '100%' }} value={v[key]} placeholder={placeholder} onChange={(e) => set(key, e.target.value)} />
+  const area = (key: TextKey, rows = 2, placeholder = '') => <textarea rows={rows} style={{ width: '100%' }} value={v[key]} placeholder={placeholder} onChange={(e) => set(key, e.target.value)} />
+  const select = (value: string, onChange: (x: string) => void, options: { value: string; label: string }[]) => (
+    <select style={{ width: '100%', maxWidth: 360 }} value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  )
+  const heading = (t: string, hint?: string) => (
+    <div style={{ margin: '26px 0 8px' }}>
+      <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 19, fontWeight: 600 }}>{t}</div>
+      {hint && <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{hint}</div>}
     </div>
   )
-  type TextKey = 'objective' | 'keyMessage' | 'script' | 'cta' | 'productionNotes' | 'caption' | 'successMetric' | 'notes' | 'assetUrl' | 'hook'
-  const text = (key: TextKey, title: string, o: { area?: boolean; rows?: number; placeholder?: string; hint?: string } = {}) => (
-    <div style={{ marginBottom: 16 }}>
-      {label(title, o.hint)}
-      {o.area ? (
-        <textarea rows={o.rows ?? 3} style={{ width: '100%' }} value={v[key]} placeholder={o.placeholder} onChange={(e) => set(key, e.target.value)} />
-      ) : (
-        <input style={{ width: '100%' }} value={v[key]} placeholder={o.placeholder} onChange={(e) => set(key, e.target.value)} />
-      )}
-    </div>
-  )
-  const cell = (flex: string, children: React.ReactNode) => <div style={{ flex }}>{children}</div>
 
   return (
     <div>
-      {section(
-        'Plan',
-        <>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-            {cell('1 1 200px', <>{label('Format')}<select style={{ width: '100%' }} value={v.contentType} onChange={(e) => set('contentType', e.target.value)}>
-              <option value="">Choose a format</option>
-              {CONTENT_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select></>)}
-            {cell('1 1 140px', <>{label('Platform')}<select style={{ width: '100%' }} value={v.platform} onChange={(e) => set('platform', e.target.value)}>
-              {Array.from(new Set([...PLATFORMS, v.platform])).map((p) => <option key={p}>{p}</option>)}
-            </select></>)}
-            {cell('1 1 200px', <>{label('Status')}<select style={{ width: '100%' }} value={v.status} onChange={(e) => set('status', e.target.value)}>
-              {STATUS_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select></>)}
-            {cell('1 1 110px', <>{label('Priority')}<select style={{ width: '100%' }} value={v.priority} onChange={(e) => set('priority', e.target.value)}>
-              {PRIORITIES.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-            </select></>)}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-            {cell('1 1 160px', <>{label('Publish date')}<input type="date" style={{ width: '100%' }} value={v.scheduledDate} onChange={(e) => set('scheduledDate', e.target.value)} /></>)}
-            {cell('1 1 160px', <>{label('Production date', 'When it is made')}<input type="date" style={{ width: '100%' }} value={v.productionDate} onChange={(e) => set('productionDate', e.target.value)} /></>)}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {cell('1 1 200px', <>{label('Pillar', strategy.pillars.length === 0 ? 'Add pillars on the Strategy page' : undefined)}<select style={{ width: '100%' }} value={v.pillar} onChange={(e) => set('pillar', e.target.value)}>
-              <option value="">No pillar</option>
-              {pillarNames.map((n) => <option key={n}>{n}</option>)}
-            </select></>)}
-            {cell('1 1 200px', <>{label('Series')}<select style={{ width: '100%' }} value={v.series} onChange={(e) => set('series', e.target.value)}>
-              <option value="">No series</option>
-              {seriesNames.map((n) => <option key={n}>{n}</option>)}
-            </select></>)}
-          </div>
-        </>
-      )}
+      <input className="post-title" value={v.title} onChange={(e) => set('title', e.target.value)} placeholder="Untitled" aria-label="Title" />
+      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>{clientLine}</div>
 
-      {section(
-        'The brief',
-        <>
-          {text('objective', 'Objective and who it is for', { area: true, rows: 2, hint: 'What this piece is meant to do, and for whom.' })}
-          {text('keyMessage', 'Main message', { hint: 'The one thing this piece needs to communicate.' })}
-
-          <div style={{ marginBottom: 16 }}>
-            {label('Hook options', 'Write several, then pick the one you will use.')}
+      <div>
+        {row('Platform', select(v.platform, (x) => set('platform', x), Array.from(new Set([...PLATFORMS, v.platform])).map((p) => ({ value: p, label: p }))))}
+        {row('Format', select(v.contentType, (x) => set('contentType', x), [{ value: '', label: 'Choose a format' }, ...CONTENT_TYPES.map((t) => ({ value: t.key, label: t.label }))]))}
+        {row('Content pillar', select(v.pillar, (x) => set('pillar', x), [{ value: '', label: strategy.pillars.length ? 'No pillar' : 'No pillar (add them on the Strategy page)' }, ...pillarNames.map((n) => ({ value: n, label: n }))]))}
+        {row('Series', select(v.series, (x) => set('series', x), [{ value: '', label: 'No series' }, ...seriesNames.map((n) => ({ value: n, label: n }))]))}
+        {row('Priority', select(v.priority, (x) => set('priority', x), PRIORITIES.map((p) => ({ value: p.key, label: p.label }))))}
+        {row('Status', select(v.status, (x) => set('status', x), STATUS_OPTIONS.map((s) => ({ value: s.key, label: s.label }))))}
+        {row('Publish date', <input type="date" value={v.scheduledDate} onChange={(e) => set('scheduledDate', e.target.value)} />)}
+        {row('Production date', <input type="date" value={v.productionDate} onChange={(e) => set('productionDate', e.target.value)} />)}
+        {row(
+          'Hook',
+          <div>
+            {input('hook', 'The chosen hook: the first line that stops the scroll')}
+            {v.hookOptions.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 4px' }}>Hook options</div>}
             {v.hookOptions.map((h, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
                 <input style={{ flex: 1, minWidth: 0 }} value={h} onChange={(e) => set('hookOptions', v.hookOptions.map((x, idx) => (idx === i ? e.target.value : x)))} placeholder={`Hook option ${i + 1}`} />
                 <button type="button" onClick={() => set('hook', h)} disabled={!h.trim()} style={{ fontSize: 12 }}>{v.hook && v.hook === h ? '✓ Chosen' : 'Use this'}</button>
-                <button type="button" onClick={() => set('hookOptions', v.hookOptions.filter((_, idx) => idx !== i))} aria-label="Remove hook" style={{ fontSize: 12, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Remove</button>
+                <button type="button" onClick={() => set('hookOptions', v.hookOptions.filter((_, idx) => idx !== i))} aria-label="Remove hook option" style={{ fontSize: 12, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Remove</button>
               </div>
             ))}
-            {v.hookOptions.length < 12 && <button type="button" onClick={() => set('hookOptions', [...v.hookOptions, ''])} style={{ fontSize: 12.5 }}>Add a hook option</button>}
+            {v.hookOptions.length < 12 && (
+              <button type="button" onClick={() => set('hookOptions', [...v.hookOptions, ''])} style={{ fontSize: 12.5, marginTop: 4 }}>Add a hook option</button>
+            )}
           </div>
-          {text('hook', 'Chosen hook', { hint: 'The first line that stops the scroll. This is the one the plan shows.' })}
-          {text('script', type?.scriptLabel ?? 'Script or outline', { area: true, rows: isText ? 5 : 7 })}
-          {text('cta', 'Call to action', { placeholder: 'What should the viewer do next?' })}
-        </>
-      )}
+        )}
+        {row('CTA', input('cta', 'What should the viewer do next?'))}
+        {row('Objective', area('objective', 2, 'What this piece is for, and who it is for'))}
+        {row('Main message', input('keyMessage', 'The one thing this piece needs to communicate'))}
+        {row('Caption', area('caption', 3, 'The client sees this'))}
+        {row('Success metric', input('successMetric', 'How will we know it worked?'))}
+        {row('Notes', area('notes', 2, 'Team only'))}
+      </div>
 
-      {section(
-        isText ? 'Files' : 'Production',
-        <>
-          {!isText && text('productionNotes', isVideo ? 'Production notes' : 'Design notes', { area: true, rows: 4, hint: isVideo ? 'Filming, B-roll, props, location, editing notes.' : 'Visuals, layout, references.' })}
-          {text('assetUrl', isVideo ? 'Video link (Google Drive set to "Anyone with the link", YouTube, Vimeo)' : 'File or image link', { placeholder: 'https://drive.google.com/file/d/...' })}
-          {!isText && (
-            <div style={{ marginBottom: 4 }}>
-              {label('Thumbnail (shown next to the video)', 'Paste a link or upload an image.')}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <input style={{ flex: '1 1 220px' }} value={v.thumbnailUrl} onChange={(e) => set('thumbnailUrl', e.target.value)} placeholder="https://..." />
-                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? 'Uploading...' : 'Upload image'}</button>
-                <input ref={fileRef} type="file" accept="image/*" onChange={onThumb} style={{ display: 'none' }} />
-              </div>
-              {v.thumbnailUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={v.thumbnailUrl} alt="Thumbnail preview" style={{ marginTop: 8, height: 96, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
-              )}
+      {heading('Content brief', type?.scriptLabel ?? 'Script or outline')}
+      <textarea rows={isText ? 8 : 12} style={{ width: '100%' }} value={v.script} onChange={(e) => set('script', e.target.value)} placeholder="Write the script, outline or draft here." />
+
+      {heading(isText ? 'Files' : 'Production')}
+      {!isText && <div>{row(isVideo ? 'Production notes' : 'Design notes', area('productionNotes', 4, isVideo ? 'Filming, B-roll, props, location, editing' : 'Visuals, layout, references'))}</div>}
+      {row(isVideo ? 'Video link' : 'File link', input('assetUrl', 'Google Drive set to "Anyone with the link", YouTube, or Vimeo'))}
+      {!isText &&
+        row(
+          'Thumbnail',
+          <div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input style={{ flex: '1 1 220px' }} value={v.thumbnailUrl} onChange={(e) => set('thumbnailUrl', e.target.value)} placeholder="Paste a link or upload an image" />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? 'Uploading...' : 'Upload image'}</button>
+              <input ref={fileRef} type="file" accept="image/*" onChange={onThumb} style={{ display: 'none' }} />
             </div>
-          )}
-        </>
-      )}
+            {v.thumbnailUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={v.thumbnailUrl} alt="Thumbnail preview" style={{ marginTop: 8, height: 96, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+            )}
+          </div>
+        )}
 
-      {section(
-        'Publishing',
-        <>
-          {text('caption', 'Caption (the client sees this)', { area: true, rows: 4 })}
-          {text('successMetric', 'Success metric', { placeholder: 'How will we know it worked?' })}
-        </>
-      )}
-
-      {section('Team notes', <>{text('notes', 'Notes (team only)', { area: true, rows: 3 })}</>)}
-
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="primary" onClick={handleSave} disabled={isPending || uploading}>{isPending ? 'Saving...' : saved ? 'Saved!' : 'Save'}</button>
+      <div className="post-savebar">
+        <button className="primary" onClick={handleSave} disabled={isPending || uploading || !dirty}>{isPending ? 'Saving...' : 'Save'}</button>
+        <span style={{ fontSize: 12.5, color: dirty ? 'var(--accent-text)' : 'var(--text-muted)' }}>{justSaved ? 'Saved' : dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+        {error && <span style={{ fontSize: 12.5, color: 'var(--accent-text)' }}>{error}</span>}
         <button type="button" onClick={remove} disabled={isPending} style={{ marginLeft: 'auto', fontSize: 12.5 }}>Delete post</button>
       </div>
-      {error && <div style={{ fontSize: 12.5, color: 'var(--accent-text)', marginTop: 10 }}>{error}</div>}
     </div>
   )
 }
