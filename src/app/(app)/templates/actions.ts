@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
 import { getUserBrands } from '@/lib/brands'
 
-type CardSnap = { type: string; content: string; x: number; y: number }
+type CardSnap = { type: string; content: string; x: number; y: number; w?: number | null; h?: number | null; s?: string | null }
 type ContentSnap = { title: string; platform: string; hook: string | null; keyMessage: string | null; script: string | null; caption: string | null }
 type TaskSnap = { title: string; description: string | null }
 type BoardSnap = { name: string; cards: CardSnap[] }
@@ -20,8 +20,8 @@ export type TemplatePayload = {
   boards?: BoardSnap[]
 }
 
-const cardsOf = (cards: { type: string; content: string; positionX: number; positionY: number }[]): CardSnap[] =>
-  cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, x: c.positionX, y: c.positionY }))
+const cardsOf = (cards: { type: string; content: string; positionX: number; positionY: number; width: number | null; height: number | null; style: string | null }[]): CardSnap[] =>
+  cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, x: c.positionX, y: c.positionY, w: c.width, h: c.height, s: c.style }))
 
 async function requireEdit(brandSpaceId: string) {
   const access = await assertBrandSpaceAccess(brandSpaceId)
@@ -78,7 +78,7 @@ export async function createFromTemplate(templateId: string, brandSpaceId: strin
   await requireEdit(brandSpaceId)
 
   const p = t.payloadJson as unknown as TemplatePayload
-  const cardCreate = (cards: CardSnap[]) => ({ create: cards.map((c) => ({ type: c.type, content: c.content, positionX: c.x, positionY: c.y })) })
+  const cardCreate = (cards: CardSnap[]) => ({ create: cards.map((c) => ({ type: c.type, content: c.content, positionX: c.x, positionY: c.y, width: c.w ?? null, height: c.h ?? null, style: c.s ?? null })) })
   const taskCreate = (tasks: TaskSnap[]) => ({ create: tasks.map((x) => ({ brandSpaceId, title: x.title, description: x.description, status: 'open' })) })
 
   revalidatePath('/dashboard')

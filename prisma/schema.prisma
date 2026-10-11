@@ -144,6 +144,9 @@ model BoardCard {
   positionX Float    @default(0)
   positionY Float    @default(0)
   meta      String?  // link cards: saved preview as JSON (title, image). null = not fetched yet, {} = nothing found
+  width     Float?   // set when the card has been resized; null = the card's natural width
+  height    Float?   // set when the card has been resized; null = height follows the content
+  style     String?  // text and colour choices as JSON: size, bold, italic, alignment, colours, title, subtitle
   createdAt DateTime @default(now())
 
   board Board @relation(fields: [boardId], references: [id])

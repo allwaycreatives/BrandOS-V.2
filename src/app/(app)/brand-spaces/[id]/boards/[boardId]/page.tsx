@@ -61,7 +61,7 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
         inner={inner}
         needsAdopt={!readOnly && inside.some((b) => !tiled.has(b.id))}
         canNest={depth < MAX_BOARD_DEPTH}
-        cards={cards.map((c) => ({ id: c.id, type: c.type, content: c.content, meta: c.meta, positionX: c.positionX, positionY: c.positionY }))}
+        cards={cards.map((c) => ({ id: c.id, type: c.type, content: c.content, meta: c.meta, width: c.width, height: c.height, style: c.style, positionX: c.positionX, positionY: c.positionY }))}
       />
     </div>
   )

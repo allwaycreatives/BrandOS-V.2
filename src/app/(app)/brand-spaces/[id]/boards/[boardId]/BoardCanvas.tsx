@@ -3,15 +3,41 @@
 import { useEffect, useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
 import { useRouter } from 'next/navigation'
-import { addBoardCardAt, moveBoardCard, deleteBoardCard, updateBoardCard, refreshLinkPreview, renameBoardTile, adoptInnerBoards } from '../actions'
+import {
+  addBoardCardAt,
+  moveBoardCards,
+  deleteBoardCards,
+  updateBoardCard,
+  deleteBoardCard,
+  refreshLinkPreview,
+  renameBoardTile,
+  adoptInnerBoards,
+  resizeBoardCard,
+  styleBoardCards,
+} from '../actions'
+import BoardInspector from './BoardInspector'
+import { HANDLES, movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
+import { DEFAULT_FS, MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, readableText, styleToJson, type CardStyle } from '@/lib/boardStyle'
 
-type Card = { id: string; type: string; content: string; meta: string | null; positionX: number; positionY: number }
+type Card = {
+  id: string
+  type: string
+  content: string
+  meta: string | null
+  width: number | null
+  height: number | null
+  style: string | null
+  positionX: number
+  positionY: number
+}
 type Inner = { id: string; name: string; cards: number; boards: number }
 type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
-type DragState =
-  | { kind: 'card'; id: string; lastX: number; lastY: number; moved: boolean }
+type Drag =
+  | { kind: 'cards'; ids: string[]; startX: number; startY: number; origin: Map<string, { x: number; y: number }>; dx: number; dy: number; moved: boolean; clickedId: string; onUp: 'collapse' | 'remove' | null }
   | { kind: 'pan'; lastX: number; lastY: number }
+  | { kind: 'marquee'; sx: number; sy: number; additive: boolean; base: Set<string>; moved: boolean }
+  | { kind: 'resize'; id: string; handle: Handle; start: Rect; hadHeight: boolean; startX: number; startY: number; last: Rect }
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
@@ -23,6 +49,7 @@ const PAPER: React.CSSProperties = {
   borderRadius: 6,
   boxShadow: '0 1px 2px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.25)',
 }
+const CURSOR: Record<Handle, string> = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
 
 function parseColor(content: string) {
   const [hex = '#888888', role = '', use = ''] = content.split('|')
@@ -45,6 +72,12 @@ function hostOf(url: string) {
   } catch {
     return url
   }
+}
+
+// Where a handle sits on the card's edge, as left/top percentages.
+const HANDLE_POS: Record<Handle, { l: string; t: string }> = {
+  nw: { l: '0%', t: '0%' }, n: { l: '50%', t: '0%' }, ne: { l: '100%', t: '0%' }, e: { l: '100%', t: '50%' },
+  se: { l: '100%', t: '100%' }, s: { l: '50%', t: '100%' }, sw: { l: '0%', t: '100%' }, w: { l: '0%', t: '50%' },
 }
 
 export default function BoardCanvas({
@@ -72,31 +105,88 @@ export default function BoardCanvas({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set())
-  const dragState = useRef<DragState | null>(null)
+  const [selected, setSelectedState] = useState<Set<string>>(new Set())
+  const [tool, setTool] = useState<'select' | 'hand'>('select')
+  const [multi, setMulti] = useState(false) // taps add to the selection (for phones, and for anyone who forgets Shift)
+  const [spaceDown, setSpaceDown] = useState(false)
+  const [marquee, setMarquee] = useState<Rect | null>(null)
+  const [cursorGrab, setCursorGrab] = useState(false)
+
+  const selRef = useRef(selected)
+  const dragRef = useRef<Drag | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const setSelected = (next: Set<string>) => {
+    selRef.current = next
+    setSelectedState(next)
+  }
+
+  // ---------- pointer handling ----------
+
   function handlePointerDown(e: React.PointerEvent) {
     const target = e.target as HTMLElement
-    if (target.closest('button, textarea, input, a')) return
+    if (target.closest('button, textarea, input, select, a, [data-nodrag]')) return
+    if (e.button === 2) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const el = e.currentTarget as HTMLElement
+
     if (pointers.current.size === 2) {
       // Two fingers: pinch to zoom instead of dragging.
       const [a, b] = Array.from(pointers.current.values())
       pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
-      dragState.current = null
-      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      dragRef.current = null
+      setMarquee(null)
+      el.setPointerCapture?.(e.pointerId)
       return
     }
+
+    const handleEl = target.closest('[data-handle]') as HTMLElement | null
     const cardEl = target.closest('[data-card]') as HTMLElement | null
-    if (cardEl && !readOnly) {
-      dragState.current = { kind: 'card', id: cardEl.dataset.cardId as string, lastX: e.clientX, lastY: e.clientY, moved: false }
-    } else {
-      dragState.current = { kind: 'pan', lastX: e.clientX, lastY: e.clientY }
+    const panWanted = readOnly || tool === 'hand' || spaceDown || e.button === 1
+
+    if (handleEl && cardEl && !readOnly && !panWanted) {
+      const id = cardEl.dataset.cardId as string
+      const card = cards.find((c) => c.id === id)
+      if (card) {
+        const r = cardEl.getBoundingClientRect()
+        const w = r.width > 0 ? r.width / zoom : card.width ?? WIDTH[card.type] ?? 210
+        const h = r.height > 0 ? r.height / zoom : card.height ?? 100
+        const start: Rect = { x: card.positionX, y: card.positionY, w, h }
+        dragRef.current = { kind: 'resize', id, handle: handleEl.dataset.handle as Handle, start, hadHeight: card.height != null, startX: e.clientX, startY: e.clientY, last: start }
+        el.setPointerCapture?.(e.pointerId)
+        return
+      }
     }
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+
+    if (cardEl && !readOnly && !panWanted) {
+      const id = cardEl.dataset.cardId as string
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey || multi
+      const sel = selectOnDown(selRef.current, id, additive)
+      setSelected(sel.next)
+      const origin = new Map<string, { x: number; y: number }>()
+      for (const cid of sel.dragIds) {
+        const c = cards.find((x) => x.id === cid)
+        if (c) origin.set(cid, { x: c.positionX, y: c.positionY })
+      }
+      dragRef.current = { kind: 'cards', ids: sel.dragIds, startX: e.clientX, startY: e.clientY, origin, dx: 0, dy: 0, moved: false, clickedId: id, onUp: sel.onUp }
+      el.setPointerCapture?.(e.pointerId)
+      return
+    }
+
+    // Empty space (or a card when only looking). Panning for the hand tool, Space, the middle button and touch;
+    // otherwise a drag draws a box that selects whatever it touches.
+    if (panWanted || e.pointerType === 'touch') {
+      dragRef.current = { kind: 'pan', lastX: e.clientX, lastY: e.clientY }
+      setCursorGrab(true)
+    } else {
+      const rect = containerRef.current?.getBoundingClientRect()
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey || multi
+      dragRef.current = { kind: 'marquee', sx: e.clientX - (rect?.left ?? 0), sy: e.clientY - (rect?.top ?? 0), additive, base: additive ? new Set(selRef.current) : new Set(), moved: false }
+    }
+    el.setPointerCapture?.(e.pointerId)
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -110,36 +200,103 @@ export default function BoardCanvas({
       }
       return
     }
-    const drag = dragState.current
+    const drag = dragRef.current
     if (!drag) return
-    const dx = e.clientX - drag.lastX
-    const dy = e.clientY - drag.lastY
-    if (drag.kind === 'card') {
-      drag.moved = true
-      setCards((prev) => prev.map((c) => (c.id === drag.id ? { ...c, positionX: c.positionX + dx / zoom, positionY: c.positionY + dy / zoom } : c)))
-    } else {
+
+    if (drag.kind === 'pan') {
+      const dx = e.clientX - drag.lastX
+      const dy = e.clientY - drag.lastY
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }))
+      drag.lastX = e.clientX
+      drag.lastY = e.clientY
+      return
     }
-    drag.lastX = e.clientX
-    drag.lastY = e.clientY
+
+    if (drag.kind === 'cards') {
+      const sx = e.clientX - drag.startX
+      const sy = e.clientY - drag.startY
+      if (!drag.moved && !movedEnough(sx, sy)) return
+      drag.moved = true
+      drag.dx = sx / zoom
+      drag.dy = sy / zoom
+      const { origin, dx, dy } = drag
+      setCards((prev) => prev.map((c) => (origin.has(c.id) ? { ...c, positionX: (origin.get(c.id) as { x: number }).x + dx, positionY: (origin.get(c.id) as { y: number }).y + dy } : c)))
+      return
+    }
+
+    if (drag.kind === 'resize') {
+      const card = cards.find((c) => c.id === drag.id)
+      if (!card) return
+      const min = MIN_SIZE[card.type] ?? { w: 60, h: 40 }
+      const r = resizeRect(drag.start, drag.handle, (e.clientX - drag.startX) / zoom, (e.clientY - drag.startY) / zoom, min, MAX_CARD_SIZE, card.type === 'image')
+      drag.last = r
+      const vertical = drag.handle.includes('n') || drag.handle.includes('s')
+      const setHeight = card.type !== 'image' && (vertical || drag.hadHeight)
+      setCards((prev) => prev.map((c) => (c.id === drag.id ? { ...c, positionX: r.x, positionY: r.y, width: r.w, height: setHeight ? r.h : null } : c)))
+      return
+    }
+
+    if (drag.kind === 'marquee') {
+      const rect = containerRef.current?.getBoundingClientRect()
+      const cx = e.clientX - (rect?.left ?? 0)
+      const cy = e.clientY - (rect?.top ?? 0)
+      if (!drag.moved && !movedEnough(cx - drag.sx, cy - drag.sy)) return
+      drag.moved = true
+      const box = normalizeRect(drag.sx, drag.sy, cx, cy)
+      setMarquee(box)
+      // Compare on screen, using the real size of each card as drawn (their heights follow their content).
+      const hits = new Set(drag.base)
+      const left = (rect?.left ?? 0) + box.x
+      const top = (rect?.top ?? 0) + box.y
+      containerRef.current?.querySelectorAll<HTMLElement>('[data-card]').forEach((node) => {
+        const r = node.getBoundingClientRect()
+        if (r.left < left + box.w && r.right > left && r.top < top + box.h && r.bottom > top) hits.add(node.dataset.cardId as string)
+      })
+      setSelected(hits)
+    }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinchDist.current = null
-    if (pointers.current.size === 1 && !dragState.current) {
+    if (pointers.current.size === 1 && !dragRef.current) {
       // One finger left after a pinch: carry on as a pan, without a jump.
       const [p] = Array.from(pointers.current.values())
-      dragState.current = { kind: 'pan', lastX: p.x, lastY: p.y }
+      dragRef.current = { kind: 'pan', lastX: p.x, lastY: p.y }
       return
     }
-    const drag = dragState.current
-    if (drag?.kind === 'card' && drag.moved) {
+    const drag = dragRef.current
+    dragRef.current = null
+    setCursorGrab(false)
+    if (!drag) return
+
+    if (drag.kind === 'cards') {
+      if (drag.moved) {
+        const moves = drag.ids.flatMap((id) => {
+          const o = drag.origin.get(id)
+          return o ? [{ id, x: o.x + drag.dx, y: o.y + drag.dy }] : []
+        })
+        moveBoardCards(boardId, moves).catch(() => {})
+      } else if (drag.onUp === 'collapse') {
+        setSelected(new Set([drag.clickedId]))
+      } else if (drag.onUp === 'remove') {
+        const next = new Set(selRef.current)
+        next.delete(drag.clickedId)
+        setSelected(next)
+      }
+    } else if (drag.kind === 'resize') {
       const card = cards.find((c) => c.id === drag.id)
-      if (card) moveBoardCard(card.id, card.positionX, card.positionY).catch(() => {})
+      const r = drag.last
+      const vertical = drag.handle.includes('n') || drag.handle.includes('s')
+      const keepHeight = card && card.type !== 'image' && (vertical || drag.hadHeight)
+      if (card) resizeBoardCard(boardId, drag.id, { x: r.x, y: r.y, w: r.w, h: keepHeight ? r.h : null }).catch(() => {})
+    } else if (drag.kind === 'marquee') {
+      setMarquee(null)
+      if (!drag.moved && !drag.additive) setSelected(new Set()) // a plain click on empty space clears the selection
     }
-    dragState.current = null
   }
+
+  // ---------- zoom ----------
 
   function zoomAt(clientX: number, clientY: number, factor: number) {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -166,6 +323,58 @@ export default function BoardCanvas({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  function zoomButton(factor: number) {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
+  }
+
+  // ---------- keyboard ----------
+
+  const deleteRef = useRef<() => void>()
+  deleteRef.current = deleteSelected
+  useEffect(() => {
+    const typingIn = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
+    }
+    const onDown = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (typingIn(e.target)) return
+      if (e.code === 'Space' && !(el && (el.tagName === 'BUTTON' || el.tagName === 'A'))) {
+        e.preventDefault()
+        setSpaceDown(true)
+        return
+      }
+      if (readOnly) return
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selRef.current.size > 0) {
+        e.preventDefault()
+        deleteRef.current?.()
+      } else if (e.key === 'Escape') {
+        setSelected(new Set())
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        setSelected(new Set(cardsRef.current.map((c) => c.id)))
+      }
+    }
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceDown(false)
+    }
+    const onBlur = () => setSpaceDown(false)
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup', onUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onDown)
+      window.removeEventListener('keyup', onUp)
+      window.removeEventListener('blur', onBlur)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly])
+  const cardsRef = useRef(cards)
+  cardsRef.current = cards
+
+  // ---------- one-time fixes for older boards ----------
 
   // Link cards made before previews existed get their thumbnail the first time an editor opens the board.
   useEffect(() => {
@@ -201,10 +410,7 @@ export default function BoardCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function zoomButton(factor: number) {
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
-  }
+  // ---------- adding, editing, styling, deleting ----------
 
   // New cards appear in the middle of what you are looking at.
   async function addCard(type: string, content: string) {
@@ -217,6 +423,7 @@ export default function BoardCanvas({
     try {
       const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
+      setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
     } catch (err) {
@@ -266,6 +473,7 @@ export default function BoardCanvas({
     const text = value.trim()
     if (!text) {
       setCards((prev) => prev.filter((c) => c.id !== card.id))
+      setSelected(new Set())
       deleteBoardCard(card.id).catch(() => {})
       return
     }
@@ -280,6 +488,28 @@ export default function BoardCanvas({
       .then((saved) => setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, content: saved.content, meta: saved.meta } : c))))
       .catch(() => alert('Could not save that change. Please try again.'))
   }
+
+  // Changes how every selected card looks. The screen updates at once; the save follows.
+  function applyStyle(patch: Record<string, unknown>) {
+    const ids = Array.from(selRef.current)
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    setCards((prev) => prev.map((c) => (idSet.has(c.id) ? { ...c, style: styleToJson(mergeStyle(parseStyle(c.style), patch)) } : c)))
+    styleBoardCards(boardId, ids, patch).catch(() => alert('Could not save that change. Please try again.'))
+  }
+
+  function deleteSelected() {
+    const ids = Array.from(selRef.current)
+    if (ids.length === 0 || readOnly) return
+    const tiles = cardsRef.current.filter((c) => idsHas(ids, c.id) && c.type === 'board').length
+    const message = tiles > 0 ? `Delete ${ids.length === 1 ? 'this board' : `these ${ids.length} cards, including ${tiles} ${tiles === 1 ? 'board' : 'boards'}`} and everything inside?` : ids.length > 1 ? `Delete these ${ids.length} cards?` : ''
+    if (message && !confirm(message)) return
+    const gone = new Set(ids)
+    setCards((prev) => prev.filter((c) => !gone.has(c.id)))
+    setSelected(new Set())
+    deleteBoardCards(boardId, ids).catch(() => alert('Could not delete. Please refresh and try again.'))
+  }
+  const idsHas = (ids: string[], id: string) => ids.includes(id)
 
   function openBoard(card: Card) {
     if (brandSpaceId) router.push(`/brand-spaces/${brandSpaceId}/boards/${card.content}`)
@@ -318,9 +548,31 @@ export default function BoardCanvas({
     { label: 'Color', glyph: '●', run: () => { const v = askColor(); if (v) addCard('color', v) } },
   ]
 
+  // ---------- drawing ----------
+
+  const selectedCards = cards.filter((c) => selected.has(c.id))
+  const single = selectedCards.length === 1 ? selectedCards[0] : null
+  const panning = tool === 'hand' || spaceDown
+  const hs = 11 / zoom // handle size, kept the same on screen at any zoom
+
+  const toolBtn = (active: boolean): React.CSSProperties => ({
+    padding: '4px 10px',
+    fontSize: 12,
+    border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border-strong)'}`,
+    background: active ? 'var(--accent-dim)' : 'var(--bg-card)',
+    color: active ? 'var(--accent-text)' : 'var(--text-primary)',
+  })
+
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, display: 'flex', gap: 6 }}>
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {!readOnly && (
+          <>
+            <button type="button" aria-pressed={tool === 'select'} onClick={() => setTool('select')} title="Select: drag on empty space to select several cards" style={toolBtn(tool === 'select' && !spaceDown)}>↖ Select</button>
+            <button type="button" aria-pressed={tool === 'hand'} onClick={() => setTool('hand')} title="Hand: drag to move around the board (or hold Space)" style={toolBtn(panning)}>✋ Move</button>
+            <button type="button" aria-pressed={multi} onClick={() => setMulti((m) => !m)} title="When on, tapping a card adds it to the selection" style={toolBtn(multi)}>Multi</button>
+          </>
+        )}
         <button type="button" onClick={() => zoomButton(1 / 1.2)} style={{ padding: '4px 10px' }}>−</button>
         <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} style={{ padding: '4px 10px', fontSize: 11 }}>{Math.round(zoom * 100)}%</button>
         <button type="button" onClick={() => zoomButton(1.2)} style={{ padding: '4px 10px' }}>+</button>
@@ -341,33 +593,63 @@ export default function BoardCanvas({
       <div
         ref={containerRef}
         className="canvas-box"
+        data-testid="canvas"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: 'grab', touchAction: 'none' }}
+        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
         <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
           {cards.map((card) => {
             const editing = editingId === card.id
-            const common: React.CSSProperties = { position: 'absolute', left: card.positionX, top: card.positionY, width: WIDTH[card.type] ?? 210, cursor: readOnly ? 'default' : 'move' }
-            const del = !readOnly && (
-              <button type="button" aria-label="Delete card" onClick={() => {
-                if (card.type === 'board' && !confirm('Delete this board and everything inside it?')) return
-                setCards((p) => p.filter((c) => c.id !== card.id))
-                deleteBoardCard(card.id).catch(() => {})
-              }} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, padding: 0, borderRadius: '50%', fontSize: 12, lineHeight: '18px', background: 'var(--bg-card)' }}>×</button>
+            const isSel = selected.has(card.id)
+            const st: CardStyle = parseStyle(card.style)
+            const isHeading = card.type === 'heading'
+            const fs = st.fs ?? DEFAULT_FS[card.type] ?? 13
+            const bold = st.b ?? isHeading
+            const hasBg = !!st.bg
+            const ink = st.color ?? (hasBg ? readableText(st.bg as string) : isHeading ? 'var(--text-primary)' : '#1a1a1a')
+            const text: React.CSSProperties = { fontSize: fs, fontWeight: bold ? 600 : 400, fontStyle: st.i ? 'italic' : 'normal', textAlign: st.al ?? 'left', color: ink }
+
+            const common: React.CSSProperties = {
+              position: 'absolute',
+              left: card.positionX,
+              top: card.positionY,
+              width: card.width ?? WIDTH[card.type] ?? 210,
+              height: card.height ?? undefined,
+              cursor: readOnly ? 'default' : panning ? 'inherit' : 'move',
+              outline: isSel ? '2px solid var(--accent)' : 'none',
+              outlineOffset: 3,
+              borderRadius: 6,
+            }
+            const paper: React.CSSProperties = { ...PAPER, ...(hasBg ? { background: st.bg } : {}) }
+            const handles =
+              isSel && !readOnly && selected.size === 1 && !editing
+                ? HANDLES.filter((h) => !(card.type === 'image' && (h === 'n' || h === 's'))).map((h) => (
+                    <div key={h} data-handle={h} style={{ position: 'absolute', left: HANDLE_POS[h].l, top: HANDLE_POS[h].t, width: hs, height: hs, marginLeft: -hs / 2, marginTop: -hs / 2, background: '#ffffff', border: `${1.5 / zoom}px solid var(--accent)`, borderRadius: 2, cursor: CURSOR[h], zIndex: 3 }} />
+                  ))
+                : null
+            const heading = (
+              <>
+                {st.title && <div style={{ ...text, fontSize: fs * 1.2, fontWeight: 700, marginBottom: 2, overflowWrap: 'anywhere' }}>{st.title}</div>}
+                {st.subtitle && card.type === 'note' && <div style={{ ...text, fontSize: fs * 0.9, fontWeight: 400, opacity: 0.7, marginBottom: 6, overflowWrap: 'anywhere' }}>{st.subtitle}</div>}
+              </>
             )
 
-            if (card.type === 'heading') {
+            if (isHeading) {
+              const box: React.CSSProperties = hasBg ? { ...paper, padding: '8px 12px', height: '100%', boxSizing: 'border-box' } : { height: '100%' }
               return (
-                <div key={card.id} data-card data-card-id={card.id} onDoubleClick={() => startEdit(card)} style={common}>
-                  {editing ? (
-                    <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={2} style={{ width: '100%', fontFamily: SERIF, fontSize: 22, fontWeight: 600, background: 'transparent', color: 'var(--text-primary)', border: '1px dashed var(--border-strong)', resize: 'none' }} />
-                  ) : (
-                    <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.25, whiteSpace: 'pre-wrap', userSelect: 'none' }}>{card.content}</div>
-                  )}
-                  {del}
+                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
+                  <div style={{ ...box, overflow: card.height ? 'hidden' : undefined }}>
+                    {editing ? (
+                      <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={2} style={{ ...text, width: '100%', height: card.height ? '100%' : undefined, fontFamily: SERIF, lineHeight: 1.25, background: 'transparent', border: '1px dashed var(--border-strong)', resize: 'none', userSelect: 'text' }} />
+                    ) : (
+                      <div style={{ ...text, fontFamily: SERIF, lineHeight: 1.25, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{card.content}</div>
+                    )}
+                    {st.subtitle && !editing && <div style={{ ...text, fontSize: fs * 0.6, fontWeight: 400, opacity: 0.7, marginTop: 4, overflowWrap: 'anywhere' }}>{st.subtitle}</div>}
+                  </div>
+                  {handles}
                 </div>
               )
             }
@@ -375,49 +657,45 @@ export default function BoardCanvas({
             if (card.type === 'board') {
               const info = inner[card.content]
               return (
-                <div key={card.id} data-card data-card-id={card.id} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, overflow: 'visible' }}>
-                  <div style={{ height: 46, borderRadius: '6px 6px 0 0', background: '#f1ece2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#8a7a5c', userSelect: 'none' }} aria-hidden="true">▤</div>
-                  <div style={{ padding: '10px 12px 12px' }}>
-                    <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.25, overflowWrap: 'anywhere', userSelect: 'none' }}>{info?.name ?? 'Board'}</div>
-                    <div style={{ fontSize: 11, color: '#666', margin: '3px 0 8px', userSelect: 'none' }}>
+                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ height: 46, flexShrink: 0, borderRadius: '6px 6px 0 0', background: '#f1ece2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#8a7a5c' }} aria-hidden="true">▤</div>
+                  <div style={{ padding: '10px 12px 12px', overflow: 'hidden' }}>
+                    <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{info?.name ?? 'Board'}</div>
+                    <div style={{ fontSize: 11, color: '#666', margin: '3px 0 8px' }}>
                       {info ? `${info.cards} ${info.cards === 1 ? 'card' : 'cards'}${info.boards > 0 ? ` · ${info.boards} ${info.boards === 1 ? 'board' : 'boards'} inside` : ''}` : ''}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <a href={`/brand-spaces/${brandSpaceId}/boards/${card.content}`} style={{ fontSize: 12, fontWeight: 600, color: '#1a1a1a' }}>Open →</a>
-                      {!readOnly && (
-                        <button type="button" onClick={() => renameTile(card)} style={{ fontSize: 11, padding: '2px 6px', background: 'transparent', color: '#555', border: '1px solid #ddd' }}>Rename</button>
-                      )}
+                      {!readOnly && <button type="button" onClick={() => renameTile(card)} style={{ fontSize: 11, padding: '2px 6px', background: 'transparent', color: '#555', border: '1px solid #ddd' }}>Rename</button>}
                     </div>
                   </div>
-                  {del}
+                  {handles}
                 </div>
               )
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: card.type === 'image' ? 6 : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' ? 'hidden' : undefined }}>
-                {card.type === 'note' && (editing ? (
-                  <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={5} style={{ width: '100%', fontSize: 13, background: 'transparent', color: '#1a1a1a', border: 'none', outline: 'none', resize: 'vertical' }} />
-                ) : (
-                  <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', userSelect: 'none' }}>{card.content}</div>
-                ))}
+              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, padding: card.type === 'image' ? 6 : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+                {card.type === 'note' && (
+                  <>
+                    {heading}
+                    {editing ? (
+                      <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={card.height ? undefined : 5} style={{ ...text, width: '100%', height: card.height ? 'calc(100% - 4px)' : undefined, background: 'transparent', border: 'none', outline: 'none', resize: card.height ? 'none' : 'vertical', userSelect: 'text' }} />
+                    ) : (
+                      <div style={{ ...text, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{card.content}</div>
+                    )}
+                  </>
+                )}
                 {card.type === 'image' && <img src={card.content} alt="" draggable={false} style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
                 {card.type === 'link' && (() => {
                   const meta = parseMeta(card.meta)
                   const showImage = !!meta.image && !brokenImages.has(card.id)
                   const pending = card.meta == null
                   return (
-                    <div>
+                    <div style={{ color: hasBg ? ink : '#1a1a1a' }}>
                       {showImage && (
                         <div style={{ position: 'relative', margin: '-12px -12px 10px', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
-                          <img
-                            src={meta.image}
-                            alt=""
-                            draggable={false}
-                            referrerPolicy="no-referrer"
-                            onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))}
-                            style={{ display: 'block', width: '100%', maxHeight: 170, objectFit: 'cover' }}
-                          />
+                          <img src={meta.image} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))} style={{ display: 'block', width: '100%', maxHeight: 170, objectFit: 'cover' }} />
                           {meta.kind === 'video' && (
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, paddingLeft: 3 }}>▶</div>
@@ -425,12 +703,10 @@ export default function BoardCanvas({
                           )}
                         </div>
                       )}
-                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', userSelect: 'none' }}>
-                        {meta.title || hostOf(card.content)}
-                      </div>
+                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meta.title || hostOf(card.content)}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 11, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', userSelect: 'none' }}>{pending ? 'Loading preview…' : meta.site || hostOf(card.content)}</span>
-                        <a href={card.content} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: '#1a1a1a', fontWeight: 600, flexShrink: 0 }}>Open ↗</a>
+                        <span style={{ fontSize: 11, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pending ? 'Loading preview…' : meta.site || hostOf(card.content)}</span>
+                        <a href={card.content} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'inherit', fontWeight: 600, flexShrink: 0 }}>Open ↗</a>
                       </div>
                     </div>
                   )
@@ -438,21 +714,23 @@ export default function BoardCanvas({
                 {card.type === 'color' && (() => {
                   const { hex, role, use } = parseColor(card.content)
                   return (
-                    <div>
-                      <div style={{ height: 64, background: hex }} />
+                    <>
+                      <div style={{ height: card.height ? undefined : 64, flex: card.height ? 1 : undefined, minHeight: 30, background: hex }} />
                       <div style={{ padding: '8px 10px' }}>
                         <div style={{ fontSize: 12, fontWeight: 600 }}>{hex.toUpperCase()}</div>
                         {role && <div style={{ fontSize: 12 }}>{role}</div>}
                         {use && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{use}</div>}
                       </div>
-                    </div>
+                    </>
                   )
                 })()}
-                {del}
+                {handles}
               </div>
             )
           })}
         </div>
+
+        {marquee && <div aria-hidden="true" style={{ position: 'absolute', left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: '1px solid var(--accent)', background: 'rgba(245,166,35,0.12)', pointerEvents: 'none', zIndex: 4 }} />}
 
         {cards.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', padding: '0 2rem', pointerEvents: 'none' }}>
@@ -461,8 +739,22 @@ export default function BoardCanvas({
           </div>
         )}
       </div>
+
+      {!readOnly && selectedCards.length > 0 && !editingId && (
+        <BoardInspector
+          count={selectedCards.length}
+          types={selectedCards.map((c) => c.type)}
+          style={parseStyle(selectedCards[0].style)}
+          single={single ? { id: single.id, type: single.type } : null}
+          onStyle={applyStyle}
+          onDelete={deleteSelected}
+        />
+      )}
+
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
-        Scroll or pinch to zoom · drag empty space to move around{readOnly ? '' : ' · drag a card to move it · double-click to edit'}
+        {readOnly
+          ? 'Scroll or pinch to zoom · drag to move around'
+          : 'Scroll or pinch to zoom · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · double-click to edit'}
       </div>
     </div>
   )

@@ -30,7 +30,7 @@ export async function duplicateBrandSpace(brandSpaceId: string) {
       data: {
         brandSpaceId: copy.id,
         name: b.name,
-        cards: { create: b.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY })) },
+        cards: { create: b.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, width: c.width, height: c.height, style: c.style, positionX: c.positionX, positionY: c.positionY })) },
       },
     })
     newIdOf.set(b.id, created.id)
@@ -41,7 +41,7 @@ export async function duplicateBrandSpace(brandSpaceId: string) {
     if (parent) await db.board.update({ where: { id: newId }, data: { parentBoardId: parent } })
     for (const tile of b.cards.filter((c) => c.type === 'board')) {
       const target = newIdOf.get(tile.content)
-      if (target) await db.boardCard.create({ data: { boardId: newId, type: 'board', content: target, positionX: tile.positionX, positionY: tile.positionY } })
+      if (target) await db.boardCard.create({ data: { boardId: newId, type: 'board', content: target, width: tile.width, height: tile.height, style: tile.style, positionX: tile.positionX, positionY: tile.positionY } })
     }
   }
 

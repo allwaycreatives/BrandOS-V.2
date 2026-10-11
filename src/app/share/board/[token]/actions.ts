@@ -24,7 +24,7 @@ export async function copySharedBoard(token: string, brandSpaceId?: string): Pro
     data: {
       brandSpaceId: targetId,
       name: source.name,
-      cards: { create: source.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, positionX: c.positionX, positionY: c.positionY })) },
+      cards: { create: source.cards.filter((c) => c.type !== 'board').map((c) => ({ type: c.type, content: c.content, width: c.width, height: c.height, style: c.style, positionX: c.positionX, positionY: c.positionY })) },
     },
   })
   return { brandSpaceId: targetId, boardId: copy.id }

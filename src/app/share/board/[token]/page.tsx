@@ -45,7 +45,7 @@ export default async function SharedBoardPage({ params }: { params: { token: str
       <BoardCanvas
         boardId={board.id}
         readOnly
-        cards={board.cards.filter((c) => c.type !== 'board').map((c) => ({ id: c.id, type: c.type, content: c.content, meta: c.meta, positionX: c.positionX, positionY: c.positionY }))}
+        cards={board.cards.filter((c) => c.type !== 'board').map((c) => ({ id: c.id, type: c.type, content: c.content, meta: c.meta, width: c.width, height: c.height, style: c.style, positionX: c.positionX, positionY: c.positionY }))}
       />
     </main>
   )
