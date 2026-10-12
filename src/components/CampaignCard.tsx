@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { STATUS_LABEL } from '@/app/(app)/brand-spaces/[id]/campaigns/constants'
 
@@ -14,7 +15,7 @@ export default function CampaignCard({
   return (
     <Link href={`/brand-spaces/${campaign.brandSpaceId}/campaigns/${campaign.id}`} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: brand.color }} />
+        <BrandDot size={8} color={brand.color} />
         <span style={{ flex: 1 }}>{brand.name}</span>
         <span>{STATUS_LABEL[campaign.status] ?? campaign.status}</span>
       </div>

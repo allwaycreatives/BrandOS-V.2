@@ -1,4 +1,5 @@
 'use client'
+import BrandDot from '@/components/BrandDot'
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -77,7 +78,7 @@ export default function FacesCard({
           {faces.map((f) => (
             <div key={f.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {f.brand && <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.brand.color, flexShrink: 0 }} />}
+                {f.brand && <BrandDot size={10} color={f.brand.color} />}
                 <span style={{ fontWeight: 600 }}>{f.name}</span>
               </div>
               {f.role && <div style={small}>{f.role}</div>}
@@ -116,7 +117,7 @@ export default function FacesCard({
           {extras.map((b) => (
             <Link key={b.id} href={`/brand-spaces/${b.id}`} className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color }} />
+                <BrandDot size={10} color={b.color} />
                 <span style={{ fontWeight: 600 }}>{b.name}</span>
               </div>
               <div style={small}>Linked personal brand</div>

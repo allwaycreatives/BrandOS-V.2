@@ -1,4 +1,5 @@
 'use client'
+import BrandDot from '@/components/BrandDot'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -172,7 +173,7 @@ export default function FirstRun({ templates }: { templates: TemplateItem[] }) {
         <div className="card" style={{ minHeight: 220 }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Your workspace{pack ? ` · ${pack.label}` : ''}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+            <BrandDot size={10} color={color} />
             <span style={{ fontWeight: 600, opacity: name ? 1 : 0.35 }}>{name || 'Your brand'}</span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Boards</div>

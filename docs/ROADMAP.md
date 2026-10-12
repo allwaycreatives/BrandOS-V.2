@@ -37,6 +37,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Production days: shoot presets (one shoot a month, two a month, a shoot day every week, just in time) with a preview and auto-assign of each post's production date; a shoot sheet per production day (what to film, grouped, with notes and script); optional publish time on posts
 - All calendars: one month grid across every brand (brand colour, post chips and shoot-day chips, filter by brand), plus a Today panel on Home (today and tomorrow across all brands)
 - Milanote-style boards: a Select tool (drag a box over empty space to select several cards; Shift/Ctrl-click or the Multi button to add), a Move tool (or Space, or the middle mouse button) to pan, group move and group delete, resize handles on every side and corner, and a formatting bar (text size, bold, italic, alignment, text colour, card colour, optional title and subtitle on notes). Size and style carry through duplicates and templates
+- Look: pure black background (sidebar, app and cards), the Team Console orange (#ff6929) as the one accent colour, a BrandOS-only sidebar header (no AW mark), and brand dots that always stay perfect circles however long the brand name is
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)

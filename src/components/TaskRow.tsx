@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 
 const STATUS_LABEL: Record<string, string> = { open: 'To do', in_progress: 'In progress', done: 'Done' }
@@ -25,7 +26,7 @@ export default function TaskRow({
       className="task-row"
       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}
     >
-      <span style={{ width: 9, height: 9, borderRadius: '50%', background: brand.color, flexShrink: 0 }} />
+      <BrandDot size={9} color={brand.color} />
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
       <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{STATUS_LABEL[status] ?? status}</span>
       {dueDate && (

@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
@@ -127,7 +128,7 @@ export default async function HomePage() {
             const changes = r.status === 'changes_requested'
             return (
               <Link key={r.id} href={`/brand-spaces/${r.brandSpaceId}/reviews/${r.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
-                {b && <span style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />}
+                {b && <BrandDot size={9} color={b.color} />}
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                 <span style={{ fontSize: 11.5, color: changes ? 'var(--accent-text)' : 'var(--text-muted)' }}>{changes ? 'Changes requested' : 'Waiting on client'}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--text-muted)', minWidth: 70, textAlign: 'right' }}>{b?.name}</span>
@@ -170,7 +171,7 @@ export default async function HomePage() {
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Waiting for your feedback</div>
           {waitingOnYou.map((d) => (
             <Link key={d.id} href={`/review/${d.reviewToken}`} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: brandById.get(d.brandSpaceId)?.color, flexShrink: 0 }} />
+              <BrandDot size={9} color={brandById.get(d.brandSpaceId)?.color} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontWeight: 600 }}>{d.title}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brandById.get(d.brandSpaceId)?.name} · version {d.version}</span>
@@ -190,7 +191,7 @@ export default async function HomePage() {
               return (
                 <Link key={b.id} href={`/brand-spaces/${b.id}`} className="card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color }} />
+                    <BrandDot size={10} color={b.color} />
                     <span style={{ fontWeight: 600 }}>{b.name}</span>
                   </div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>

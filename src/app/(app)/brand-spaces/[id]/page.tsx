@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -289,7 +290,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
             </Link>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 14, height: 14, borderRadius: '50%', background: brandColor(brandSpace.name), flexShrink: 0 }} />
+            <BrandDot size={14} color={brandColor(brandSpace.name)} />
             <h1 style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{brandSpace.name}</h1>
           </div>
           <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6 }}>

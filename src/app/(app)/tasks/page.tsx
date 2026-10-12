@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { getOrCreateCurrentUser } from '@/lib/auth'
@@ -49,7 +50,7 @@ export default async function MyTasksPage({ searchParams }: { searchParams: { br
               className="card"
               style={{ padding: '6px 12px', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, borderColor: active?.id === b.id ? 'var(--accent)' : undefined }}
             >
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: b.color }} />
+              <BrandDot size={8} color={b.color} />
               {b.name}
             </Link>
           ))}

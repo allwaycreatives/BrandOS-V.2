@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { getOrCreateCurrentUser } from '@/lib/auth'
 import { getUserBrands } from '@/lib/brands'
@@ -57,7 +58,7 @@ export default async function AllCalendarsPage({ searchParams }: { searchParams:
     alignItems: 'center',
     gap: 6,
   })
-  const dot = (c: string) => <span style={{ width: 9, height: 9, borderRadius: '50%', background: c, flexShrink: 0 }} />
+  const dot = (c: string) => <BrandDot size={9} color={c} />
 
   return (
     <div>

@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import { createIdea, promoteIdea, archiveIdea, deleteIdea, sendIdeaToCompany, makePostFromIdea } from '@/app/(app)/brand-spaces/[id]/ideas/actions'
 
 type Brand = { id: string; name: string; color: string; parentId?: string | null }
@@ -39,7 +40,7 @@ export default function IdeaList({ ideas, brands, fixedBrandId }: { ideas: Idea[
         return (
           <div key={idea.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-              {brand && !fixedBrandId && <span style={{ width: 8, height: 8, borderRadius: '50%', background: brand.color, flexShrink: 0 }} />}
+              {brand && !fixedBrandId && <BrandDot size={8} color={brand.color} />}
               <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 600, fontSize: 15 }}>{idea.title}</span>
               {brand && !fixedBrandId && <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{brand.name}</span>}
             </div>

@@ -1,4 +1,5 @@
 'use client'
+import BrandDot from '@/components/BrandDot'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -113,16 +114,10 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     {open && <div className="sidebar-backdrop" onClick={() => setOpen(false)} />}
     <aside className={`sidebar${open ? ' open' : ''}`} style={{ width: collapsed ? 64 : 220 }}>
       <div className="sidebar-brand" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
-        <div className="logo-glow-wrap">
-          <img src="/aw-logo.png" alt="All Way Creatives" style={{ width: 30, height: 30, objectFit: 'contain', flexShrink: 0 }} />
-        </div>
-        {!collapsed && (
-          <img
-            src="/brandos-logo.png"
-            alt="BrandOS"
-            style={{ height: 18, display: 'block' }}
-            className="splash-fade splash-delay-1"
-          />
+        {collapsed ? (
+          <div aria-label="BrandOS" style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', color: '#16110a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontStyle: 'italic', fontSize: 17 }}>B</div>
+        ) : (
+          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 20, display: 'block' }} className="splash-fade splash-delay-1" />
         )}
       </div>
 
@@ -142,7 +137,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
                 className="sidebar-link"
                 style={collapsed ? { justifyContent: 'center' } : isCurrent ? { color: 'var(--text-primary)', fontWeight: 600 } : undefined}
               >
-                <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+                <BrandDot size={9} color={b.color} />
                 {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>}
               </Link>
               {isCurrent && brandItems.length > 0 && (

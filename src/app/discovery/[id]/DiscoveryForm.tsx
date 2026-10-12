@@ -15,7 +15,7 @@ function Confetti() {
     () =>
       Array.from({ length: 70 }).map((_, i) => ({
         left: Math.random() * 100,
-        color: ['#f5a623', '#ffffff', '#ff6b6b', '#4dd4ac', '#6c8cff'][i % 5],
+        color: ['#ff6929', '#ffffff', '#ff6b6b', '#4dd4ac', '#6c8cff'][i % 5],
         delay: Math.random() * 0.5,
         duration: 2 + Math.random() * 1.3,
         rotate: Math.random() * 360,

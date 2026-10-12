@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { getAgenda } from '@/lib/agenda'
 import { addDays, todayKey } from '@/lib/plan'
@@ -25,7 +26,7 @@ export default async function TodayPanel({ brands }: { brands: Brand[] }) {
               const b = byId.get(x.brandId) as Brand
               return (
                 <Link key={`s-${x.brandId}`} href={`/brand-spaces/${b.id}/shoot/${key}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13.5 }}>
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+                  <BrandDot size={9} color={b.color} />
                   <span><strong>Shoot</strong> · {b.name} · {x.count} {x.count === 1 ? 'post' : 'posts'} →</span>
                 </Link>
               )
@@ -34,7 +35,7 @@ export default async function TodayPanel({ brands }: { brands: Brand[] }) {
               const b = byId.get(x.brandId) as Brand
               return (
                 <Link key={x.id} href={`/brand-spaces/${b.id}/calendar/${x.id}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13.5 }}>
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
+                  <BrandDot size={9} color={b.color} />
                   <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{x.time ? `${x.time} · ` : ''}{x.title} <span style={{ color: 'var(--text-muted)' }}>· {b.name} · {x.platform}</span></span>
                 </Link>
               )

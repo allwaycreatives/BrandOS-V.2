@@ -730,7 +730,7 @@ export default function BoardCanvas({
           })}
         </div>
 
-        {marquee && <div aria-hidden="true" style={{ position: 'absolute', left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: '1px solid var(--accent)', background: 'rgba(245,166,35,0.12)', pointerEvents: 'none', zIndex: 4 }} />}
+        {marquee && <div aria-hidden="true" style={{ position: 'absolute', left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: '1px solid var(--accent)', background: 'rgba(255,105,41,0.12)', pointerEvents: 'none', zIndex: 4 }} />}
 
         {cards.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', padding: '0 2rem', pointerEvents: 'none' }}>

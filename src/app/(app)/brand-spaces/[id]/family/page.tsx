@@ -1,3 +1,4 @@
+import BrandDot from '@/components/BrandDot'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
@@ -70,7 +71,7 @@ export default async function FamilyPage({ params }: { params: { id: string } })
               {members.map((m) => (
                 <th key={m.id} style={th}>
                   <Link href={`/brand-spaces/${m.id}/calendar`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color }} />
+                    <BrandDot size={8} color={m.color} />
                     {m.name}
                   </Link>
                 </th>
@@ -119,7 +120,7 @@ export default async function FamilyPage({ params }: { params: { id: string } })
                       <Link key={it.id} href={`/brand-spaces/${it.brandSpaceId}/calendar`} style={{ display: 'block', background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
                         <div style={{ fontSize: 13, fontWeight: 500 }}>{it.title}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: b?.color }} />
+                          <BrandDot size={7} color={b?.color} />
                           {b?.name} · {it.platform}
                         </div>
                       </Link>
