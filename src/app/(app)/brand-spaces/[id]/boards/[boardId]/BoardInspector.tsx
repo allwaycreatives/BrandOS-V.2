@@ -11,6 +11,7 @@ export default function BoardInspector({
   single,
   onStyle,
   onDelete,
+  pos,
 }: {
   count: number
   types: string[] // the kinds of card selected
@@ -18,6 +19,7 @@ export default function BoardInspector({
   single: { id: string; type: string } | null // set when exactly one card is selected
   onStyle: (patch: Record<string, unknown>) => void
   onDelete: () => void
+  pos: { left: number; top: number; above: boolean } // where to float it, relative to the canvas
 }) {
   const [menu, setMenu] = useState<'text' | 'card' | null>(null)
   const textual = types.every((t) => t === 'note' || t === 'heading')
@@ -46,7 +48,7 @@ export default function BoardInspector({
   const sep = <span style={{ width: 1, height: 20, background: 'var(--border-strong)', margin: '0 2px' }} aria-hidden="true" />
 
   const swatches = (colors: string[], current: string | undefined, key: 'color' | 'bg') => (
-    <div style={{ position: 'absolute', bottom: 40, left: 0, background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 10, padding: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', width: 196, zIndex: 8 }}>
+    <div style={{ position: 'absolute', top: 38, left: 0, background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 10, padding: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', width: 196, zIndex: 8 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
         {colors.map((c) => (
           <button key={c} type="button" aria-label={c} onClick={() => { onStyle({ [key]: c }); setMenu(null) }} style={{ width: 28, height: 28, borderRadius: 6, background: c, border: current === c ? '2px solid var(--accent)' : '1px solid var(--border-strong)', padding: 0, cursor: 'pointer' }} />
@@ -63,7 +65,11 @@ export default function BoardInspector({
   )
 
   return (
-    <div data-nodrag style={{ position: 'absolute', left: '50%', bottom: 12, transform: 'translateX(-50%)', zIndex: 6, maxWidth: 'calc(100% - 24px)', background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div
+      data-nodrag
+      // Pressing a button here must not pull the cursor out of the text being edited.
+      onMouseDown={(e) => { if (!(e.target as HTMLElement).closest('input, select')) e.preventDefault() }}
+      style={{ position: 'absolute', left: pos.left, top: pos.top, transform: pos.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)', width: 'max-content', zIndex: 6, maxWidth: 'calc(100% - 16px)', background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
         <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px' }}>{count} selected</span>
 

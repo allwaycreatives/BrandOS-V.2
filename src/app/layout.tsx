@@ -11,7 +11,7 @@ const poppins = Poppins({ subsets: ['latin'], weight: ['600', '700'], variable: 
 
 export const metadata: Metadata = {
   title: 'BrandOS',
-  description: 'The operating system for creators, brands, and the agencies serving them.',
+  description: 'Brand OS helps creatives discover their brand, manage it, and grow it, with every brand, project and task in one simple place.',
   manifest: '/manifest.json',
 }
 

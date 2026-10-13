@@ -73,6 +73,7 @@ model BrandSpace {
   intakeToken          String?  @unique // when set, clients can send a brief through a public form
   planToken            String?  @unique // when set, anyone with the link can view the content plan and approve posts
   planNote             String?  // the "direction" note shown at the top of the client plan
+  socialLinks          Json?    // the brand's social media and website links: [{platform, url}]
   strategy             Json?    // content strategy: mission, season, pillars, platform roles and targets, series
   name           String
   platformPriority Json?  // ordered array of platform names, e.g. ["Instagram","TikTok"]

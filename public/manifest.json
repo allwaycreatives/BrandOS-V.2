@@ -1,7 +1,7 @@
 {
   "name": "BrandOS",
   "short_name": "BrandOS",
-  "description": "The operating system for creators, brands, and the agencies serving them.",
+  "description": "Brand OS helps creatives discover their brand, manage it, and grow it, with every brand, project and task in one simple place.",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#000000",

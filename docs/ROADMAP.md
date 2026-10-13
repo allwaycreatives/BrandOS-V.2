@@ -38,6 +38,9 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - All calendars: one month grid across every brand (brand colour, post chips and shoot-day chips, filter by brand), plus a Today panel on Home (today and tomorrow across all brands)
 - Milanote-style boards: a Select tool (drag a box over empty space to select several cards; Shift/Ctrl-click or the Multi button to add), a Move tool (or Space, or the middle mouse button) to pan, group move and group delete, resize handles on every side and corner, and a formatting bar (text size, bold, italic, alignment, text colour, card colour, optional title and subtitle on notes). Size and style carry through duplicates and templates
 - Look: pure black background (sidebar, app and cards), the Team Console orange (#ff6929) as the one accent colour, a BrandOS-only sidebar header (no AW mark), and brand dots that always stay perfect circles however long the brand name is
+- Click-to-type notes and titles (no double-click, cursor lands where you click), and a formatting bar that floats beside the selected card
+- Social links on every brand (paste a link or just an @handle), one tap to open
+- Removed the Duplicate buttons (brand, board, project): "duplicatable" is a mindset about simplicity, not a feature
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)
@@ -72,7 +75,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Notion embed (removed). The database column is kept so no data is dropped; remove it in a proper migration.
 
 ## Next (brand families)
-- Import discovery answers the same way; one-time migration of existing Notion posts; Visual & Production Bible template; structure-only brand duplicate
+- Import discovery answers the same way; one-time migration of existing Notion posts; Visual & Production Bible template
 - Visual & Production Bible template (10 pages, built from nested boards) and a "structure only" option when duplicating a brand (copy the system, not the strategy)
 - Duplicating a company brand does not copy its faces yet
 - Family-wide campaigns (one campaign that spans the shared brand and founders); guidance when a founder doubles up on a platform the shared brand covers

@@ -1,11 +1,12 @@
 import BrandDot from '@/components/BrandDot'
+import SocialLinks from './SocialLinks'
+import { parseSocial } from '@/lib/social'
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import DiscoveryLink from './DiscoveryLink'
 import InviteLink from './InviteLink'
-import DuplicateBrandButton from './DuplicateBrandButton'
 import ShareBrandCard from './ShareBrandCard'
 import ShareBriefCard from './ShareBriefCard'
 import ClientItemRow from './ClientItemRow'
@@ -150,6 +151,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         <div style={{ marginBottom: 20 }}>
           <div className="topbar-greeting">{brandSpace.name}</div>
           <div className="topbar-sub">Here's what we're working on for you.</div>
+          <SocialLinks brandSpaceId={params.id} links={parseSocial(brandSpace.socialLinks)} canEdit={false} />
         </div>
 
         {brandSummaryCard}
@@ -296,8 +298,8 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
           <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6 }}>
             {summaryParts.length > 0 ? summaryParts.join('  ·  ') : responseCount > 0 ? 'Nothing in progress yet. Add a task, project or campaign to get going.' : 'Nothing in progress yet. Start with discovery or add a task.'}
           </div>
+          <SocialLinks brandSpaceId={params.id} links={parseSocial(brandSpace.socialLinks)} canEdit />
         </div>
-        {role === 'agency' && <DuplicateBrandButton brandSpaceId={params.id} />}
       </div>
 
       {attention.length > 0 && (

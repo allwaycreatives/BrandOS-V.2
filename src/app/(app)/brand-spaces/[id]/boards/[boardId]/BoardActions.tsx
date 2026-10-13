@@ -1,25 +1,16 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { duplicateBoard, enableBoardShare, disableBoardShare } from '../actions'
+import { enableBoardShare, disableBoardShare } from '../actions'
 import SaveTemplateButton from '@/components/SaveTemplateButton'
 
 export default function BoardActions({ brandSpaceId, boardId, name, shareToken }: { brandSpaceId: string; boardId: string; name: string; shareToken: string | null }) {
-  const router = useRouter()
   const [token, setToken] = useState(shareToken)
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const link = token && typeof window !== 'undefined' ? `${window.location.origin}/share/board/${token}` : ''
-
-  function duplicate() {
-    startTransition(async () => {
-      const { boardId: newId } = await duplicateBoard(boardId)
-      router.push(`/brand-spaces/${brandSpaceId}/boards/${newId}`)
-    })
-  }
 
   function share() {
     setOpen(true)
@@ -47,7 +38,6 @@ export default function BoardActions({ brandSpaceId, boardId, name, shareToken }
 
   return (
     <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
-      <button type="button" onClick={duplicate} disabled={isPending}>Duplicate</button>
       <SaveTemplateButton kind="board" sourceId={boardId} defaultName={name} />
       <button type="button" className="primary" onClick={share} disabled={isPending}>Share</button>
       {open && (

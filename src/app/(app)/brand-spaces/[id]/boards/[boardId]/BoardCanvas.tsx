@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
 import { useRouter } from 'next/navigation'
 import {
@@ -34,7 +34,7 @@ type Inner = { id: string; name: string; cards: number; boards: number }
 type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
 type Drag =
-  | { kind: 'cards'; ids: string[]; startX: number; startY: number; origin: Map<string, { x: number; y: number }>; dx: number; dy: number; moved: boolean; clickedId: string; onUp: 'collapse' | 'remove' | null }
+  | { kind: 'cards'; ids: string[]; startX: number; startY: number; origin: Map<string, { x: number; y: number }>; dx: number; dy: number; moved: boolean; clickedId: string; additive: boolean; onUp: 'collapse' | 'remove' | null }
   | { kind: 'pan'; lastX: number; lastY: number }
   | { kind: 'marquee'; sx: number; sy: number; additive: boolean; base: Set<string>; moved: boolean }
   | { kind: 'resize'; id: string; handle: Handle; start: Rect; hadHeight: boolean; startX: number; startY: number; last: Rect }
@@ -74,6 +74,26 @@ function hostOf(url: string) {
   }
 }
 
+// When a note is clicked, find which character the click landed on, so the cursor can go exactly there.
+function caretOffsetAt(x: number, y: number, card: HTMLElement | null): number | null {
+  const doc = document as unknown as {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+  }
+  let node: Node | null = null
+  let offset = 0
+  if (doc.caretPositionFromPoint) {
+    const p = doc.caretPositionFromPoint(x, y)
+    if (p) { node = p.offsetNode; offset = p.offset }
+  } else if (doc.caretRangeFromPoint) {
+    const r = doc.caretRangeFromPoint(x, y)
+    if (r) { node = r.startContainer; offset = r.startOffset }
+  }
+  const body = card?.querySelector('[data-body]')
+  if (!node || !body || !body.contains(node) || node.nodeType !== 3) return null
+  return offset
+}
+
 // Where a handle sits on the card's edge, as left/top percentages.
 const HANDLE_POS: Record<Handle, { l: string; t: string }> = {
   nw: { l: '0%', t: '0%' }, n: { l: '50%', t: '0%' }, ne: { l: '100%', t: '0%' }, e: { l: '100%', t: '50%' },
@@ -111,6 +131,7 @@ export default function BoardCanvas({
   const [spaceDown, setSpaceDown] = useState(false)
   const [marquee, setMarquee] = useState<Rect | null>(null)
   const [cursorGrab, setCursorGrab] = useState(false)
+  const [anchor, setAnchor] = useState<{ cx: number; top: number; bottom: number; cw: number } | null>(null)
 
   const selRef = useRef(selected)
   const dragRef = useRef<Drag | null>(null)
@@ -118,6 +139,7 @@ export default function BoardCanvas({
   const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const caretRef = useRef<number | null>(null)
 
   const setSelected = (next: Set<string>) => {
     selRef.current = next
@@ -171,7 +193,7 @@ export default function BoardCanvas({
         const c = cards.find((x) => x.id === cid)
         if (c) origin.set(cid, { x: c.positionX, y: c.positionY })
       }
-      dragRef.current = { kind: 'cards', ids: sel.dragIds, startX: e.clientX, startY: e.clientY, origin, dx: 0, dy: 0, moved: false, clickedId: id, onUp: sel.onUp }
+      dragRef.current = { kind: 'cards', ids: sel.dragIds, startX: e.clientX, startY: e.clientY, origin, dx: 0, dy: 0, moved: false, clickedId: id, additive, onUp: sel.onUp }
       el.setPointerCapture?.(e.pointerId)
       return
     }
@@ -277,12 +299,19 @@ export default function BoardCanvas({
           return o ? [{ id, x: o.x + drag.dx, y: o.y + drag.dy }] : []
         })
         moveBoardCards(boardId, moves).catch(() => {})
-      } else if (drag.onUp === 'collapse') {
-        setSelected(new Set([drag.clickedId]))
-      } else if (drag.onUp === 'remove') {
-        const next = new Set(selRef.current)
-        next.delete(drag.clickedId)
-        setSelected(next)
+      } else {
+        if (drag.onUp === 'collapse') setSelected(new Set([drag.clickedId]))
+        else if (drag.onUp === 'remove') {
+          const next = new Set(selRef.current)
+          next.delete(drag.clickedId)
+          setSelected(next)
+        }
+        // A plain click (not a drag, not an add-to-selection click) on a note or a title: just start typing.
+        const clicked = cardsRef.current.find((c) => c.id === drag.clickedId)
+        if (!drag.additive && clicked && (clicked.type === 'note' || clicked.type === 'heading')) {
+          caretRef.current = caretOffsetAt(e.clientX, e.clientY, containerRef.current?.querySelector<HTMLElement>(`[data-card-id="${clicked.id}"]`) ?? null)
+          setEditingId(clicked.id)
+        }
       }
     } else if (drag.kind === 'resize') {
       const card = cards.find((c) => c.id === drag.id)
@@ -373,6 +402,48 @@ export default function BoardCanvas({
   }, [readOnly])
   const cardsRef = useRef(cards)
   cardsRef.current = cards
+
+  // The floating formatting bar follows whatever is selected.
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    const box = el?.getBoundingClientRect()
+    if (!el || !box || readOnly || selected.size === 0) {
+      setAnchor((a) => (a ? null : a))
+      return
+    }
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity
+    el.querySelectorAll<HTMLElement>('[data-card]').forEach((node) => {
+      if (!selected.has(node.dataset.cardId as string)) return
+      const rc = node.getBoundingClientRect()
+      l = Math.min(l, rc.left); t = Math.min(t, rc.top); r = Math.max(r, rc.right); b = Math.max(b, rc.bottom)
+    })
+    if (!Number.isFinite(l)) {
+      setAnchor((a) => (a ? null : a))
+      return
+    }
+    const next = { cx: Math.round((l + r) / 2 - box.left), top: Math.round(t - box.top), bottom: Math.round(b - box.top), cw: Math.round(box.width) }
+    setAnchor((a) => (a && a.cx === next.cx && a.top === next.top && a.bottom === next.bottom && a.cw === next.cw ? a : next))
+  }, [selected, cards, pan, zoom, editingId, readOnly])
+
+  const growBox = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`
+  }
+  const editRef = (fixedHeight: boolean) => (el: HTMLTextAreaElement | null) => {
+    if (!el || el.dataset.ready) return
+    el.dataset.ready = '1'
+    const pos = caretRef.current ?? el.value.length
+    caretRef.current = null
+    el.focus()
+    try { el.setSelectionRange(pos, pos) } catch {}
+    if (!fixedHeight) growBox(el)
+  }
+  const editKeys = (commitOnEnter: boolean) => (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' || (commitOnEnter && e.key === 'Enter' && !e.shiftKey)) {
+      e.preventDefault()
+      e.currentTarget.blur()
+    }
+  }
 
   // ---------- one-time fixes for older boards ----------
 
@@ -625,7 +696,7 @@ export default function BoardCanvas({
             }
             const paper: React.CSSProperties = { ...PAPER, ...(hasBg ? { background: st.bg } : {}) }
             const handles =
-              isSel && !readOnly && selected.size === 1 && !editing
+              isSel && !readOnly && selected.size === 1
                 ? HANDLES.filter((h) => !(card.type === 'image' && (h === 'n' || h === 's'))).map((h) => (
                     <div key={h} data-handle={h} style={{ position: 'absolute', left: HANDLE_POS[h].l, top: HANDLE_POS[h].t, width: hs, height: hs, marginLeft: -hs / 2, marginTop: -hs / 2, background: '#ffffff', border: `${1.5 / zoom}px solid var(--accent)`, borderRadius: 2, cursor: CURSOR[h], zIndex: 3 }} />
                   ))
@@ -643,9 +714,9 @@ export default function BoardCanvas({
                 <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
                   <div style={{ ...box, overflow: card.height ? 'hidden' : undefined }}>
                     {editing ? (
-                      <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={2} style={{ ...text, width: '100%', height: card.height ? '100%' : undefined, fontFamily: SERIF, lineHeight: 1.25, background: 'transparent', border: '1px dashed var(--border-strong)', resize: 'none', userSelect: 'text' }} />
+                      <textarea ref={editRef(!!card.height)} defaultValue={card.content} rows={1} onBlur={(e) => commitEdit(card, e.target.value)} onInput={(e) => !card.height && growBox(e.currentTarget)} onKeyDown={editKeys(true)} aria-label="Title text" style={{ ...text, display: 'block', width: '100%', height: card.height ? '100%' : undefined, fontFamily: SERIF, lineHeight: 1.25, padding: 0, margin: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none', overflow: card.height ? 'auto' : 'hidden', userSelect: 'text' }} />
                     ) : (
-                      <div style={{ ...text, fontFamily: SERIF, lineHeight: 1.25, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{card.content}</div>
+                      <div data-body style={{ ...text, fontFamily: SERIF, lineHeight: 1.25, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: '1.25em' }}>{card.content}</div>
                     )}
                     {st.subtitle && !editing && <div style={{ ...text, fontSize: fs * 0.6, fontWeight: 400, opacity: 0.7, marginTop: 4, overflowWrap: 'anywhere' }}>{st.subtitle}</div>}
                   </div>
@@ -680,9 +751,9 @@ export default function BoardCanvas({
                   <>
                     {heading}
                     {editing ? (
-                      <textarea autoFocus defaultValue={card.content} onBlur={(e) => commitEdit(card, e.target.value)} rows={card.height ? undefined : 5} style={{ ...text, width: '100%', height: card.height ? 'calc(100% - 4px)' : undefined, background: 'transparent', border: 'none', outline: 'none', resize: card.height ? 'none' : 'vertical', userSelect: 'text' }} />
+                      <textarea ref={editRef(!!card.height)} defaultValue={card.content} rows={1} onBlur={(e) => commitEdit(card, e.target.value)} onInput={(e) => !card.height && growBox(e.currentTarget)} onKeyDown={editKeys(false)} aria-label="Note text" style={{ ...text, display: 'block', width: '100%', height: card.height ? 'calc(100% - 4px)' : undefined, lineHeight: 1.45, padding: 0, margin: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none', overflow: card.height ? 'auto' : 'hidden', userSelect: 'text' }} />
                     ) : (
-                      <div style={{ ...text, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{card.content}</div>
+                      <div data-body style={{ ...text, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minHeight: '1.45em' }}>{card.content}</div>
                     )}
                   </>
                 )}
@@ -740,21 +811,28 @@ export default function BoardCanvas({
         )}
       </div>
 
-      {!readOnly && selectedCards.length > 0 && !editingId && (
-        <BoardInspector
-          count={selectedCards.length}
-          types={selectedCards.map((c) => c.type)}
-          style={parseStyle(selectedCards[0].style)}
-          single={single ? { id: single.id, type: single.type } : null}
-          onStyle={applyStyle}
-          onDelete={deleteSelected}
-        />
-      )}
+      {!readOnly && selectedCards.length > 0 && anchor && (() => {
+        // Above the card when there is room, below it when the card is near the top edge.
+        const half = Math.min(250, (anchor.cw - 16) / 2)
+        const left = Math.min(anchor.cw - half - 8, Math.max(half + 8, anchor.cx))
+        const above = anchor.top >= 110
+        return (
+          <BoardInspector
+            count={selectedCards.length}
+            types={selectedCards.map((c) => c.type)}
+            style={parseStyle(selectedCards[0].style)}
+            single={single ? { id: single.id, type: single.type } : null}
+            onStyle={applyStyle}
+            onDelete={deleteSelected}
+            pos={{ left, top: above ? anchor.top - 10 : anchor.bottom + 10, above }}
+          />
+        )
+      })()}
 
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Scroll or pinch to zoom · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · double-click to edit'}
+          : 'Click a note to type · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · scroll or pinch to zoom'}
       </div>
     </div>
   )

@@ -1,4 +1,16 @@
-﻿# BrandOS — starter (Sprint 1-2 scope)
+# Brand OS
+
+**Brand OS is a brand operating system for creatives.** It helps you discover your brand, manage it, and grow it, with one or many brands, and all their projects and tasks, in one simple place.
+
+**Who it is for:** anyone in the creative space: content creators, influencers, content and marketing agencies, film and production houses, editing houses, graphic designers, web developers.
+
+**How it works:** you can start with discovery questions to find out what a brand really is, or skip them and create a brand straight away. From there you keep track of the work: projects, tasks, campaigns, content calendars, boards, client reviews, and a short brief form you can send to a client so you know what they want before you start.
+
+**The principle that decides everything we build: keep it simple.** A simple-minded content creator should be able to use it over and over without it ever becoming complicated. ("Duplicatable" means exactly that: easy to pick up and repeat. It is a mindset, not a Duplicate button.) If an idea makes Brand OS harder to explain in three sentences, it does not belong here.
+
+---
+
+## Technical notes (original starter)
 
 This is the first real code, matching `Technical-Architecture-MVP.md`:
 - Next.js (App Router) + TypeScript

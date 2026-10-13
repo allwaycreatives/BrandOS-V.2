@@ -5,7 +5,6 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { createBoard } from './actions'
 import { TEMPLATE_LIST } from './templates'
 import DeleteBoardButton from './DeleteBoardButton'
-import DuplicateBoardButton from './DuplicateBoardButton'
 import TemplatePicker from './TemplatePicker'
 
 export default async function BoardsListPage({ params }: { params: { id: string } }) {
@@ -54,7 +53,6 @@ export default async function BoardsListPage({ params }: { params: { id: string 
         {boards.map((board) => (
           <Link key={board.id} href={`/brand-spaces/${params.id}/boards/${board.id}`} className="card" style={{ position: 'relative', paddingTop: 34 }}>
             {canEdit && <DeleteBoardButton brandSpaceId={params.id} boardId={board.id} />}
-            {canEdit && <DuplicateBoardButton boardId={board.id} />}
             <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{board.name}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
               {board._count.cards} {board._count.cards === 1 ? 'card' : 'cards'}
