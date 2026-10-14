@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { upload } from '@vercel/blob/client'
+import UploadBar from '@/components/UploadBar'
+import { useFileUpload } from '@/lib/useFileUpload'
 import { updateCalendarItemDetails, deleteCalendarItem, type ItemDetails } from '../actions'
 import { PLATFORMS } from '../../campaigns/constants'
 import { CONTENT_TYPES, PRIORITIES, typeOf } from '@/lib/contentOptions'
@@ -27,7 +28,8 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [justSaved, setJustSaved] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const thumbUpload = useFileUpload()
+  const uploading = thumbUpload.uploading
   const fileRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof ItemDetails>(key: K, val: ItemDetails[K]) => setV((x) => ({ ...x, [key]: val }))
 
@@ -64,17 +66,10 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
     e.target.value = ''
     if (!f) return
     if (!f.type.startsWith('image/')) return setError('Please choose an image for the thumbnail.')
-    if (f.size > 5 * 1024 * 1024) return setError('Thumbnails up to 5 MB. Resize it, or paste a link instead.')
-    setUploading(true)
+    if (f.size > 40 * 1024 * 1024) return setError('That image is over 40 MB. Resize it, or paste a link instead.')
     setError(null)
-    try {
-      const blob = await upload(f.name, f, { access: 'public', handleUploadUrl: '/api/upload' })
-      set('thumbnailUrl', blob.url)
-    } catch {
-      setError('Upload failed. Try again, or paste a link instead.')
-    } finally {
-      setUploading(false)
-    }
+    const res = await thumbUpload.run(f) // big photos are shrunk in the browser first
+    if (res) set('thumbnailUrl', res.url)
   }
 
   function remove() {
@@ -166,6 +161,11 @@ export default function CalendarItemForm({ brandSpaceId, itemId, initial, strate
               <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? 'Uploading...' : 'Upload image'}</button>
               <input ref={fileRef} type="file" accept="image/*" onChange={onThumb} style={{ display: 'none' }} />
             </div>
+            {thumbUpload.item && thumbUpload.item.status !== 'done' && (
+              <div style={{ marginTop: 8, maxWidth: 360 }}>
+                <UploadBar item={thumbUpload.item} onCancel={thumbUpload.cancel} onRetry={thumbUpload.retry} onDismiss={thumbUpload.dismiss} />
+              </div>
+            )}
             {v.thumbnailUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={v.thumbnailUrl} alt="Thumbnail preview" style={{ marginTop: 8, height: 96, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />

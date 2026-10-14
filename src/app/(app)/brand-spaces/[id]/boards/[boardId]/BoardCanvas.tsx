@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { upload } from '@vercel/blob/client'
+import UploadBar, { type UploadView } from '@/components/UploadBar'
+import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
 import { useRouter } from 'next/navigation'
 import {
   addBoardCardAt,
@@ -139,6 +140,10 @@ export default function BoardCanvas({
   const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [uploads, setUploads] = useState<(UploadView & { id: string })[]>([])
+  const uploadFiles = useRef(new Map<string, File>())
+  const uploadCtl = useRef(new Map<string, AbortController>())
+  const uploadedUrls = useRef(new Map<string, string>()) // so a retry after a failed "add card" does not upload again
   const caretRef = useRef<number | null>(null)
 
   const setSelected = (next: Set<string>) => {
@@ -484,7 +489,7 @@ export default function BoardCanvas({
   // ---------- adding, editing, styling, deleting ----------
 
   // New cards appear in the middle of what you are looking at.
-  async function addCard(type: string, content: string) {
+  async function addCard(type: string, content: string, quiet = false): Promise<{ ok: boolean; message?: string }> {
     const rect = containerRef.current?.getBoundingClientRect()
     const w = WIDTH[type] ?? 210
     const cx = rect ? (rect.width / 2 - pan.x) / zoom : 200
@@ -497,8 +502,11 @@ export default function BoardCanvas({
       setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
+      return { ok: true }
     } catch (err) {
-      alert(err instanceof Error && /levels deep|name/.test(err.message) ? err.message : 'Could not add that card. Please try again.')
+      const message = err instanceof Error && /levels deep|name/.test(err.message) ? err.message : 'Could not add that card. Please try again.'
+      if (!quiet) alert(message)
+      return { ok: false, message }
     }
   }
 
@@ -524,19 +532,64 @@ export default function BoardCanvas({
     return `${hex}|${role}|${use}`
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setBusy(true)
+  function patchUpload(id: string, patch: Partial<UploadView>) {
+    setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+  }
+
+  function dropUpload(id: string) {
+    uploadFiles.current.delete(id)
+    uploadCtl.current.delete(id)
+    uploadedUrls.current.delete(id)
+    setUploads((prev) => prev.filter((u) => u.id !== id))
+  }
+
+  async function runUpload(id: string) {
+    const file = uploadFiles.current.get(id)
+    if (!file) return // cancelled while waiting in line
+    const controller = new AbortController()
+    uploadCtl.current.set(id, controller)
     try {
-      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload' })
-      await addCard('image', blob.url)
-    } catch {
-      alert('Upload failed. Check that the file is an image under 500 MB.')
-    } finally {
-      setBusy(false)
+      let url = uploadedUrls.current.get(id)
+      if (!url) {
+        patchUpload(id, { status: isImageFile(file) ? 'preparing' : 'uploading', percent: 0, error: undefined })
+        const res = await uploadFile(file, {
+          signal: controller.signal,
+          onProgress: (percent, phase) => patchUpload(id, { percent, status: phase }),
+        })
+        url = res.url
+        uploadedUrls.current.set(id, url)
+      }
+      patchUpload(id, { status: 'saving', percent: 100, error: undefined })
+      const saved = await addCard('image', url, true)
+      if (!saved.ok) {
+        patchUpload(id, { status: 'error', error: `Uploaded, but could not add it to the board. ${saved.message ?? ''}`.trim() })
+        return
+      }
+      patchUpload(id, { status: 'done', percent: 100 })
+      setTimeout(() => dropUpload(id), 1500)
+    } catch (err) {
+      if (controller.signal.aborted) return dropUpload(id)
+      patchUpload(id, { status: 'error', error: friendlyUploadError(err).message })
     }
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).filter(isImageFile).slice(0, 12)
+    e.target.value = ''
+    if (!files.length) return
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const ids = files.map((file, i) => {
+      const id = `${stamp}-${i}`
+      uploadFiles.current.set(id, file)
+      return id
+    })
+    setUploads((prev) => [...prev, ...files.map((file, i) => ({ id: ids[i], name: file.name, percent: 0, status: 'queued' as const }))])
+    // A few at a time: fast on good connections, and does not choke a phone on a big batch.
+    let next = 0
+    const worker = async () => {
+      while (next < ids.length) await runUpload(ids[next++])
+    }
+    await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker))
   }
 
   function commitEdit(card: Card, value: string) {
@@ -657,7 +710,25 @@ export default function BoardCanvas({
               <span style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>{t.label === 'Image' && busy ? '...' : t.label}</span>
             </button>
           ))}
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
+        </div>
+      )}
+
+      {uploads.length > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 12, zIndex: 6, width: 'min(340px, calc(100% - 24px))', maxHeight: '45%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: 10, background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)' }}
+        >
+          {uploads.map((u) => (
+            <UploadBar
+              key={u.id}
+              item={u}
+              onCancel={u.status === 'saving' ? undefined : () => { uploadCtl.current.get(u.id)?.abort(); dropUpload(u.id) }}
+              onRetry={() => runUpload(u.id)}
+              onDismiss={() => dropUpload(u.id)}
+            />
+          ))}
         </div>
       )}
 
@@ -757,7 +828,7 @@ export default function BoardCanvas({
                     )}
                   </>
                 )}
-                {card.type === 'image' && <img src={card.content} alt="" draggable={false} style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
+                {card.type === 'image' && <img src={card.content} alt="" draggable={false} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
                 {card.type === 'link' && (() => {
                   const meta = parseMeta(card.meta)
                   const showImage = !!meta.image && !brokenImages.has(card.id)

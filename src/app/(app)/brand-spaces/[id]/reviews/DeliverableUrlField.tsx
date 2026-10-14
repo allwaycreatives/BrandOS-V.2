@@ -1,12 +1,14 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { upload } from '@vercel/blob/client'
+import UploadBar from '@/components/UploadBar'
+import { useFileUpload } from '@/lib/useFileUpload'
 
 // A link field with an "Upload image" option, for design proofs that clients can pin comments on.
 export default function DeliverableUrlField() {
   const [url, setUrl] = useState('')
-  const [busy, setBusy] = useState(false)
+  const proof = useFileUpload({ compress: false }) // design proofs stay pixel-perfect
+  const busy = proof.uploading
   const [err, setErr] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -16,16 +18,9 @@ export default function DeliverableUrlField() {
     if (!f) return
     if (!f.type.startsWith('image/')) return setErr('Please choose an image. For video or documents, paste a link.')
     if (f.size > 15 * 1024 * 1024) return setErr('Images up to 15 MB. For anything bigger, paste a link.')
-    setBusy(true)
     setErr(null)
-    try {
-      const blob = await upload(f.name, f, { access: 'public', handleUploadUrl: '/api/upload' })
-      setUrl(blob.url)
-    } catch {
-      setErr('Upload failed. Try again, or paste a link instead.')
-    } finally {
-      setBusy(false)
-    }
+    const res = await proof.run(f)
+    if (res) setUrl(res.url)
   }
 
   return (
@@ -35,6 +30,9 @@ export default function DeliverableUrlField() {
         <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Uploading...' : 'Upload image'}</button>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
       </div>
+      {proof.item && proof.item.status !== 'done' && (
+        <UploadBar item={proof.item} onCancel={proof.cancel} onRetry={proof.retry} onDismiss={proof.dismiss} />
+      )}
       {err && <span style={{ fontSize: 12, color: 'var(--accent-text)' }}>{err}</span>}
     </div>
   )
