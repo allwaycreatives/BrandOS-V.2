@@ -1,6 +1,7 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { ALLOWED_UPLOAD_TYPES } from '@/lib/uploadTypes'
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024 // 500 MB
 
@@ -18,18 +19,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!userId) throw new Error('UNAUTHENTICATED')
 
         return {
-          allowedContentTypes: [
-            'image/*',
-            'video/*',
-            'audio/*',
-            'text/*',
-            'application/pdf',
-            'application/zip',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.*',
-            'application/vnd.ms-excel',
-            'application/vnd.ms-powerpoint',
-          ],
+          allowedContentTypes: ALLOWED_UPLOAD_TYPES,
           maximumSizeInBytes: MAX_UPLOAD_BYTES,
           addRandomSuffix: true,
         }
