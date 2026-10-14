@@ -31,6 +31,7 @@ type Card = {
   positionX: number
   positionY: number
 }
+type BoardUpload = UploadView & { id: string; x: number; y: number; preview: string }
 type Inner = { id: string; name: string; cards: number; boards: number }
 type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
@@ -50,6 +51,8 @@ const PAPER: React.CSSProperties = {
   borderRadius: 6,
   boxShadow: '0 1px 2px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.25)',
 }
+// Milanote-style: a picture floats on the board with no white card around it.
+const IMAGE_FRAME: React.CSSProperties = { background: 'transparent', boxShadow: '0 2px 10px rgba(0,0,0,0.35)' }
 const CURSOR: Record<Handle, string> = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
 
 function parseColor(content: string) {
@@ -140,7 +143,11 @@ export default function BoardCanvas({
   const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [uploads, setUploads] = useState<(UploadView & { id: string })[]>([])
+  const [uploads, setUploads] = useState<BoardUpload[]>([])
+  const [dropping, setDropping] = useState(false)
+  const dragDepth = useRef(0)
+  const uploadsRef = useRef<BoardUpload[]>([])
+  const startUploadsRef = useRef<(files: File[], at?: { x: number; y: number }) => void>(() => {})
   const uploadFiles = useRef(new Map<string, File>())
   const uploadCtl = useRef(new Map<string, AbortController>())
   const uploadedUrls = useRef(new Map<string, string>()) // so a retry after a failed "add card" does not upload again
@@ -489,13 +496,13 @@ export default function BoardCanvas({
   // ---------- adding, editing, styling, deleting ----------
 
   // New cards appear in the middle of what you are looking at.
-  async function addCard(type: string, content: string, quiet = false): Promise<{ ok: boolean; message?: string }> {
+  async function addCard(type: string, content: string, quiet = false, at?: { x: number; y: number }): Promise<{ ok: boolean; message?: string }> {
     const rect = containerRef.current?.getBoundingClientRect()
     const w = WIDTH[type] ?? 210
     const cx = rect ? (rect.width / 2 - pan.x) / zoom : 200
     const cy = rect ? (rect.height / 2 - pan.y) / zoom : 150
-    const x = cx - w / 2 + (Math.random() - 0.5) * 60
-    const y = cy - 50 + (Math.random() - 0.5) * 60
+    const x = at ? at.x : cx - w / 2 + (Math.random() - 0.5) * 60
+    const y = at ? at.y : cy - 50 + (Math.random() - 0.5) * 60
     try {
       const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
@@ -540,12 +547,26 @@ export default function BoardCanvas({
     uploadFiles.current.delete(id)
     uploadCtl.current.delete(id)
     uploadedUrls.current.delete(id)
-    setUploads((prev) => prev.filter((u) => u.id !== id))
+    setUploads((prev) => {
+      const gone = prev.find((u) => u.id === id)
+      if (gone) URL.revokeObjectURL(gone.preview)
+      return prev.filter((u) => u.id !== id)
+    })
   }
+
+  // Wait (briefly) for the real picture to load, so swapping the placeholder for the card does not flash.
+  const preload = (url: string) =>
+    new Promise<void>((resolve) => {
+      const img = new Image()
+      img.onload = img.onerror = () => resolve()
+      img.src = url
+      setTimeout(resolve, 3000)
+    })
 
   async function runUpload(id: string) {
     const file = uploadFiles.current.get(id)
-    if (!file) return // cancelled while waiting in line
+    const spot = uploadsRef.current.find((u) => u.id === id)
+    if (!file || !spot) return // cancelled while waiting in line
     const controller = new AbortController()
     uploadCtl.current.set(id, controller)
     try {
@@ -560,36 +581,104 @@ export default function BoardCanvas({
         uploadedUrls.current.set(id, url)
       }
       patchUpload(id, { status: 'saving', percent: 100, error: undefined })
-      const saved = await addCard('image', url, true)
+      await preload(url)
+      const saved = await addCard('image', url, true, { x: spot.x, y: spot.y })
       if (!saved.ok) {
         patchUpload(id, { status: 'error', error: `Uploaded, but could not add it to the board. ${saved.message ?? ''}`.trim() })
         return
       }
-      patchUpload(id, { status: 'done', percent: 100 })
-      setTimeout(() => dropUpload(id), 1500)
+      dropUpload(id) // the real card is already in the same spot
     } catch (err) {
       if (controller.signal.aborted) return dropUpload(id)
       patchUpload(id, { status: 'error', error: friendlyUploadError(err).message })
     }
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).filter(isImageFile).slice(0, 12)
-    e.target.value = ''
+  // Images dropped, pasted or picked land right where you are looking (or where you dropped them),
+  // show up immediately as a faded preview, and fill in as they upload.
+  function startUploads(rawFiles: File[], drop?: { x: number; y: number }) {
+    const files = rawFiles.filter(isImageFile).slice(0, 12)
     if (!files.length) return
+    const w = WIDTH.image
+    const rect = containerRef.current?.getBoundingClientRect()
+    const base = drop
+      ? { x: drop.x - w / 2, y: drop.y - 60 }
+      : { x: (rect ? (rect.width / 2 - pan.x) / zoom : 200) - w / 2, y: (rect ? (rect.height / 2 - pan.y) / zoom : 150) - 80 }
+    const cols = Math.min(files.length, 3)
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    const ids = files.map((file, i) => {
+    const fresh: BoardUpload[] = files.map((file, i) => {
       const id = `${stamp}-${i}`
       uploadFiles.current.set(id, file)
-      return id
+      return {
+        id,
+        name: file.name,
+        percent: 0,
+        status: 'queued',
+        preview: URL.createObjectURL(file),
+        x: base.x + (i % cols) * (w + 16),
+        y: base.y + Math.floor(i / cols) * (w * 0.85 + 16),
+      }
     })
-    setUploads((prev) => [...prev, ...files.map((file, i) => ({ id: ids[i], name: file.name, percent: 0, status: 'queued' as const }))])
+    uploadsRef.current = [...uploadsRef.current, ...fresh]
+    setUploads((prev) => [...prev, ...fresh])
     // A few at a time: fast on good connections, and does not choke a phone on a big batch.
     let next = 0
     const worker = async () => {
-      while (next < ids.length) await runUpload(ids[next++])
+      while (next < fresh.length) await runUpload(fresh[next++].id)
     }
-    await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker))
+    void Promise.all(Array.from({ length: Math.min(3, fresh.length) }, worker))
+  }
+  startUploadsRef.current = startUploads
+  useEffect(() => {
+    uploadsRef.current = uploads
+  }, [uploads])
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    startUploads(files)
+  }
+
+  // Paste a copied image or screenshot (Ctrl/Cmd+V) anywhere on the page, unless you are typing in a field.
+  useEffect(() => {
+    if (readOnly) return
+    function onPaste(e: ClipboardEvent) {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const files = Array.from(e.clipboardData?.files ?? []).filter(isImageFile)
+      if (!files.length) return
+      e.preventDefault()
+      startUploadsRef.current(files)
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [readOnly])
+
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  function onDragEnter(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current += 1
+    setDropping(true)
+  }
+  function onDragOver(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+  function onDragLeave(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDropping(false)
+  }
+  function onDrop(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current = 0
+    setDropping(false)
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    startUploads(Array.from(e.dataTransfer.files), { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom })
   }
 
   function commitEdit(card: Card, value: string) {
@@ -714,24 +803,6 @@ export default function BoardCanvas({
         </div>
       )}
 
-      {uploads.length > 0 && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 12, zIndex: 6, width: 'min(340px, calc(100% - 24px))', maxHeight: '45%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: 10, background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)' }}
-        >
-          {uploads.map((u) => (
-            <UploadBar
-              key={u.id}
-              item={u}
-              onCancel={u.status === 'saving' ? undefined : () => { uploadCtl.current.get(u.id)?.abort(); dropUpload(u.id) }}
-              onRetry={() => runUpload(u.id)}
-              onDismiss={() => dropUpload(u.id)}
-            />
-          ))}
-        </div>
-      )}
-
       <div
         ref={containerRef}
         className="canvas-box"
@@ -740,6 +811,10 @@ export default function BoardCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
         style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
         <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
@@ -817,7 +892,7 @@ export default function BoardCanvas({
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, padding: card.type === 'image' ? 6 : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
                 {card.type === 'note' && (
                   <>
                     {heading}
@@ -828,7 +903,7 @@ export default function BoardCanvas({
                     )}
                   </>
                 )}
-                {card.type === 'image' && <img src={card.content} alt="" draggable={false} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
+                {card.type === 'image' && <img src={card.content} alt="" draggable={false} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: hasBg ? 3 : 6, display: 'block' }} />}
                 {card.type === 'link' && (() => {
                   const meta = parseMeta(card.meta)
                   const showImage = !!meta.image && !brokenImages.has(card.id)
@@ -870,7 +945,24 @@ export default function BoardCanvas({
               </div>
             )
           })}
+
+          {uploads.map((u) => (
+            <div key={u.id} data-nodrag style={{ position: 'absolute', left: u.x, top: u.y, width: WIDTH.image, minHeight: 96, borderRadius: 6, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.35)', background: 'var(--bg-card)', cursor: 'default' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u.preview} alt="" draggable={false} onError={(e) => { e.currentTarget.style.display = 'none' }} style={{ width: '100%', display: 'block', opacity: u.status === 'error' ? 0.3 : 0.5 }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 8, background: 'color-mix(in srgb, var(--bg-card) 88%, transparent)' }}>
+                <UploadBar
+                  item={u}
+                  onCancel={u.status === 'saving' ? undefined : () => { uploadCtl.current.get(u.id)?.abort(); dropUpload(u.id) }}
+                  onRetry={() => runUpload(u.id)}
+                  onDismiss={() => dropUpload(u.id)}
+                />
+              </div>
+            </div>
+          ))}
         </div>
+
+        {dropping && <div aria-hidden="true" style={{ position: 'absolute', inset: 8, border: '2px dashed var(--accent)', borderRadius: 8, background: 'rgba(255,105,41,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-text)', fontSize: 14, pointerEvents: 'none', zIndex: 5 }}>Drop images to add them to the board</div>}
 
         {marquee && <div aria-hidden="true" style={{ position: 'absolute', left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: '1px solid var(--accent)', background: 'rgba(255,105,41,0.12)', pointerEvents: 'none', zIndex: 4 }} />}
 
@@ -903,7 +995,7 @@ export default function BoardCanvas({
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Click a note to type · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · scroll or pinch to zoom'}
+          : 'Drop or paste images straight onto the board · click a note to type · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · scroll or pinch to zoom'}
       </div>
     </div>
   )
