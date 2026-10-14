@@ -34,7 +34,8 @@ export default function UploadBar({
   const failed = item.status === 'error'
   const done = item.status === 'done'
   const working = !failed && !done
-  const indeterminate = item.status === 'preparing' || item.status === 'retrying' || item.status === 'saving'
+  const unknown = item.status === 'uploading' && item.percent < 0
+  const indeterminate = item.status === 'preparing' || item.status === 'retrying' || item.status === 'saving' || unknown
   const pct = done ? 100 : Math.max(0, Math.min(100, item.percent))
 
   return (
@@ -45,7 +46,7 @@ export default function UploadBar({
           {item.name}
         </span>
         <span style={{ flex: '0 0 auto', color: failed ? 'var(--accent-text)' : 'var(--text-muted)' }}>
-          {item.status === 'uploading' ? `${pct}%` : done ? '✓' : ''}
+          {item.status === 'uploading' && !unknown ? `${pct}%` : done ? '✓' : ''}
         </span>
         {working && onCancel && (
           <button type="button" onClick={onCancel} aria-label={`Cancel upload of ${item.name}`} style={{ padding: '0 6px', fontSize: 11, border: 'none', background: 'transparent', color: 'var(--text-muted)' }}>
@@ -78,7 +79,7 @@ export default function UploadBar({
         />
       </div>
       <span style={{ color: failed ? 'var(--accent-text)' : 'var(--text-muted)' }}>
-        {failed ? item.error ?? LABEL.error : item.status === 'uploading' || done ? '' : LABEL[item.status]}
+        {failed ? item.error ?? LABEL.error : unknown ? 'Uploading…' : item.status === 'uploading' || done ? '' : LABEL[item.status]}
       </span>
     </div>
   )

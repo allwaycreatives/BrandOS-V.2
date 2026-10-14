@@ -21,7 +21,8 @@ export type UploadOptions = {
 const MAX_EDGE = 2400 // longest side, in pixels, after shrinking
 const COMPRESS_ABOVE = 1.5 * 1024 * 1024 // images smaller than this are left alone
 const MULTIPART_ABOVE = 8 * 1024 * 1024 // big files are split into parallel, individually-retried parts
-const STALL_MS = 45_000 // no progress for this long = connection is stuck
+const STALL_MS = 15_000 // with progress events: no movement for this long = stuck
+const plainTimeoutMs = (bytes: number) => Math.max(60_000, (bytes / (40 * 1024)) * 1000) // without progress events: assume at least ~40 KB/s
 const MAX_ATTEMPTS = 3
 
 const EXT: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }
@@ -96,6 +97,11 @@ export function friendlyUploadError(err: unknown): UploadError {
   return new UploadError('Upload failed. Check your connection and try again.')
 }
 
+// The SDK reports progress through a streaming fetch in Chrome. On some networks (VPNs, proxies, antivirus)
+// that path hangs while a plain upload works fine. If it stalls, we fall back to the plain upload, and
+// remember that for the rest of the session so later uploads skip the 15 second wait.
+let streamingProgressBroken = false
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<UploadResult> {
@@ -112,43 +118,59 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
 
   let lastError: UploadError | null = null
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const withProgress = attempt === 1 && !streamingProgressBroken
     const controller = new AbortController()
     let stalled = false
+    let gotProgress = false
     let timer: ReturnType<typeof setTimeout> | undefined
-    const arm = () => {
+    const arm = (ms: number) => {
       clearTimeout(timer)
       timer = setTimeout(() => {
         stalled = true
         controller.abort()
-      }, STALL_MS)
+      }, ms)
     }
     const onUserAbort = () => controller.abort()
     signal?.addEventListener('abort', onUserAbort)
+    const startedAt = Date.now()
 
     try {
-      onProgress?.(0, attempt === 1 ? 'uploading' : 'retrying')
-      arm()
+      // -1 means "no percentage available": the bar pulses instead of filling.
+      onProgress?.(withProgress ? 0 : -1, attempt === 1 ? 'uploading' : 'retrying')
+      arm(withProgress ? STALL_MS : plainTimeoutMs(body.size))
       const blob = await upload(body.name, body, {
         access: 'public',
         handleUploadUrl: '/api/upload',
         multipart: body.size > MULTIPART_ABOVE,
         abortSignal: controller.signal,
-        onUploadProgress: (e) => {
-          arm()
-          onProgress?.(Math.min(100, Math.round(e.percentage)), 'uploading')
-        },
+        ...(withProgress
+          ? {
+              onUploadProgress: (e: { percentage: number }) => {
+                gotProgress = true
+                arm(STALL_MS)
+                onProgress?.(Math.min(100, Math.round(e.percentage)), 'uploading')
+              },
+            }
+          : {}),
       })
+      // Worked without the progress stream after the streaming path stalled: stop using it.
+      if (!withProgress && attempt > 1 && (lastError?.message.includes('stalled') || lastError?.message.includes('did not respond'))) streamingProgressBroken = true
       onProgress?.(100, 'uploading')
       return { url: blob.url, name: body.name }
     } catch (err) {
       if (signal?.aborted) throw cancelled()
+      console.warn(`[upload] attempt ${attempt} (${withProgress ? 'with progress' : 'plain'}) failed after ${Date.now() - startedAt}ms`, err)
       lastError = stalled
-        ? new UploadError('The upload stalled. Check your connection and try again.')
+        ? new UploadError(
+            gotProgress || !withProgress
+              ? 'The upload stalled. Check your connection and try again.'
+              : 'The upload server did not respond. Check your connection and try again.',
+          )
         : friendlyUploadError(err)
       if (!lastError.retryable) throw lastError
       if (attempt < MAX_ATTEMPTS) {
-        onProgress?.(0, 'retrying')
-        await sleep(800 * attempt * attempt)
+        onProgress?.(-1, 'retrying')
+        await sleep(600 * attempt)
         if (signal?.aborted) throw cancelled()
       }
     } finally {
