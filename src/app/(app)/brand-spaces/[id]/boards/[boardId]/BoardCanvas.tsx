@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { upload } from '@vercel/blob/client'
+import { uploadImage } from '@/lib/uploadImage'
 import { useRouter } from 'next/navigation'
 import {
   addBoardCardAt,
@@ -16,6 +16,8 @@ import {
   styleBoardCards,
 } from '../actions'
 import BoardInspector from './BoardInspector'
+import BoardPrompt from './BoardPrompt'
+import { DEFAULT_COLOR, parseColorCard, serializeColorCard, type ColorCard } from '@/lib/boardColor'
 import { HANDLES, movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
 import { DEFAULT_FS, MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, readableText, styleToJson, type CardStyle } from '@/lib/boardStyle'
 
@@ -50,11 +52,6 @@ const PAPER: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.25)',
 }
 const CURSOR: Record<Handle, string> = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
-
-function parseColor(content: string) {
-  const [hex = '#888888', role = '', use = ''] = content.split('|')
-  return { hex, role, use }
-}
 
 function parseMeta(raw: string | null): Meta {
   if (!raw) return {}
@@ -132,6 +129,10 @@ export default function BoardCanvas({
   const [marquee, setMarquee] = useState<Rect | null>(null)
   const [cursorGrab, setCursorGrab] = useState(false)
   const [anchor, setAnchor] = useState<{ cx: number; top: number; bottom: number; cw: number } | null>(null)
+  const [dialog, setDialog] = useState<{ kind: 'link' | 'board' | 'rename' | 'editlink'; cardId?: string; initial: string } | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'error' | 'info' | 'progress'; text: string; percent?: number | null } | null>(null)
+  const [barPos, setBarPos] = useState<{ x: number; y: number } | null>(null)
+  const [newColorId, setNewColorId] = useState<string | null>(null)
 
   const selRef = useRef(selected)
   const dragRef = useRef<Drag | null>(null)
@@ -140,6 +141,9 @@ export default function BoardCanvas({
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const caretRef = useRef<number | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>()
+  const colorTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   const setSelected = (next: Set<string>) => {
     selRef.current = next
@@ -425,6 +429,22 @@ export default function BoardCanvas({
     setAnchor((a) => (a && a.cx === next.cx && a.top === next.top && a.bottom === next.bottom && a.cw === next.cw ? a : next))
   }, [selected, cards, pan, zoom, editingId, readOnly])
 
+  useEffect(() => {
+    if (newColorId && !(selected.size === 1 && selected.has(newColorId))) setNewColorId(null)
+  }, [selected, newColorId])
+
+  // Leaving the board: save any colour change that was still waiting for its half-second.
+  useEffect(() => {
+    const timers = colorTimers.current
+    return () => {
+      timers.forEach((t, id) => {
+        clearTimeout(t)
+        const latest = cardsRef.current.find((c) => c.id === id)
+        if (latest) updateBoardCard(id, latest.content).catch(() => {})
+      })
+    }
+  }, [])
+
   const growBox = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
     if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`
@@ -483,6 +503,13 @@ export default function BoardCanvas({
 
   // ---------- adding, editing, styling, deleting ----------
 
+  // A message on the board (instead of a browser alert box). Errors fade after a few seconds; progress stays until it is done.
+  function notify(text: string, kind: 'error' | 'info' = 'error') {
+    setNotice({ kind, text })
+    clearTimeout(noticeTimer.current)
+    noticeTimer.current = setTimeout(() => setNotice((n) => (n && n.kind !== 'progress' ? null : n)), 7000)
+  }
+
   // New cards appear in the middle of what you are looking at.
   async function addCard(type: string, content: string) {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -497,44 +524,37 @@ export default function BoardCanvas({
       setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
+      if (type === 'color') setNewColorId(created.id)
     } catch (err) {
-      alert(err instanceof Error && /levels deep|name/.test(err.message) ? err.message : 'Could not add that card. Please try again.')
+      notify(err instanceof Error && /levels deep|name|link|colour/.test(err.message) ? err.message : 'Could not add that card. Please try again.')
     }
   }
 
-  async function addLink() {
-    const raw = prompt('Paste a link')?.trim()
-    if (!raw) return
-    setBusy(true)
-    try {
-      await addCard('link', /^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function askColor(current = { hex: '#', role: '', use: '' }) {
-    const hex = prompt('Color code, like #ED8D01', current.hex)?.trim()
-    if (!hex || !/^#[0-9a-f]{3,8}$/i.test(hex)) {
-      if (hex) alert('That does not look like a color code. Use something like #ED8D01.')
-      return null
-    }
-    const role = prompt('What is this color called? (Primary, Accent…)', current.role) ?? current.role
-    const use = prompt('What is it used for?', current.use) ?? current.use
-    return `${hex}|${role}|${use}`
-  }
-
+  // Pictures go through one helper (src/lib/uploadImage.ts). This only shows what is happening and adds the card.
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (!file) return
+    if (files.length === 0) return
+    const controller = new AbortController()
+    abortRef.current = controller
     setBusy(true)
     try {
-      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload' })
-      await addCard('image', blob.url)
-    } catch {
-      alert('Upload failed. Check that the file is an image under 500 MB.')
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const label = files.length > 1 ? `Uploading ${i + 1} of ${files.length}: ${file.name}` : `Uploading ${file.name}`
+        setNotice({ kind: 'progress', text: label, percent: null })
+        const { url } = await uploadImage(file, {
+          signal: controller.signal,
+          onProgress: (p) => setNotice({ kind: 'progress', text: p.stage ? `${label} · ${p.stage}` : label, percent: p.percent }),
+        })
+        await addCard('image', url)
+      }
+      setNotice(null)
+    } catch (err) {
+      if (controller.signal.aborted) setNotice(null)
+      else notify(err instanceof Error && err.message ? `Upload failed: ${err.message}` : 'Upload failed. Please try again.')
     } finally {
+      abortRef.current = null
       setBusy(false)
     }
   }
@@ -557,7 +577,7 @@ export default function BoardCanvas({
     })
     updateBoardCard(card.id, text)
       .then((saved) => setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, content: saved.content, meta: saved.meta } : c))))
-      .catch(() => alert('Could not save that change. Please try again.'))
+      .catch(() => notify('Could not save that change. Please try again.'))
   }
 
   // Changes how every selected card looks. The screen updates at once; the save follows.
@@ -566,7 +586,7 @@ export default function BoardCanvas({
     if (ids.length === 0) return
     const idSet = new Set(ids)
     setCards((prev) => prev.map((c) => (idSet.has(c.id) ? { ...c, style: styleToJson(mergeStyle(parseStyle(c.style), patch)) } : c)))
-    styleBoardCards(boardId, ids, patch).catch(() => alert('Could not save that change. Please try again.'))
+    styleBoardCards(boardId, ids, patch).catch(() => notify('Could not save that change. Please try again.'))
   }
 
   function deleteSelected() {
@@ -578,45 +598,79 @@ export default function BoardCanvas({
     const gone = new Set(ids)
     setCards((prev) => prev.filter((c) => !gone.has(c.id)))
     setSelected(new Set())
-    deleteBoardCards(boardId, ids).catch(() => alert('Could not delete. Please refresh and try again.'))
+    deleteBoardCards(boardId, ids).catch(() => notify('Could not delete. Please refresh and try again.'))
   }
   const idsHas = (ids: string[], id: string) => ids.includes(id)
+
+  // What the little input box does when you press Enter.
+  async function submitDialog(value: string) {
+    const d = dialog
+    setDialog(null)
+    if (!d) return
+    const card = d.cardId ? cardsRef.current.find((c) => c.id === d.cardId) : undefined
+    if (d.kind === 'link') {
+      setBusy(true)
+      try {
+        await addCard('link', /^https?:\/\//i.test(value) ? value : `https://${value}`)
+      } finally {
+        setBusy(false)
+      }
+    } else if (d.kind === 'editlink') {
+      if (card) commitEdit(card, /^https?:\/\//i.test(value) ? value : `https://${value}`)
+    } else if (d.kind === 'board') {
+      await addCard('board', value)
+    } else if (d.kind === 'rename' && card) {
+      if (value === (inner[card.content]?.name ?? '')) return
+      setInner((prev) => ({ ...prev, [card.content]: { ...(prev[card.content] as Inner), name: value } }))
+      renameBoardTile(card.id, value).catch(() => notify('Could not rename that board. Please try again.'))
+    }
+  }
+
+  // Colour cards: the colour, plus an optional name, type and use. Saved a moment after typing stops.
+  function applyColor(patch: Partial<ColorCard>) {
+    const id = selRef.current.size === 1 ? Array.from(selRef.current)[0] : null
+    const target = id ? cardsRef.current.find((c) => c.id === id) : undefined
+    if (!id || !target || target.type !== 'color') return
+    const next = serializeColorCard({ ...parseColorCard(target.content), ...patch })
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: next } : c)))
+    const timers = colorTimers.current
+    const pending = timers.get(id)
+    if (pending) clearTimeout(pending)
+    timers.set(
+      id,
+      setTimeout(() => {
+        timers.delete(id)
+        const latest = cardsRef.current.find((c) => c.id === id)
+        if (latest) updateBoardCard(id, latest.content).catch(() => notify('Could not save that colour. Please try again.'))
+      }, 500)
+    )
+  }
 
   function openBoard(card: Card) {
     if (brandSpaceId) router.push(`/brand-spaces/${brandSpaceId}/boards/${card.content}`)
   }
 
   function renameTile(card: Card) {
-    const current = inner[card.content]?.name ?? ''
-    const next = prompt('Rename this board', current)?.trim()
-    if (!next || next === current) return
-    setInner((prev) => ({ ...prev, [card.content]: { ...(prev[card.content] as Inner), name: next } }))
-    renameBoardTile(card.id, next).catch(() => alert('Could not rename that board. Please try again.'))
+    setDialog({ kind: 'rename', cardId: card.id, initial: inner[card.content]?.name ?? '' })
   }
 
   function startEdit(card: Card) {
     if (card.type === 'board') return openBoard(card)
     if (readOnly) return
     if (card.type === 'note' || card.type === 'heading') return setEditingId(card.id)
-    if (card.type === 'link') {
-      const next = prompt('Edit link', card.content)?.trim()
-      if (next) commitEdit(card, /^https?:\/\//i.test(next) ? next : `https://${next}`)
-    }
-    if (card.type === 'color') {
-      const next = askColor(parseColor(card.content))
-      if (next) commitEdit(card, next)
-    }
+    if (card.type === 'link') setDialog({ kind: 'editlink', cardId: card.id, initial: card.content })
+    // A colour card is edited in the bar above it, so there is nothing to open here.
   }
 
   const tools = [
     { label: 'Note', glyph: '≡', run: () => addCard('note', '') },
     { label: 'Title', glyph: 'T', run: () => addCard('heading', '') },
     { label: 'Image', glyph: '▣', run: () => fileRef.current?.click() },
-    { label: 'Link', glyph: '∞', run: addLink },
+    { label: 'Link', glyph: '∞', run: () => setDialog({ kind: 'link', initial: '' }) },
     ...(canNest
-      ? [{ label: 'Board', glyph: '▤', run: () => { const name = prompt('Name this board (for example: Inspirations)')?.trim(); if (name) addCard('board', name) } }]
+      ? [{ label: 'Board', glyph: '▤', run: () => setDialog({ kind: 'board', initial: '' }) }]
       : []),
-    { label: 'Color', glyph: '●', run: () => { const v = askColor(); if (v) addCard('color', v) } },
+    { label: 'Color', glyph: '●', run: () => addCard('color', serializeColorCard({ hex: DEFAULT_COLOR })) },
   ]
 
   // ---------- drawing ----------
@@ -657,7 +711,37 @@ export default function BoardCanvas({
               <span style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>{t.label === 'Image' && busy ? '...' : t.label}</span>
             </button>
           ))}
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
+        </div>
+      )}
+
+      {dialog && (
+        <BoardPrompt
+          key={`${dialog.kind}-${dialog.cardId ?? ''}`}
+          title={{ link: 'Paste a link', board: 'Name this board', rename: 'Rename this board', editlink: 'Edit link' }[dialog.kind]}
+          placeholder={{ link: 'https://…', board: 'For example: Inspirations', rename: 'Board name', editlink: 'https://…' }[dialog.kind]}
+          initial={dialog.initial}
+          submitLabel={{ link: 'Add', board: 'Create', rename: 'Save', editlink: 'Save' }[dialog.kind]}
+          onSubmit={submitDialog}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+
+      {notice && (
+        <div role={notice.kind === 'error' ? 'alert' : 'status'} style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 7, width: 340, maxWidth: 'calc(100% - 200px)', background: 'var(--bg-card)', border: `1px solid ${notice.kind === 'error' ? 'var(--accent-border)' : 'var(--border-strong)'}`, borderRadius: 12, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12.5, color: notice.kind === 'error' ? 'var(--accent-text)' : 'var(--text-primary)', overflowWrap: 'anywhere' }}>{notice.text}</div>
+            {notice.kind === 'progress' ? (
+              <button type="button" onClick={() => abortRef.current?.abort()} style={{ fontSize: 12, flexShrink: 0 }}>Cancel</button>
+            ) : (
+              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" style={{ fontSize: 14, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>×</button>
+            )}
+          </div>
+          {notice.kind === 'progress' && (
+            <div className="progress-track" style={{ marginTop: 8 }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={notice.percent ?? undefined}>
+              {notice.percent == null ? <div className="progress-indeterminate" /> : <div className="progress-fill" style={{ width: `${Math.max(2, Math.min(100, notice.percent))}%` }} />}
+            </div>
+          )}
         </div>
       )}
 
@@ -783,14 +867,20 @@ export default function BoardCanvas({
                   )
                 })()}
                 {card.type === 'color' && (() => {
-                  const { hex, role, use } = parseColor(card.content)
+                  const c = parseColorCard(card.content)
                   return (
                     <>
-                      <div style={{ height: card.height ? undefined : 64, flex: card.height ? 1 : undefined, minHeight: 30, background: hex }} />
+                      <div style={{ height: card.height ? undefined : 64, flex: card.height ? 1 : undefined, minHeight: 30, background: c.hex || '#888888' }} />
                       <div style={{ padding: '8px 10px' }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{hex.toUpperCase()}</div>
-                        {role && <div style={{ fontSize: 12 }}>{role}</div>}
-                        {use && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{use}</div>}
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{c.hex ? c.hex.toUpperCase() : 'No colour yet'}</div>
+                        {c.more && (
+                          <>
+                            {c.name && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, overflowWrap: 'anywhere' }}>{c.name}</div>}
+                            {c.type && <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#666', marginTop: 2 }}>{c.type}</div>}
+                            {c.use && <div style={{ fontSize: 11.5, color: '#555', marginTop: 4, overflowWrap: 'anywhere' }}>{c.use}</div>}
+                            {!c.name && !c.type && !c.use && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Add details in the bar above</div>}
+                          </>
+                        )}
                       </div>
                     </>
                   )
@@ -825,6 +915,12 @@ export default function BoardCanvas({
             onStyle={applyStyle}
             onDelete={deleteSelected}
             pos={{ left, top: above ? anchor.top - 10 : anchor.bottom + 10, above }}
+            manual={barPos}
+            onMove={(x, y) => setBarPos({ x, y })}
+            onReset={() => setBarPos(null)}
+            colorCard={single && single.type === 'color' ? parseColorCard(single.content) : null}
+            onColor={applyColor}
+            autoFocusHex={!!single && single.id === newColorId}
           />
         )
       })()}

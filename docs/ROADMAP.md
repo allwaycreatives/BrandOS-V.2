@@ -41,6 +41,7 @@ projects, campaigns and tasks from idea to delivery. It must be **simple**, **du
 - Click-to-type notes and titles (no double-click, cursor lands where you click), and a formatting bar that floats beside the selected card
 - Social links on every brand (paste a link or just an @handle), one tap to open
 - Removed the Duplicate buttons (brand, board, project): "duplicatable" is a mindset about simplicity, not a feature
+- Boards without browser pop-ups: links, board names and renames use a small box beside the tools; errors and upload progress show on the board. Colour cards are created instantly (no questions) and edited in the bar: colour picker, colour code, and optional name, type and use ("Color only" / "Add details"). The formatting bar has a drag handle (double-click puts it back). Uploads go through one helper, src/lib/uploadImage.ts
 - Ideas: park an idea fast, promote it to a campaign or project
 - Shareable read-only brand guide link (positioning, voice, audience, platform kit)
 - First-run guide with starter packs by role (creator, founder, social media manager, agency, film house, editor, designer)

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CARD_COLORS, DEFAULT_FS, FONT_SIZES, TEXT_COLORS, type CardStyle } from '@/lib/boardStyle'
+import { COLOR_TYPES, DEFAULT_COLOR, normalizeHex, type ColorCard } from '@/lib/boardColor'
 
 // The bar that appears when cards are selected: text size, bold, italic, alignment, colours, title and subtitle, delete.
+// For a colour card it becomes the colour editor. It floats beside the selection, and it can be dragged out of the way.
 export default function BoardInspector({
   count,
   types,
@@ -12,6 +14,12 @@ export default function BoardInspector({
   onStyle,
   onDelete,
   pos,
+  manual,
+  onMove,
+  onReset,
+  colorCard,
+  onColor,
+  autoFocusHex,
 }: {
   count: number
   types: string[] // the kinds of card selected
@@ -19,11 +27,35 @@ export default function BoardInspector({
   single: { id: string; type: string } | null // set when exactly one card is selected
   onStyle: (patch: Record<string, unknown>) => void
   onDelete: () => void
-  pos: { left: number; top: number; above: boolean } // where to float it, relative to the canvas
+  pos: { left: number; top: number; above: boolean } // where it floats by itself, relative to the canvas
+  manual: { x: number; y: number } | null // where the person dragged it to (top-left corner), if they did
+  onMove: (x: number, y: number) => void
+  onReset: () => void
+  colorCard: ColorCard | null // set when exactly one colour card is selected
+  onColor: (patch: Partial<ColorCard>) => void
+  autoFocusHex: boolean
 }) {
   const [menu, setMenu] = useState<'text' | 'card' | null>(null)
-  const textual = types.every((t) => t === 'note' || t === 'heading')
-  const colourable = types.every((t) => ['note', 'heading', 'link', 'image'].includes(t))
+  const rootRef = useRef<HTMLDivElement>(null)
+  const hexRef = useRef<HTMLInputElement>(null)
+  const [hexDraft, setHexDraft] = useState(colorCard?.hex ?? '')
+
+  // A colour changed from somewhere else (the colour picker): show it in the box. Typing is left alone.
+  useEffect(() => {
+    if (colorCard && normalizeHex(hexDraft) !== colorCard.hex) setHexDraft(colorCard.hex)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorCard?.hex, single?.id])
+
+  // A brand-new colour card asks for its colour straight away.
+  useEffect(() => {
+    if (autoFocusHex) {
+      hexRef.current?.focus()
+      hexRef.current?.select()
+    }
+  }, [autoFocusHex, single?.id])
+
+  const textual = !colorCard && types.every((t) => t === 'note' || t === 'heading')
+  const colourable = !colorCard && types.every((t) => ['note', 'heading', 'link', 'image'].includes(t))
   const defFs = DEFAULT_FS[types[0]] ?? 13
   const fs = style.fs ?? defFs
   const isBold = style.b ?? types[0] === 'heading'
@@ -32,6 +64,30 @@ export default function BoardInspector({
     const base = idx === -1 ? FONT_SIZES.length - 1 : idx
     const next = FONT_SIZES[Math.min(FONT_SIZES.length - 1, Math.max(0, base + dir))]
     onStyle({ fs: next })
+  }
+
+  // Drag the bar by its handle. It stays inside the board, and stays where it was put until it is put back.
+  function startDrag(e: React.PointerEvent) {
+    const el = rootRef.current
+    const parent = el?.parentElement
+    if (!el || !parent) return
+    e.preventDefault()
+    const box = parent.getBoundingClientRect()
+    const me = el.getBoundingClientRect()
+    const origin = { x: me.left - box.left, y: me.top - box.top }
+    const startX = e.clientX
+    const startY = e.clientY
+    const maxX = Math.max(0, box.width - me.width)
+    const maxY = Math.max(0, box.height - me.height)
+    const clamp = (v: number, hi: number) => Math.min(hi, Math.max(0, v))
+    const move = (ev: PointerEvent) => onMove(clamp(origin.x + ev.clientX - startX, maxX), clamp(origin.y + ev.clientY - startY, maxY))
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    onMove(origin.x, origin.y) // from now on it stays where it is, wherever the card goes
   }
 
   const btn = (active = false): React.CSSProperties => ({
@@ -64,14 +120,56 @@ export default function BoardInspector({
     </div>
   )
 
+  const hexValid = normalizeHex(hexDraft) !== null
+  const where: React.CSSProperties = manual
+    ? { left: manual.x, top: manual.y, transform: 'none' }
+    : { left: pos.left, top: pos.top, transform: pos.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }
+
   return (
     <div
+      ref={rootRef}
       data-nodrag
       // Pressing a button here must not pull the cursor out of the text being edited.
       onMouseDown={(e) => { if (!(e.target as HTMLElement).closest('input, select')) e.preventDefault() }}
-      style={{ position: 'absolute', left: pos.left, top: pos.top, transform: pos.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)', width: 'max-content', zIndex: 6, maxWidth: 'calc(100% - 16px)', background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      style={{ position: 'absolute', ...where, width: 'max-content', zIndex: 6, maxWidth: 'calc(100% - 16px)', background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: 6 }}
+    >
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
+        <span
+          data-grip
+          role="button"
+          aria-label="Move this bar"
+          title="Drag to move this bar out of the way. Double-click to put it back."
+          onPointerDown={startDrag}
+          onDoubleClick={onReset}
+          style={{ cursor: 'grab', padding: '0 6px', color: 'var(--text-muted)', userSelect: 'none', touchAction: 'none', letterSpacing: -2, fontSize: 15 }}
+        >
+          ⋮⋮
+        </span>
         <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px' }}>{count} selected</span>
+
+        {colorCard && (
+          <>
+            {sep}
+            <input type="color" value={colorCard.hex || DEFAULT_COLOR} onChange={(e) => onColor({ hex: e.target.value })} aria-label="Pick a colour" style={{ width: 34, height: 30, padding: 0, border: '1px solid var(--border-strong)', borderRadius: 6, background: 'transparent', cursor: 'pointer' }} />
+            <input
+              ref={hexRef}
+              value={hexDraft}
+              onChange={(e) => {
+                setHexDraft(e.target.value)
+                const n = normalizeHex(e.target.value)
+                if (n) onColor({ hex: n })
+              }}
+              placeholder="#ff6929"
+              aria-label="Colour code"
+              aria-invalid={!hexValid}
+              spellCheck={false}
+              style={{ width: 96, fontSize: 13, borderColor: hexValid ? undefined : '#e5484d' }}
+            />
+            <button type="button" style={btn(colorCard.more)} aria-pressed={colorCard.more} onClick={() => onColor({ more: !colorCard.more })}>
+              {colorCard.more ? 'Color only' : 'Add details'}
+            </button>
+          </>
+        )}
 
         {textual && (
           <>
@@ -109,6 +207,17 @@ export default function BoardInspector({
         {sep}
         <button type="button" style={{ ...btn(), color: 'var(--accent-text)' }} onClick={onDelete}>Delete{count > 1 ? ` ${count}` : ''}</button>
       </div>
+
+      {colorCard?.more && (
+        <div key={single?.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input value={colorCard.name} onChange={(e) => onColor({ name: e.target.value })} placeholder="Name, like Sunset Orange" aria-label="Color name" style={{ flex: '1 1 150px', fontSize: 12.5 }} />
+          <select value={colorCard.type} onChange={(e) => onColor({ type: e.target.value })} aria-label="Color type" style={{ flex: '0 1 130px', fontSize: 12.5 }}>
+            <option value="">Type</option>
+            {COLOR_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <input value={colorCard.use} onChange={(e) => onColor({ use: e.target.value })} placeholder="What it is used for" aria-label="Used for" style={{ flex: '1 1 170px', fontSize: 12.5 }} />
+        </div>
+      )}
 
       {single && (single.type === 'note' || single.type === 'heading') && (
         <div key={single.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

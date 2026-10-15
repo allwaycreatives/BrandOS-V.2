@@ -9,6 +9,7 @@ import { TEMPLATES } from './templates'
 import { safeUrl } from '@/lib/embed'
 import { getLinkPreview, metaToJson } from '@/lib/linkPreview'
 import { MAX_BOARD_DEPTH } from './constants'
+import { normalizeHex, parseColorCard, serializeColorCard } from '@/lib/boardColor'
 import { MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, styleToJson } from '@/lib/boardStyle'
 
 
@@ -105,6 +106,12 @@ export async function addBoardCardAt(boardId: string, type: string, content: str
     meta = metaToJson(await getLinkPreview(url))
   }
 
+  if (type === 'color') {
+    const c = parseColorCard(text)
+    if (!normalizeHex(c.hex)) throw new Error('That is not a colour code.')
+    text = serializeColorCard(c)
+  }
+
   // A board tile: this creates the new board inside this one, and the tile on the canvas opens it.
   if (type === 'board') {
     const name = text.trim().slice(0, 120)
@@ -167,6 +174,11 @@ export async function updateBoardCard(cardId: string, content: string): Promise<
     if (!url) throw new Error('That does not look like a link.')
     text = url
     meta = metaToJson(await getLinkPreview(url))
+  }
+  if (card.type === 'color') {
+    const c = parseColorCard(text)
+    if (!normalizeHex(c.hex)) throw new Error('That is not a colour code.')
+    text = serializeColorCard(c)
   }
   await db.boardCard.update({ where: { id: cardId }, data: { content: text, meta } })
   return { content: text, meta }
