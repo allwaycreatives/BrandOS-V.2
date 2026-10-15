@@ -400,11 +400,32 @@ a.card:hover {
 
 .canvas-box { height: calc(100vh - 220px); height: calc(100dvh - 220px); min-height: 480px; }
 
-.canvas-tools {
-  position: absolute; top: 10px; left: 10px; z-index: 5;
-  display: flex; flex-direction: column; gap: 4px; padding: 6px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+.canvas-box { border-radius: var(--radius); }
+
+/* Board layout: a full-height tool rail attached to the canvas, like Milanote */
+.board-layout { display: flex; align-items: stretch; }
+.has-rail .canvas-box { border-radius: 0 var(--radius) var(--radius) 0; }
+.board-rail {
+  flex: 0 0 68px; width: 68px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 0; overflow-y: auto; overflow-x: hidden;
+  background: var(--bg-card); border: 1px solid var(--border); border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
 }
+.rail-spacer { flex: 1 1 auto; min-height: 8px; }
+.rail-btn {
+  width: 58px; min-height: 0; padding: 6px 0 5px; border: none; background: transparent; box-shadow: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--text-secondary); border-radius: 10px; cursor: pointer;
+}
+.rail-btn:hover:not(:disabled) { background: var(--accent-dim); color: var(--accent-text); }
+.rail-btn:disabled { opacity: 0.35; cursor: default; }
+.rail-icon {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg-app);
+}
+.rail-btn:hover:not(:disabled) .rail-icon { border-color: var(--accent-border); }
+.rail-label { font-size: 10.5px; line-height: 1; }
 
 .notif-dropdown {
   position: absolute; right: 0; top: calc(100% + 8px);
@@ -446,10 +467,16 @@ a.card:hover {
 
   /* Board canvas: tools along the bottom, more room for the board */
   .canvas-box { height: calc(100vh - 190px); height: calc(100dvh - 190px); min-height: 420px; }
-  .canvas-tools {
-    top: auto; bottom: 10px; left: 50%; transform: translateX(-50%);
-    flex-direction: row; max-width: calc(100% - 20px);
+  /* On phones the tool rail sits under the board as a scrolling row */
+  .board-layout { flex-direction: column-reverse; }
+  .has-rail .canvas-box { border-radius: var(--radius) var(--radius) 0 0; }
+  .board-rail {
+    flex: 0 0 auto; width: auto; flex-direction: row; justify-content: flex-start; gap: 4px;
+    padding: 6px 8px; overflow-x: auto; overflow-y: hidden;
+    border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius);
   }
+  .rail-spacer { display: none; }
+  .rail-btn { flex: 0 0 auto; width: 56px; }
 
   /* Task rows wrap instead of squeezing the title */
   .task-row { flex-wrap: wrap; row-gap: 4px; }

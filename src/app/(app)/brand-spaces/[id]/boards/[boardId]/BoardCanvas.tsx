@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import UploadBar, { type UploadView } from '@/components/UploadBar'
+import TodoCard from './TodoCard'
+import { Icons } from './BoardIcons'
 import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
 import { useRouter } from 'next/navigation'
 import {
@@ -43,7 +45,7 @@ type Drag =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 240, color: 140, board: 200 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 140, board: 200, todo: 250 }
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -76,6 +78,38 @@ function hostOf(url: string) {
   } catch {
     return url
   }
+}
+
+// Link cards stay clean, like Milanote: a big picture and "From Pinterest", not the page's long title.
+const VISUAL_SITES = /(^|\.)(pinterest\.[a-z.]+|pin\.it|instagram\.com|tiktok\.com|behance\.net|dribbble\.com|unsplash\.com|flickr\.com|vsco\.co|are\.na)$/i
+const SITE_NAMES: [RegExp, string][] = [
+  [/(^|\.)(pinterest\.[a-z.]+|pin\.it)$/i, 'Pinterest'],
+  [/(^|\.)instagram\.com$/i, 'Instagram'],
+  [/(^|\.)tiktok\.com$/i, 'TikTok'],
+  [/(^|\.)(youtube\.com|youtu\.be)$/i, 'YouTube'],
+  [/(^|\.)vimeo\.com$/i, 'Vimeo'],
+  [/(^|\.)behance\.net$/i, 'Behance'],
+  [/(^|\.)dribbble\.com$/i, 'Dribbble'],
+  [/(^|\.)unsplash\.com$/i, 'Unsplash'],
+]
+
+function linkHost(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
+function siteLabel(url: string, metaSite?: string) {
+  const host = linkHost(url)
+  for (const [re, name] of SITE_NAMES) if (re.test(host)) return name
+  return metaSite || hostOf(url)
+}
+
+// Pinterest hands out tiny thumbnails (236 px wide). Ask for the 736 px version so big cards stay sharp.
+function sharpImage(url: string) {
+  return url.replace(/(i\.pinimg\.com\/)\d+x\d*(?:_[A-Z]+)?\//, '$1736x/')
 }
 
 // When a note is clicked, find which character the click landed on, so the cursor can go exactly there.
@@ -681,6 +715,12 @@ export default function BoardCanvas({
     startUploads(Array.from(e.dataTransfer.files), { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom })
   }
 
+  // Checklists save as you type; no need to rebuild the card, the list keeps its own state.
+  function saveTodo(id: string, text: string) {
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: text } : c)))
+    updateBoardCard(id, text).catch(() => {})
+  }
+
   function commitEdit(card: Card, value: string) {
     setEditingId(null)
     const text = value.trim()
@@ -750,15 +790,16 @@ export default function BoardCanvas({
     }
   }
 
-  const tools = [
-    { label: 'Note', glyph: '≡', run: () => addCard('note', '') },
-    { label: 'Title', glyph: 'T', run: () => addCard('heading', '') },
-    { label: 'Image', glyph: '▣', run: () => fileRef.current?.click() },
-    { label: 'Link', glyph: '∞', run: addLink },
+  const tools: { label: string; icon: React.ReactNode; run: () => void; hint: string }[] = [
+    { label: 'Note', icon: Icons.note, run: () => addCard('note', ''), hint: 'Add a note' },
+    { label: 'Title', icon: Icons.title, run: () => addCard('heading', ''), hint: 'Add a title' },
+    { label: 'To-do', icon: Icons.todo, run: () => addCard('todo', ''), hint: 'Add a to-do list' },
+    { label: 'Link', icon: Icons.link, run: addLink, hint: 'Add a link (Pinterest, YouTube, any page)' },
+    { label: 'Image', icon: Icons.image, run: () => fileRef.current?.click(), hint: 'Add images (or drop / paste them on the board)' },
     ...(canNest
-      ? [{ label: 'Board', glyph: '▤', run: () => { const name = prompt('Name this board (for example: Inspirations)')?.trim(); if (name) addCard('board', name) } }]
+      ? [{ label: 'Board', icon: Icons.board, run: () => { const name = prompt('Name this board (for example: Inspirations)')?.trim(); if (name) addCard('board', name) }, hint: 'Add a board inside this board' }]
       : []),
-    { label: 'Color', glyph: '●', run: () => { const v = askColor(); if (v) addCard('color', v) } },
+    { label: 'Color', icon: Icons.color, run: () => { const v = askColor(); if (v) addCard('color', v) }, hint: 'Add a color swatch' },
   ]
 
   // ---------- drawing ----------
@@ -778,6 +819,24 @@ export default function BoardCanvas({
 
   return (
     <div style={{ position: 'relative' }}>
+      <div className={`board-layout${readOnly ? '' : ' has-rail'}`}>
+        {!readOnly && (
+          <div className="board-rail" role="toolbar" aria-label="Add to the board">
+            {tools.map((t) => (
+              <button key={t.label} type="button" className="rail-btn" onClick={t.run} disabled={busy} title={t.hint}>
+                <span className="rail-icon">{t.icon}</span>
+                <span className="rail-label">{t.label}</span>
+              </button>
+            ))}
+            <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
+            <div className="rail-spacer" />
+            <button type="button" className="rail-btn" onClick={deleteSelected} disabled={selected.size === 0} title="Delete the selected cards (or press Delete)">
+              <span className="rail-icon">{Icons.trash}</span>
+              <span className="rail-label">Trash</span>
+            </button>
+          </div>
+        )}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
       <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {!readOnly && (
           <>
@@ -791,18 +850,6 @@ export default function BoardCanvas({
         <button type="button" onClick={() => zoomButton(1.2)} style={{ padding: '4px 10px' }}>+</button>
       </div>
 
-      {!readOnly && (
-        <div className="canvas-tools">
-          {tools.map((t) => (
-            <button key={t.label} type="button" onClick={t.run} disabled={busy} title={`Add ${t.label.toLowerCase()}`} style={{ width: 54, padding: '7px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', background: 'transparent' }}>
-              <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden="true">{t.glyph}</span>
-              <span style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>{t.label === 'Image' && busy ? '...' : t.label}</span>
-            </button>
-          ))}
-          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
-        </div>
-      )}
-
       <div
         ref={containerRef}
         className="canvas-box"
@@ -815,9 +862,9 @@ export default function BoardCanvas({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
+        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', overflow: 'hidden', backgroundColor: 'var(--bg-app)', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: `${22 * zoom}px ${22 * zoom}px`, backgroundPosition: `${pan.x}px ${pan.y}px`, cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
-        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
           {cards.map((card) => {
             const editing = editingId === card.id
             const isSel = selected.has(card.id)
@@ -892,7 +939,7 @@ export default function BoardCanvas({
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || (card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)) ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
                 {card.type === 'note' && (
                   <>
                     {heading}
@@ -908,11 +955,15 @@ export default function BoardCanvas({
                   const meta = parseMeta(card.meta)
                   const showImage = !!meta.image && !brokenImages.has(card.id)
                   const pending = card.meta == null
+                  const site = siteLabel(card.content, meta.site)
+                  const quiet = VISUAL_SITES.test(linkHost(card.content)) && showImage // pictures speak for themselves
+                  const title = quiet ? '' : meta.title || ''
                   return (
                     <div style={{ color: hasBg ? ink : '#1a1a1a' }}>
                       {showImage && (
-                        <div style={{ position: 'relative', margin: '-12px -12px 10px', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
-                          <img src={meta.image} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))} style={{ display: 'block', width: '100%', maxHeight: 170, objectFit: 'cover' }} />
+                        <div style={{ position: 'relative', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={sharpImage(meta.image as string)} alt="" draggable={false} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))} style={{ display: 'block', width: '100%', height: 'auto' }} />
                           {meta.kind === 'video' && (
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, paddingLeft: 3 }}>▶</div>
@@ -920,14 +971,25 @@ export default function BoardCanvas({
                           )}
                         </div>
                       )}
-                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meta.title || hostOf(card.content)}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 11, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pending ? 'Loading preview…' : meta.site || hostOf(card.content)}</span>
-                        <a href={card.content} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'inherit', fontWeight: 600, flexShrink: 0 }}>Open ↗</a>
+                      <div style={{ padding: showImage ? '8px 10px 9px' : '2px 0 0' }}>
+                        {(title || !showImage) && (
+                          <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.3, overflowWrap: 'anywhere', marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title || hostOf(card.content)}</div>
+                        )}
+                        <div style={{ fontSize: 11, opacity: pending ? 0.6 : 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {pending ? (
+                            'Loading preview…'
+                          ) : (
+                            <>
+                              From{' '}
+                              <a href={card.content} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', textDecoration: 'none', fontWeight: 500 }}>{site}</a>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
                 })()}
+                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveTodo(card.id, text)} />}
                 {card.type === 'color' && (() => {
                   const { hex, role, use } = parseColor(card.content)
                   return (
@@ -969,7 +1031,7 @@ export default function BoardCanvas({
         {cards.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', padding: '0 2rem', pointerEvents: 'none' }}>
             <div style={{ fontFamily: SERIF, fontSize: 20, color: 'var(--text-secondary)' }}>{readOnly ? 'This board is empty.' : 'Start your board'}</div>
-            {!readOnly && <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Pick a tool on the left to add a note, a title, an image, a link or a color.</div>}
+            {!readOnly && <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Pick a tool on the left, or drop images and paste links right onto the board.</div>}
           </div>
         )}
       </div>
@@ -992,10 +1054,13 @@ export default function BoardCanvas({
         )
       })()}
 
+        </div>
+      </div>
+
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Drop or paste images straight onto the board · click a note to type · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · scroll or pinch to zoom'}
+          : 'Drop or paste images onto the board · Space + drag to move around · scroll or pinch to zoom'}
       </div>
     </div>
   )
