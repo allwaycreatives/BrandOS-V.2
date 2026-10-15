@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import UploadBar, { type UploadView } from '@/components/UploadBar'
 import TodoCard from './TodoCard'
+import ColorCard, { COLOR_PALETTE } from './ColorCard'
+import CanvasScrollbars from './CanvasScrollbars'
 import { Icons } from './BoardIcons'
 import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
 import { useRouter } from 'next/navigation'
@@ -19,7 +21,7 @@ import {
   styleBoardCards,
 } from '../actions'
 import BoardInspector from './BoardInspector'
-import { HANDLES, movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
+import { movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
 import { DEFAULT_FS, MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, readableText, styleToJson, type CardStyle } from '@/lib/boardStyle'
 
 type Card = {
@@ -45,7 +47,7 @@ type Drag =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 140, board: 200, todo: 250 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 200, board: 200, todo: 250 }
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -56,11 +58,6 @@ const PAPER: React.CSSProperties = {
 // Milanote-style: a picture floats on the board with no white card around it.
 const IMAGE_FRAME: React.CSSProperties = { background: 'transparent', boxShadow: '0 2px 10px rgba(0,0,0,0.35)' }
 const CURSOR: Record<Handle, string> = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
-
-function parseColor(content: string) {
-  const [hex = '#888888', role = '', use = ''] = content.split('|')
-  return { hex, role, use }
-}
 
 function parseMeta(raw: string | null): Meta {
   if (!raw) return {}
@@ -169,6 +166,9 @@ export default function BoardCanvas({
   const [spaceDown, setSpaceDown] = useState(false)
   const [marquee, setMarquee] = useState<Rect | null>(null)
   const [cursorGrab, setCursorGrab] = useState(false)
+  const [popIds, setPopIds] = useState<Set<string>>(new Set()) // cards that just appeared (they pop in)
+  const [view, setView] = useState({ w: 0, h: 0 })
+  const imageAt = useRef<{ x: number; y: number } | null>(null)
   const [anchor, setAnchor] = useState<{ cx: number; top: number; bottom: number; cw: number } | null>(null)
 
   const selRef = useRef(selected)
@@ -387,7 +387,19 @@ export default function BoardCanvas({
 
   // A native listener is needed so zooming doesn't also scroll the page.
   const wheelRef = useRef<(e: WheelEvent) => void>()
-  wheelRef.current = (e) => zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.08 : 1 / 1.08)
+  wheelRef.current = (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + scroll, and a pinch on a trackpad (which arrives as Ctrl + scroll)
+      const d = Math.max(-30, Math.min(30, e.deltaY))
+      zoomAt(e.clientX, e.clientY, Math.exp(-d * 0.006))
+      return
+    }
+    const unit = e.deltaMode === 1 ? 16 : 1
+    const sideways = e.shiftKey && e.deltaX === 0
+    const dx = (sideways ? e.deltaY : e.deltaX) * unit
+    const dy = (sideways ? 0 : e.deltaY) * unit
+    setPan((p) => ({ x: p.x - dx, y: p.y - dy }))
+  }
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -398,6 +410,29 @@ export default function BoardCanvas({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setView((v) => (v.w === el.clientWidth && v.h === el.clientHeight ? v : { w: el.clientWidth, h: el.clientHeight }))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // The area the scrollbars cover: everything on the board.
+  const bounds = useMemo(() => {
+    if (cards.length === 0) return null
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const c of cards) {
+      minX = Math.min(minX, c.positionX)
+      minY = Math.min(minY, c.positionY)
+      maxX = Math.max(maxX, c.positionX + (c.width ?? WIDTH[c.type] ?? 210))
+      maxY = Math.max(maxY, c.positionY + (c.height ?? 160))
+    }
+    return { minX, minY, maxX, maxY }
+  }, [cards])
 
   function zoomButton(factor: number) {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -469,7 +504,7 @@ export default function BoardCanvas({
     }
     const next = { cx: Math.round((l + r) / 2 - box.left), top: Math.round(t - box.top), bottom: Math.round(b - box.top), cw: Math.round(box.width) }
     setAnchor((a) => (a && a.cx === next.cx && a.top === next.top && a.bottom === next.bottom && a.cw === next.cw ? a : next))
-  }, [selected, cards, pan, zoom, editingId, readOnly])
+  }, [selected, cards, pan, zoom, editingId, readOnly, popIds])
 
   const growBox = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
@@ -540,6 +575,8 @@ export default function BoardCanvas({
     try {
       const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
+      setPopIds((prev) => new Set(prev).add(created.id))
+      setTimeout(() => setPopIds((prev) => { const n = new Set(prev); n.delete(created.id); return n }), 600)
       setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
@@ -551,26 +588,34 @@ export default function BoardCanvas({
     }
   }
 
-  async function addLink() {
-    const raw = prompt('Paste a link')?.trim()
-    if (!raw) return
-    setBusy(true)
-    try {
-      await addCard('link', /^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
-    } finally {
-      setBusy(false)
+  // Every tool in the sidebar, whether it was clicked (lands in the middle of your view) or dragged
+  // onto the board (lands where you let go).
+  async function runTool(key: string, point?: { x: number; y: number }) {
+    const at = (type: string) => (point ? { x: point.x - (WIDTH[type] ?? 210) / 2, y: point.y - 30 } : undefined)
+    if (key === 'note') return void addCard('note', '', false, at('note'))
+    if (key === 'title') return void addCard('heading', '', false, at('heading'))
+    if (key === 'todo') return void addCard('todo', '', false, at('todo'))
+    if (key === 'color') return void addCard('color', COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)], false, at('color'))
+    if (key === 'image') {
+      imageAt.current = point ?? null
+      fileRef.current?.click()
+      return
     }
-  }
-
-  function askColor(current = { hex: '#', role: '', use: '' }) {
-    const hex = prompt('Color code, like #ED8D01', current.hex)?.trim()
-    if (!hex || !/^#[0-9a-f]{3,8}$/i.test(hex)) {
-      if (hex) alert('That does not look like a color code. Use something like #ED8D01.')
-      return null
+    if (key === 'link') {
+      const raw = prompt('Paste a link')?.trim()
+      if (!raw) return
+      setBusy(true)
+      try {
+        await addCard('link', /^https?:\/\//i.test(raw) ? raw : `https://${raw}`, false, at('link'))
+      } finally {
+        setBusy(false)
+      }
+      return
     }
-    const role = prompt('What is this color called? (Primary, Accent…)', current.role) ?? current.role
-    const use = prompt('What is it used for?', current.use) ?? current.use
-    return `${hex}|${role}|${use}`
+    if (key === 'board') {
+      const name = prompt('Name this board (for example: Inspirations)')?.trim()
+      if (name) await addCard('board', name, false, at('board'))
+    }
   }
 
   function patchUpload(id: string, patch: Partial<UploadView>) {
@@ -670,7 +715,9 @@ export default function BoardCanvas({
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    startUploads(files)
+    const where = imageAt.current ?? undefined
+    imageAt.current = null
+    startUploads(files, where)
   }
 
   // Paste a copied image or screenshot (Ctrl/Cmd+V) anywhere on the page, unless you are typing in a field.
@@ -689,6 +736,7 @@ export default function BoardCanvas({
   }, [readOnly])
 
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  const hasTool = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('application/x-brandos-tool')
   function onDragEnter(e: React.DragEvent) {
     if (readOnly || !hasFiles(e)) return
     e.preventDefault()
@@ -696,7 +744,7 @@ export default function BoardCanvas({
     setDropping(true)
   }
   function onDragOver(e: React.DragEvent) {
-    if (readOnly || !hasFiles(e)) return
+    if (readOnly || !(hasFiles(e) || hasTool(e))) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
   }
@@ -706,17 +754,24 @@ export default function BoardCanvas({
     if (dragDepth.current === 0) setDropping(false)
   }
   function onDrop(e: React.DragEvent) {
-    if (readOnly || !hasFiles(e)) return
+    if (readOnly) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const point = { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom }
+    if (hasTool(e)) {
+      e.preventDefault()
+      void runTool(e.dataTransfer.getData('application/x-brandos-tool'), point)
+      return
+    }
+    if (!hasFiles(e)) return
     e.preventDefault()
     dragDepth.current = 0
     setDropping(false)
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    startUploads(Array.from(e.dataTransfer.files), { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom })
+    startUploads(Array.from(e.dataTransfer.files), point)
   }
 
-  // Checklists save as you type; no need to rebuild the card, the list keeps its own state.
-  function saveTodo(id: string, text: string) {
+  // Checklists and color cards save as you type; the card keeps its own state.
+  function saveContent(id: string, text: string) {
     setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: text } : c)))
     updateBoardCard(id, text).catch(() => {})
   }
@@ -784,22 +839,16 @@ export default function BoardCanvas({
       const next = prompt('Edit link', card.content)?.trim()
       if (next) commitEdit(card, /^https?:\/\//i.test(next) ? next : `https://${next}`)
     }
-    if (card.type === 'color') {
-      const next = askColor(parseColor(card.content))
-      if (next) commitEdit(card, next)
-    }
   }
 
-  const tools: { label: string; icon: React.ReactNode; run: () => void; hint: string }[] = [
-    { label: 'Note', icon: Icons.note, run: () => addCard('note', ''), hint: 'Add a note' },
-    { label: 'Title', icon: Icons.title, run: () => addCard('heading', ''), hint: 'Add a title' },
-    { label: 'To-do', icon: Icons.todo, run: () => addCard('todo', ''), hint: 'Add a to-do list' },
-    { label: 'Link', icon: Icons.link, run: addLink, hint: 'Add a link (Pinterest, YouTube, any page)' },
-    { label: 'Image', icon: Icons.image, run: () => fileRef.current?.click(), hint: 'Add images (or drop / paste them on the board)' },
-    ...(canNest
-      ? [{ label: 'Board', icon: Icons.board, run: () => { const name = prompt('Name this board (for example: Inspirations)')?.trim(); if (name) addCard('board', name) }, hint: 'Add a board inside this board' }]
-      : []),
-    { label: 'Color', icon: Icons.color, run: () => { const v = askColor(); if (v) addCard('color', v) }, hint: 'Add a color swatch' },
+  const tools: { key: string; label: string; icon: React.ReactNode; hint: string }[] = [
+    { key: 'note', label: 'Note', icon: Icons.note, hint: 'Add a note (or drag it onto the board)' },
+    { key: 'title', label: 'Title', icon: Icons.title, hint: 'Add a title (or drag it onto the board)' },
+    { key: 'todo', label: 'To-do', icon: Icons.todo, hint: 'Add a to-do list (or drag it onto the board)' },
+    { key: 'link', label: 'Link', icon: Icons.link, hint: 'Add a link: Pinterest, YouTube, any page' },
+    { key: 'image', label: 'Image', icon: Icons.image, hint: 'Add images (or drop / paste them on the board)' },
+    ...(canNest ? [{ key: 'board', label: 'Board', icon: Icons.board, hint: 'Add a board inside this board' }] : []),
+    { key: 'color', label: 'Color', icon: Icons.color, hint: 'Add a color swatch (or drag it onto the board)' },
   ]
 
   // ---------- drawing ----------
@@ -818,15 +867,25 @@ export default function BoardCanvas({
   })
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="board-root" style={{ position: 'relative' }}>
       <div className={`board-layout${readOnly ? '' : ' has-rail'}`}>
         {!readOnly && (
           <div className="board-rail" role="toolbar" aria-label="Add to the board">
             {tools.map((t) => (
-              <button key={t.label} type="button" className="rail-btn" onClick={t.run} disabled={busy} title={t.hint}>
-                <span className="rail-icon">{t.icon}</span>
-                <span className="rail-label">{t.label}</span>
-              </button>
+              <div
+                key={t.key}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/x-brandos-tool', t.key)
+                  e.dataTransfer.setData('text/plain', t.label)
+                  e.dataTransfer.effectAllowed = 'copy'
+                }}
+              >
+                <button type="button" className="rail-btn" onClick={() => runTool(t.key)} disabled={busy} title={t.hint}>
+                  <span className="rail-icon">{t.icon}</span>
+                  <span className="rail-label">{t.label}</span>
+                </button>
+              </div>
             ))}
             <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
             <div className="rail-spacer" />
@@ -888,12 +947,13 @@ export default function BoardCanvas({
               borderRadius: 6,
             }
             const paper: React.CSSProperties = { ...PAPER, ...(hasBg ? { background: st.bg } : {}) }
+            const gs = 22 / zoom // the grip stays the same size on screen however far you zoom
             const handles =
-              isSel && !readOnly && selected.size === 1
-                ? HANDLES.filter((h) => !(card.type === 'image' && (h === 'n' || h === 's'))).map((h) => (
-                    <div key={h} data-handle={h} style={{ position: 'absolute', left: HANDLE_POS[h].l, top: HANDLE_POS[h].t, width: hs, height: hs, marginLeft: -hs / 2, marginTop: -hs / 2, background: '#ffffff', border: `${1.5 / zoom}px solid var(--accent)`, borderRadius: 2, cursor: CURSOR[h], zIndex: 3 }} />
-                  ))
-                : null
+              isSel && !readOnly && selected.size === 1 ? (
+                <div data-handle="se" title="Drag to resize" style={{ position: 'absolute', right: 4 / zoom, bottom: 4 / zoom, width: gs, height: gs, borderRadius: 6 / zoom, background: 'rgba(20,20,20,0.72)', color: '#fff', cursor: CURSOR.se, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 12 12" width="60%" height="60%" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ pointerEvents: 'none' }}><path d="M10 3L3 10M10 6.5L6.5 10M10 9.5L9.5 10" /></svg>
+                </div>
+              ) : null
             const heading = (
               <>
                 {st.title && <div style={{ ...text, fontSize: fs * 1.2, fontWeight: 700, marginBottom: 2, overflowWrap: 'anywhere' }}>{st.title}</div>}
@@ -904,7 +964,7 @@ export default function BoardCanvas({
             if (isHeading) {
               const box: React.CSSProperties = hasBg ? { ...paper, padding: '8px 12px', height: '100%', boxSizing: 'border-box' } : { height: '100%' }
               return (
-                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
+                <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
                   <div style={{ ...box, overflow: card.height ? 'hidden' : undefined }}>
                     {editing ? (
                       <textarea ref={editRef(!!card.height)} defaultValue={card.content} rows={1} onBlur={(e) => commitEdit(card, e.target.value)} onInput={(e) => !card.height && growBox(e.currentTarget)} onKeyDown={editKeys(true)} aria-label="Title text" style={{ ...text, display: 'block', width: '100%', height: card.height ? '100%' : undefined, fontFamily: SERIF, lineHeight: 1.25, padding: 0, margin: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none', overflow: card.height ? 'auto' : 'hidden', userSelect: 'text' }} />
@@ -921,7 +981,7 @@ export default function BoardCanvas({
             if (card.type === 'board') {
               const info = inner[card.content]
               return (
-                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, display: 'flex', flexDirection: 'column' }}>
+                <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: 46, flexShrink: 0, borderRadius: '6px 6px 0 0', background: '#f1ece2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#8a7a5c' }} aria-hidden="true">▤</div>
                   <div style={{ padding: '10px 12px 12px', overflow: 'hidden' }}>
                     <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{info?.name ?? 'Board'}</div>
@@ -939,7 +999,7 @@ export default function BoardCanvas({
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || (card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)) ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+              <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || (card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)) ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
                 {card.type === 'note' && (
                   <>
                     {heading}
@@ -989,20 +1049,8 @@ export default function BoardCanvas({
                     </div>
                   )
                 })()}
-                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveTodo(card.id, text)} />}
-                {card.type === 'color' && (() => {
-                  const { hex, role, use } = parseColor(card.content)
-                  return (
-                    <>
-                      <div style={{ height: card.height ? undefined : 64, flex: card.height ? 1 : undefined, minHeight: 30, background: hex }} />
-                      <div style={{ padding: '8px 10px' }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{hex.toUpperCase()}</div>
-                        {role && <div style={{ fontSize: 12 }}>{role}</div>}
-                        {use && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{use}</div>}
-                      </div>
-                    </>
-                  )
-                })()}
+                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'color' && <ColorCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} autoFocus={popIds.has(card.id)} onChange={(text) => saveContent(card.id, text)} />}
                 {handles}
               </div>
             )
@@ -1023,6 +1071,8 @@ export default function BoardCanvas({
             </div>
           ))}
         </div>
+
+        <CanvasScrollbars bounds={bounds} pan={pan} zoom={zoom} view={view} onPan={setPan} />
 
         {dropping && <div aria-hidden="true" style={{ position: 'absolute', inset: 8, border: '2px dashed var(--accent)', borderRadius: 8, background: 'rgba(255,105,41,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-text)', fontSize: 14, pointerEvents: 'none', zIndex: 5 }}>Drop images to add them to the board</div>}
 
@@ -1057,10 +1107,10 @@ export default function BoardCanvas({
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
+      <div className="board-hint" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Drop or paste images onto the board · Space + drag to move around · scroll or pinch to zoom'}
+          : 'Drop or paste images onto the board · scroll to move around · Ctrl + scroll to zoom'}
       </div>
     </div>
   )

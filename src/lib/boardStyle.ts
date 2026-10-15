@@ -21,7 +21,7 @@ export const MIN_SIZE: Record<string, { w: number; h: number }> = {
   heading: { w: 90, h: 34 },
   image: { w: 60, h: 40 },
   link: { w: 150, h: 80 },
-  color: { w: 80, h: 70 },
+  color: { w: 120, h: 110 },
   board: { w: 150, h: 96 },
 }
 export const MAX_CARD_SIZE = 2000
