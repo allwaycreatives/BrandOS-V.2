@@ -631,3 +631,14 @@ html:has(.board-focus), body:has(.board-focus) { overflow: hidden; }
 @keyframes splash-failsafe {
   to { opacity: 0; visibility: hidden; pointer-events: none; }
 }
+
+/* Rail: divider and the "More" menu */
+.rail-sep { width: 36px; height: 1px; background: var(--border); margin: 6px 0; flex: 0 0 auto; }
+.rail-more {
+  position: fixed; z-index: 500; box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(4, 64px); gap: 2px; padding: 10px;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 14px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+}
+.rail-more .rail-btn { width: 64px; }
+@media (max-width: 380px) { .rail-more { grid-template-columns: repeat(3, 64px); } }

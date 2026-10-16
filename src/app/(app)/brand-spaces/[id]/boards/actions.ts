@@ -12,7 +12,10 @@ import { MAX_BOARD_DEPTH } from './constants'
 import { MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, styleToJson } from '@/lib/boardStyle'
 
 
-const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo']
+const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo', 'sketch', 'document', 'table', 'column', 'comment', 'audio', 'video', 'map']
+// Documents, tables and sketches hold much more than a note does.
+const BIG_TYPES = ['document', 'table', 'sketch']
+const contentLimit = (type: string) => (BIG_TYPES.includes(type) ? 50000 : 5000)
 
 // Clients can view boards but not change them.
 async function requireEdit(brandSpaceId: string) {
@@ -96,7 +99,7 @@ export async function addBoardCardAt(boardId: string, type: string, content: str
   if (!CARD_TYPES.includes(type)) throw new Error('Unknown card type.')
   if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Bad position.')
 
-  let text = String(content).slice(0, 5000)
+  let text = String(content).slice(0, contentLimit(type))
   let meta: string | null = null
   if (type === 'link') {
     const url = safeUrl(text)
@@ -160,7 +163,7 @@ export async function adoptInnerBoards(boardId: string) {
 // Returns the card's saved link preview (if it is a link), so the screen can update without a reload.
 export async function updateBoardCard(cardId: string, content: string): Promise<{ content: string; meta: string | null }> {
   const card = await cardForEdit(cardId)
-  let text = String(content).slice(0, 5000)
+  let text = String(content).slice(0, contentLimit(card.type))
   let meta: string | null = card.meta
   if (card.type === 'link') {
     const url = safeUrl(text)
