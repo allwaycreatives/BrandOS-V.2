@@ -19,6 +19,8 @@ export default function ServiceWorkerRegister() {
   const [failed, setFailed] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [ready, setReady] = useState('')
+  const [saving, setSaving] = useState('')
+  const [warmFail, setWarmFail] = useState('')
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
@@ -28,11 +30,18 @@ export default function ServiceWorkerRegister() {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'warmed' && e.data.pages > 0) {
-        // only now is it safe to say the pages are saved
-        try { localStorage.setItem(WARM_KEY, String(Date.now())) } catch {}
-        setReady(`Saved for offline use (${e.data.pages} pages)`)
-        setTimeout(() => setReady(''), 6000)
+      if (e.data?.type === 'warm-progress') setSaving(`Saving for offline use… ${e.data.pages} page${e.data.pages === 1 ? '' : 's'}`)
+      if (e.data?.type === 'warmed') {
+        setSaving('')
+        if (e.data.pages > 0) {
+          // only now is it safe to say the pages are saved
+          try { localStorage.setItem(WARM_KEY, String(Date.now())) } catch {}
+          setWarmFail('')
+          setReady(`Saved for offline use (${e.data.pages} pages)`)
+          setTimeout(() => setReady(''), 10000)
+        } else {
+          setWarmFail(`Couldn't save for offline use${e.data.why?.length ? ` — ${e.data.why[0]}` : ''}`)
+        }
       }
       if (e.data?.type === 'queue') {
         setPending(e.data.count || 0)
@@ -64,7 +73,10 @@ export default function ServiceWorkerRegister() {
         .map((a) => (a as HTMLAnchorElement).getAttribute('href') || '')
         .map((h) => h.split('#')[0].split('?')[0])
       const urls = Array.from(new Set([location.pathname, ...ROOTS, ...links]))
+      setSaving('Saving for offline use…')
       post({ type: 'warm', urls })
+      // if nothing comes back, say so instead of staying silent
+      setTimeout(() => setSaving((cur) => { if (cur) setWarmFail('Offline saving did not finish'); return '' }), 120000)
     }
 
     window.addEventListener('online', goOnline)
@@ -88,7 +100,7 @@ export default function ServiceWorkerRegister() {
     }
   }, [])
 
-  if (online && !pending && !failed && !ready) return null
+  if (online && !pending && !failed && !ready && !saving && !warmFail) return null
 
   let text = ''
   if (!online) text = pending ? `Offline · ${pending} change${pending === 1 ? '' : 's'} saved, will sync` : 'Offline · changes will sync when you reconnect'
@@ -96,6 +108,8 @@ export default function ServiceWorkerRegister() {
   else if (pending) text = `${pending} change${pending === 1 ? '' : 's'} waiting to sync`
   else if (failed) text = 'Some changes could not sync'
   else if (ready) text = ready
+  else if (saving) text = saving
+  else if (warmFail) text = warmFail
 
   return (
     <div
@@ -109,6 +123,11 @@ export default function ServiceWorkerRegister() {
       }}
     >
       {text}
+      {online && warmFail && !pending && (
+        <button onClick={() => { setWarmFail(''); try { localStorage.removeItem(WARM_KEY) } catch {}; setSaving('Saving for offline use…'); post({ type: 'warm', urls: ROOTS.concat([location.pathname]) }) }} style={{ marginLeft: 10, background: '#fff', color: '#000', border: 0, borderRadius: 999, padding: '3px 10px', fontWeight: 700, cursor: 'pointer' }}>
+          Retry
+        </button>
+      )}
       {online && pending > 0 && !syncing && (
         <button onClick={() => { setSyncing(true); post({ type: 'replay' }) }} style={{ marginLeft: 10, background: '#fff', color: '#000', border: 0, borderRadius: 999, padding: '3px 10px', fontWeight: 700, cursor: 'pointer' }}>
           Sync now

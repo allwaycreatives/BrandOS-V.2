@@ -222,7 +222,9 @@ async function warm(urls) {
   let done = 0
   const images = new Set()
   const assets = new Set()
-  while (queue.length && done < 90) {
+  const why = []
+  const say = async (m) => (await self.clients.matchAll({ includeUncontrolled: true })).forEach((cl) => cl.postMessage(m))
+  while (queue.length && done < 70) {
     const batch = queue.splice(0, 4)
     await Promise.all(batch.map(async ({ u, d }) => {
       const url = new URL(u, self.location.origin)
@@ -230,7 +232,10 @@ async function warm(urls) {
       seen.add(url.pathname)
       try {
         const res = await fetch(url.href, { credentials: 'include', headers: { Accept: 'text/html' } })
-        if (!res.ok || res.redirected || !(res.headers.get('content-type') || '').includes('text/html')) return
+        if (!res.ok || res.redirected || !(res.headers.get('content-type') || '').includes('text/html')) {
+          if (why.length < 4) why.push(url.pathname + ': ' + (res.redirected ? 'redirected to ' + new URL(res.url).pathname : res.status + ' ' + (res.headers.get('content-type') || '').split(';')[0]))
+          return
+        }
         const html = await res.clone().text()
         await c.put(url.href, res)
         done++
@@ -248,8 +253,9 @@ async function warm(urls) {
         const ire = /(https:\/\/[a-z0-9.-]+blob\.vercel-storage\.com\/[^"'\s\\)<]+)/g
         let im
         while ((im = ire.exec(html)) && images.size < 80) images.add(im[1].replace(/&amp;/g, '&'))
-      } catch (e) {}
+      } catch (e) { if (why.length < 4) why.push(url.pathname + ': ' + (e && e.message)) }
     }))
+    await say({ type: 'warm-progress', pages: done })
   }
   const sc = await caches.open(STATIC)
   const list = Array.from(assets)
@@ -286,8 +292,7 @@ async function warm(urls) {
     } catch (e) {}
   }
   trim(IMAGES, MAX_IMAGES)
-  const all = await self.clients.matchAll({ includeUncontrolled: true })
-  all.forEach((cl) => cl.postMessage({ type: 'warmed', pages: done }))
+  await say({ type: 'warmed', pages: done, why })
 }
 
 self.addEventListener('message', (event) => {
