@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-const WARM_KEY = 'brandos-warm-at'
+const WARM_KEY = 'brandos-warm-v3-at'
 const WARM_EVERY_MS = 10 * 60 * 1000
 const ROOTS = ['/dashboard', '/projects', '/tasks', '/campaigns', '/calendar', '/ideas', '/brand-spaces', '/templates']
 const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/discovery', '/share', '/review', '/brief', '/invite']
@@ -18,6 +18,7 @@ export default function ServiceWorkerRegister() {
   const [pending, setPending] = useState(0)
   const [failed, setFailed] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  const [ready, setReady] = useState('')
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
@@ -27,6 +28,12 @@ export default function ServiceWorkerRegister() {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'warmed' && e.data.pages > 0) {
+        // only now is it safe to say the pages are saved
+        try { localStorage.setItem(WARM_KEY, String(Date.now())) } catch {}
+        setReady(`Saved for offline use (${e.data.pages} pages)`)
+        setTimeout(() => setReady(''), 6000)
+      }
       if (e.data?.type === 'queue') {
         setPending(e.data.count || 0)
         setFailed(e.data.failed || 0)
@@ -58,7 +65,6 @@ export default function ServiceWorkerRegister() {
         .map((h) => h.split('#')[0].split('?')[0])
       const urls = Array.from(new Set([location.pathname, ...ROOTS, ...links]))
       post({ type: 'warm', urls })
-      try { localStorage.setItem(WARM_KEY, String(Date.now())) } catch {}
     }
 
     window.addEventListener('online', goOnline)
@@ -66,7 +72,7 @@ export default function ServiceWorkerRegister() {
     post({ type: 'status' })
     if (navigator.onLine) {
       sync()
-      const t = setTimeout(warm, 5000)
+      const t = setTimeout(warm, 2000)
       return () => {
         clearTimeout(t); clearTimeout(timer)
         window.removeEventListener('online', goOnline)
@@ -82,13 +88,14 @@ export default function ServiceWorkerRegister() {
     }
   }, [])
 
-  if (online && !pending && !failed) return null
+  if (online && !pending && !failed && !ready) return null
 
   let text = ''
   if (!online) text = pending ? `Offline · ${pending} change${pending === 1 ? '' : 's'} saved, will sync` : 'Offline · changes will sync when you reconnect'
   else if (pending && syncing) text = `Syncing ${pending} change${pending === 1 ? '' : 's'}…`
   else if (pending) text = `${pending} change${pending === 1 ? '' : 's'} waiting to sync`
   else if (failed) text = 'Some changes could not sync'
+  else if (ready) text = ready
 
   return (
     <div
