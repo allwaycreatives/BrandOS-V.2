@@ -65,6 +65,12 @@ async function notify() {
 
 /* ---------- helpers ---------- */
 const isSameOrigin = (url) => url.origin === self.location.origin
+// Next's page files have [id] in their names. Browsers ask for them as %5Bid%5D, so always store/look up that one form.
+function norm(href) {
+  const u = new URL(href, self.location.origin)
+  u.pathname = u.pathname.replace(/\[/g, '%5B').replace(/\]/g, '%5D')
+  return u.href
+}
 async function trim(cacheName, max) {
   const c = await caches.open(cacheName)
   const keys = await c.keys()
@@ -117,10 +123,11 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheFirst(request, name) {
   const c = await caches.open(name)
-  const hit = await c.match(request, { ignoreSearch: true, ignoreVary: true })
+  const key = new URL(request.url).origin === self.location.origin ? norm(request.url) : request.url
+  const hit = (await c.match(key, { ignoreSearch: true, ignoreVary: true })) || (await c.match(request, { ignoreSearch: true, ignoreVary: true }))
   if (hit) return hit
   const res = await fetch(request)
-  if (res.ok) c.put(request, res.clone())
+  if (res.ok) c.put(key, res.clone())
   return res
 }
 
@@ -242,9 +249,9 @@ async function warm(urls) {
         if (d < 3) {
           const re = /href="(\/[^"#?]*)"/g
           let m
-          while ((m = re.exec(html))) if (!seen.has(m[1]) && !SKIP.test(m[1])) queue.push({ u: m[1], d: d + 1 })
+          while ((m = re.exec(html))) if (!seen.has(m[1]) && !SKIP.test(m[1]) && !m[1].startsWith('/_next') && !/\.[a-z0-9]{2,5}$/i.test(m[1])) queue.push({ u: m[1], d: d + 1 })
         }
-        const are = /(?:\/_next\/)?(static\/(?:chunks|css|media)\/[^"'\s\\)<>,]+\.(?:js|css|woff2?))/g
+        const are = /(?:\/_next\/)?(static\/(?:chunks|css|media)\/[^"'\s\\<>,]+?\.(?:js|css|woff2?))/g
         let am
         while ((am = are.exec(html)) && assets.size < 400) assets.add('/_next/' + am[1].replace(/&amp;/g, '&'))
         const cre = /src="(https:\/\/[^"]*clerk[^"]*\.js)"/gi
@@ -264,19 +271,20 @@ async function warm(urls) {
       try {
         const cross = !a.startsWith('/')
         const abs = new URL(a, self.location.origin)
-        let res = await sc.match(abs.href, { ignoreSearch: true })
+        const key = cross ? abs.href : norm(abs.href)
+        let res = await sc.match(key, { ignoreSearch: true, ignoreVary: true })
         if (!res) {
-          res = await fetch(abs.href, cross ? { mode: 'cors' } : undefined)
+          res = await fetch(key, cross ? { mode: 'cors' } : undefined)
           if (!res.ok) return
-          await sc.put(abs.href, res.clone())
+          await sc.put(key, res.clone())
         }
         if (/\.css$/.test(abs.pathname)) {
           const css = await res.clone().text()
           const fre = /url\(\s*["']?([^)"']+\.woff2?)/g
           let fm
           while ((fm = fre.exec(css))) {
-            const f = new URL(fm[1], abs.href).href
-            if (!(await sc.match(f, { ignoreSearch: true }))) { const fr = await fetch(f); if (fr.ok) await sc.put(f, fr) }
+            const f = norm(new URL(fm[1], abs.href).href)
+            if (!(await sc.match(f, { ignoreSearch: true, ignoreVary: true }))) { const fr = await fetch(f); if (fr.ok) await sc.put(f, fr) }
           }
         }
       } catch (e) {}
