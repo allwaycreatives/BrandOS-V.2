@@ -88,7 +88,7 @@ self.addEventListener('fetch', (event) => {
     if (request.destination === 'image' && /blob\.vercel-storage\.com$/.test(url.hostname)) {
       event.respondWith(cachedImage(request))
     } else if (request.destination === 'script' && /clerk/i.test(url.hostname)) {
-      event.respondWith(staleWhileRevalidate(request, STATIC))
+      event.respondWith(cacheFirst(request, STATIC))
     }
     return
   }
@@ -114,7 +114,7 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheFirst(request, name) {
   const c = await caches.open(name)
-  const hit = await c.match(request)
+  const hit = await c.match(request, { ignoreSearch: true })
   if (hit) return hit
   const res = await fetch(request)
   if (res.ok) c.put(request, res.clone())
@@ -218,6 +218,7 @@ async function warm(urls) {
   let queue = urls.map((u) => ({ u, d: 0 }))
   let done = 0
   const images = new Set()
+  const assets = new Set()
   while (queue.length && done < 90) {
     const batch = queue.splice(0, 4)
     await Promise.all(batch.map(async ({ u, d }) => {
@@ -235,9 +236,40 @@ async function warm(urls) {
           let m
           while ((m = re.exec(html))) if (!seen.has(m[1]) && !SKIP.test(m[1])) queue.push({ u: m[1], d: d + 1 })
         }
+        const are = /(?:\/_next\/)?(static\/(?:chunks|css|media)\/[^"'\s\\)<>,]+\.(?:js|css|woff2?))/g
+        let am
+        while ((am = are.exec(html)) && assets.size < 400) assets.add('/_next/' + am[1].replace(/&amp;/g, '&'))
+        const cre = /src="(https:\/\/[^"]*clerk[^"]*\.js)"/gi
+        let cm
+        while ((cm = cre.exec(html))) assets.add(cm[1])
         const ire = /(https:\/\/[a-z0-9.-]+blob\.vercel-storage\.com\/[^"'\s\\)<]+)/g
         let im
         while ((im = ire.exec(html)) && images.size < 80) images.add(im[1].replace(/&amp;/g, '&'))
+      } catch (e) {}
+    }))
+  }
+  const sc = await caches.open(STATIC)
+  const list = Array.from(assets)
+  for (let i = 0; i < list.length; i += 6) {
+    await Promise.all(list.slice(i, i + 6).map(async (a) => {
+      try {
+        const cross = !a.startsWith('/')
+        const abs = new URL(a, self.location.origin)
+        let res = await sc.match(abs.href, { ignoreSearch: true })
+        if (!res) {
+          res = await fetch(abs.href, cross ? { mode: 'cors' } : undefined)
+          if (!res.ok) return
+          await sc.put(abs.href, res.clone())
+        }
+        if (/\.css$/.test(abs.pathname)) {
+          const css = await res.clone().text()
+          const fre = /url\(\s*["']?([^)"']+\.woff2?)/g
+          let fm
+          while ((fm = fre.exec(css))) {
+            const f = new URL(fm[1], abs.href).href
+            if (!(await sc.match(f, { ignoreSearch: true }))) { const fr = await fetch(f); if (fr.ok) await sc.put(f, fr) }
+          }
+        }
       } catch (e) {}
     }))
   }
