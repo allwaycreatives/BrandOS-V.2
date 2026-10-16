@@ -4,9 +4,9 @@
  *    pre-loaded in the background so they open even if you never visited them offline.
  *  - Changes made offline (server actions) are saved in a queue on the device and sent
  *    when the connection is back. */
-const STATIC = 'brandos-static-v2'
-const PAGES = 'brandos-pages-v2'
-const IMAGES = 'brandos-images-v2'
+const STATIC = 'brandos-static-v3'
+const PAGES = 'brandos-pages-v3'
+const IMAGES = 'brandos-images-v3'
 const KEEP = [STATIC, PAGES, IMAGES]
 const OFFLINE_URL = '/offline.html'
 const NAV_TIMEOUT = 4000
@@ -62,12 +62,6 @@ async function notify() {
 
 /* ---------- helpers ---------- */
 const isSameOrigin = (url) => url.origin === self.location.origin
-function normalizeRsc(url) {
-  const u = new URL(url.href)
-  u.searchParams.delete('_rsc')
-  u.hash = ''
-  return u.href + '#rsc'
-}
 async function trim(cacheName, max) {
   const c = await caches.open(cacheName)
   const keys = await c.keys()
@@ -110,11 +104,9 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.pathname.startsWith('/_next/')) return
 
-  // Next's in-app page switches (RSC data)
-  if (request.headers.get('RSC') === '1') {
-    event.respondWith(rscNetworkFirst(request, url))
-    return
-  }
+  // Next's in-app page data (RSC) is left alone on purpose: offline it fails and Next
+  // then does a normal page load, which is served from the saved pages below.
+  if (request.headers.get('RSC') === '1' || url.searchParams.has('_rsc')) return
   if (request.mode === 'navigate') {
     event.respondWith(pageNetworkFirst(request))
   }
@@ -170,22 +162,6 @@ async function pageNetworkFirst(request) {
     if (hit) { network.catch(() => {}); return hit }
     try { return await network } catch (e2) {}
     return (await caches.match(OFFLINE_URL)) || Response.error()
-  }
-}
-
-async function rscNetworkFirst(request, url) {
-  const c = await caches.open(PAGES)
-  const key = normalizeRsc(url)
-  try {
-    const res = await Promise.race([fetch(request), timeout(NAV_TIMEOUT)])
-    if (res.ok && !res.redirected && (res.headers.get('content-type') || '').includes('text/x-component')) {
-      c.put(key, res.clone())
-    }
-    return res
-  } catch (e) {
-    const hit = await c.match(key)
-    // If we have nothing, failing makes Next do a normal page load, which we serve from the page cache
-    return hit || Response.error()
   }
 }
 
