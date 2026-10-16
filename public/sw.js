@@ -15,7 +15,10 @@ const MAX_IMAGES = 200
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, '/manifest.json'])).then(() => self.skipWaiting())
+    caches.open(STATIC).then(async (c) => {
+      await c.add(OFFLINE_URL)
+      await Promise.all(['/manifest.json', '/aw-logo.png', '/brandos-logo.png', '/icon.png', '/icon-192.png', '/icon-512.png'].map((u) => c.add(u).catch(() => {})))
+    }).then(() => self.skipWaiting())
   )
 })
 
@@ -114,7 +117,7 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheFirst(request, name) {
   const c = await caches.open(name)
-  const hit = await c.match(request, { ignoreSearch: true })
+  const hit = await c.match(request, { ignoreSearch: true, ignoreVary: true })
   if (hit) return hit
   const res = await fetch(request)
   if (res.ok) c.put(request, res.clone())
@@ -123,7 +126,7 @@ async function cacheFirst(request, name) {
 
 async function staleWhileRevalidate(request, name, max) {
   const c = await caches.open(name)
-  const hit = await c.match(request)
+  const hit = (await c.match(request, { ignoreVary: true })) || (await caches.match(request, { ignoreVary: true }))
   const net = fetch(request)
     .then((res) => { if (res.ok) { c.put(request, res.clone()); if (max) trim(name, max) } return res })
     .catch(() => null)
@@ -158,7 +161,7 @@ async function pageNetworkFirst(request) {
   try {
     return await Promise.race([network, timeout(NAV_TIMEOUT)])
   } catch (e) {
-    const hit = await c.match(key)
+    const hit = await c.match(key, { ignoreVary: true })
     if (hit) { network.catch(() => {}); return hit }
     try { return await network } catch (e2) {}
     return (await caches.match(OFFLINE_URL)) || Response.error()
