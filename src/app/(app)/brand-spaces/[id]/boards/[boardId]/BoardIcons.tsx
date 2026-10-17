@@ -50,6 +50,12 @@ export const Icons = {
   more: (
     <svg {...base} fill="currentColor" stroke="none"><circle cx="5.5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="18.5" cy="12" r="1.7" /></svg>
   ),
+  line: (
+    <svg {...base}><path d="M5 19L19 5M10 5h9v9" /></svg>
+  ),
+  draw: (
+    <svg {...base}><path d="M3 17c2.5-6 4.5-9 6-9s1 5 3 5 3-6 4.5-6S19 14 21 15" /></svg>
+  ),
   trash: (
     <svg {...base}><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5" /></svg>
   ),

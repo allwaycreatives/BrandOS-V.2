@@ -642,3 +642,6 @@ html:has(.board-focus), body:has(.board-focus) { overflow: hidden; }
 }
 .rail-more .rail-btn { width: 64px; }
 @media (max-width: 380px) { .rail-more { grid-template-columns: repeat(3, 64px); } }
+
+.rail-btn.active { background: var(--accent-dim); color: var(--accent-text); }
+.rail-btn.active .rail-icon { border-color: var(--accent-border); }
