@@ -6,11 +6,12 @@ import TodoCard from './TodoCard'
 import ColorCard, { COLOR_PALETTE } from './ColorCard'
 import CanvasScrollbars from './CanvasScrollbars'
 import LinesLayer, { LineToolbar, type LineItem, type DraftLine } from './LinesLayer'
+import { fitDrawing } from '@/lib/boardDrawing'
 import { healLine, parseLine, resolveLine, serializeLine, type Box, type LineData } from '@/lib/boardLines'
 import TableCard, { DEFAULT_TABLE } from './TableCard'
 import DocumentCard from './DocumentCard'
 import ColumnCard from './ColumnCard'
-import SketchCard from './SketchCard'
+import SketchCard, { DRAWING_INKS } from './SketchCard'
 import { AudioCard, MapCard, VideoCard, videoSource } from './MediaCards'
 import { Icons } from './BoardIcons'
 import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
@@ -50,15 +51,16 @@ type Drag =
   | { kind: 'cards'; ids: string[]; startX: number; startY: number; origin: Map<string, { x: number; y: number }>; dx: number; dy: number; moved: boolean; clickedId: string; additive: boolean; onUp: 'collapse' | 'remove' | null }
   | { kind: 'pan'; lastX: number; lastY: number }
   | { kind: 'marquee'; sx: number; sy: number; additive: boolean; base: Set<string>; moved: boolean }
+  | { kind: 'draw' }
   | { kind: 'newLine'; from: string | null; sx: number; sy: number }
   | { kind: 'lineEnd'; id: string; end: 'a' | 'b' }
   | { kind: 'resize'; id: string; handle: Handle; start: Rect; hadHeight: boolean; startX: number; startY: number; last: Rect }
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 200, board: 200, todo: 250, sketch: 260, document: 240, table: 340, column: 280, comment: 210, audio: 280, video: 360, map: 320 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 200, board: 200, todo: 250, sketch: 260, document: 240, table: 340, column: 280, comment: 210, audio: 280, video: 360, map: 320, drawing: 260 }
 // These keep their proportions or follow their own content, so only their width can be dragged.
-const WIDTH_ONLY = new Set(['image', 'sketch', 'video', 'map', 'audio', 'table', 'document'])
+const WIDTH_ONLY = new Set(['image', 'sketch', 'drawing', 'video', 'map', 'audio', 'table', 'document'])
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -172,7 +174,7 @@ export default function BoardCanvas({
   const [busy, setBusy] = useState(false)
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set())
   const [selected, setSelectedState] = useState<Set<string>>(new Set())
-  const [tool, setTool] = useState<'select' | 'hand' | 'line'>('select')
+  const [tool, setTool] = useState<'select' | 'hand' | 'line' | 'draw'>('select')
   const [multi, setMulti] = useState(false) // taps add to the selection (for phones, and for anyone who forgets Shift)
   const [spaceDown, setSpaceDown] = useState(false)
   const [marquee, setMarquee] = useState<Rect | null>(null)
@@ -180,6 +182,12 @@ export default function BoardCanvas({
   const [popIds, setPopIds] = useState<Set<string>>(new Set()) // cards that just appeared (they pop in)
   const [view, setView] = useState({ w: 0, h: 0 })
   const imageAt = useRef<{ x: number; y: number } | null>(null)
+  const [strokes, setStrokes] = useState<{ c: string; w: number; p: [number, number][] }[]>([]) // scribbles waiting to become a drawing card
+  const [liveStroke, setLiveStroke] = useState<{ c: string; w: number; p: [number, number][] } | null>(null)
+  const liveRef = useRef<{ c: string; w: number; p: [number, number][] } | null>(null)
+  const [penColor, setPenColor] = useState(DRAWING_INKS[0])
+  const [penSize, setPenSize] = useState(3) // pen width on screen, in pixels
+  const prevTool = useRef<'select' | 'hand' | 'line' | 'draw'>('select')
   const [draftLine, setDraftLine] = useState<DraftLine | null>(null)
   const [hoverCardId, setHoverCardId] = useState<string | null>(null)
   const sizesRef = useRef(new Map<string, { w: number; h: number }>())
@@ -243,6 +251,8 @@ export default function BoardCanvas({
       const [a, b] = Array.from(pointers.current.values())
       pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
       dragRef.current = null
+      liveRef.current = null
+      setLiveStroke(null)
       setMarquee(null)
       el.setPointerCapture?.(e.pointerId)
       return
@@ -251,6 +261,15 @@ export default function BoardCanvas({
     const handleEl = target.closest('[data-handle]') as HTMLElement | null
     const cardEl = target.closest('[data-card]') as HTMLElement | null
     const panWanted = readOnly || tool === 'hand' || spaceDown || e.button === 1
+
+    if (tool === 'draw' && !readOnly && !panWanted && e.button === 0) {
+      const w = worldAt(e)
+      liveRef.current = { c: penColor, w: penSize / zoom, p: [[Math.round(w.x * 10) / 10, Math.round(w.y * 10) / 10]] }
+      setLiveStroke(liveRef.current)
+      dragRef.current = { kind: 'draw' }
+      el.setPointerCapture?.(e.pointerId)
+      return
+    }
 
     const lineEnd = target.closest('[data-line-end]') as unknown as HTMLElement | null
     if (lineEnd && !readOnly && !panWanted) {
@@ -323,6 +342,17 @@ export default function BoardCanvas({
     }
     const drag = dragRef.current
     if (!drag) return
+
+    if (drag.kind === 'draw') {
+      const s = liveRef.current
+      if (!s) return
+      const w = worldAt(e)
+      const last = s.p[s.p.length - 1]
+      if (Math.hypot(w.x - last[0], w.y - last[1]) < 1.5 / zoom || s.p.length > 2500) return
+      liveRef.current = { ...s, p: [...s.p, [Math.round(w.x * 10) / 10, Math.round(w.y * 10) / 10]] }
+      setLiveStroke(liveRef.current)
+      return
+    }
 
     if (drag.kind === 'newLine') {
       const w = worldAt(e)
@@ -435,6 +465,11 @@ export default function BoardCanvas({
       const keepHeight = card && !WIDTH_ONLY.has(card.type) && (vertical || drag.hadHeight)
       if (card) resizeBoardCard(boardId, drag.id, { x: r.x, y: r.y, w: r.w, h: keepHeight ? r.h : null }).catch(() => {})
       setTimeout(() => refreshLines(new Set([drag.id])), 120)
+    } else if (drag.kind === 'draw') {
+      const s = liveRef.current
+      liveRef.current = null
+      setLiveStroke(null)
+      if (s) setStrokes((prev) => [...prev, s])
     } else if (drag.kind === 'newLine') {
       finishNewLine(drag, e)
       setDraftLine(null)
@@ -658,6 +693,27 @@ export default function BoardCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sizesVersion, cards.length])
 
+  // Leaving draw mode turns the scribbles into one drawing card, sized to fit and placed where you drew.
+  async function commitDrawing() {
+    const all = strokes
+    setStrokes([])
+    if (all.length === 0) return
+    const built = fitDrawing(all)
+    if (!built) return void alert('That drawing is too detailed to save. Try drawing in smaller pieces.')
+    const made = await addCard('drawing', built.content, true, { x: built.x, y: built.y })
+    if (made.ok && made.id) {
+      const id = made.id
+      setCards((prev) => prev.map((c) => (c.id === id ? { ...c, width: built.w } : c)))
+      resizeBoardCard(boardId, id, { x: built.x, y: built.y, w: built.w, h: null }).catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    if (prevTool.current === 'draw' && tool !== 'draw') void commitDrawing()
+    prevTool.current = tool
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool])
+
   const worldAt = (e: { clientX: number; clientY: number }) => {
     const rect = containerRef.current?.getBoundingClientRect()
     return { x: (e.clientX - (rect?.left ?? 0) - pan.x) / zoom, y: (e.clientY - (rect?.top ?? 0) - pan.y) / zoom }
@@ -718,7 +774,7 @@ export default function BoardCanvas({
   useEffect(() => {
     if (!editingId) return
     const c = cardsRef.current.find((x) => x.id === editingId)
-    if (c && c.type === 'sketch' && !selected.has(editingId)) setEditingId(null)
+    if (c && (c.type === 'sketch' || c.type === 'drawing') && !selected.has(editingId)) setEditingId(null)
   }, [selected, editingId])
 
   const growBox = (el: HTMLTextAreaElement) => {
@@ -780,7 +836,7 @@ export default function BoardCanvas({
   // ---------- adding, editing, styling, deleting ----------
 
   // New cards appear in the middle of what you are looking at.
-  async function addCard(type: string, content: string, quiet = false, at?: { x: number; y: number }): Promise<{ ok: boolean; message?: string }> {
+  async function addCard(type: string, content: string, quiet = false, at?: { x: number; y: number }): Promise<{ ok: boolean; message?: string; id?: string }> {
     const rect = containerRef.current?.getBoundingClientRect()
     const w = WIDTH[type] ?? 210
     const cx = rect ? (rect.width / 2 - pan.x) / zoom : 200
@@ -795,7 +851,7 @@ export default function BoardCanvas({
       setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading' || type === 'comment' || type === 'sketch' || type === 'document') setEditingId(created.id)
-      return { ok: true }
+      return { ok: true, id: created.id }
     } catch (err) {
       const message = err instanceof Error && /levels deep|name/.test(err.message) ? err.message : 'Could not add that card. Please try again.'
       if (!quiet) alert(message)
@@ -806,7 +862,12 @@ export default function BoardCanvas({
   // Every tool in the sidebar, whether it was clicked (lands in the middle of your view) or dragged
   // onto the board (lands where you let go).
   async function runTool(key: string, point?: { x: number; y: number }) {
-    if (key !== 'line') setTool((t) => (t === 'line' ? 'select' : t))
+    if (key !== 'line' && key !== 'draw') setTool((t) => (t === 'line' || t === 'draw' ? 'select' : t))
+    if (key === 'draw') {
+      setSelected(new Set())
+      setTool((t) => (t === 'draw' ? 'select' : 'draw'))
+      return
+    }
     if (key === 'line') {
       if (!point) {
         setSelected(new Set())
@@ -1093,7 +1154,7 @@ export default function BoardCanvas({
     if (card.type === 'board') return openBoard(card)
     if (card.type === 'document') return setEditingId(card.id) // people with view-only access can read documents too
     if (readOnly) return
-    if (card.type === 'note' || card.type === 'heading' || card.type === 'comment' || card.type === 'sketch') return setEditingId(card.id)
+    if (card.type === 'note' || card.type === 'heading' || card.type === 'comment' || card.type === 'sketch' || card.type === 'drawing') return setEditingId(card.id)
     if (card.type === 'map') {
       const next = prompt('Search a place or address', card.content)?.trim()
       if (next) saveContent(card.id, next)
@@ -1126,6 +1187,7 @@ export default function BoardCanvas({
     { key: 'column', label: 'Column', icon: Icons.column, hint: 'Add a column to group cards' },
   ]
   const imageTool: Tool = { key: 'image', label: 'Image', icon: Icons.image, hint: 'Add images (or drop / paste them on the board)' }
+  const drawTool: Tool = { key: 'draw', label: 'Draw', icon: Icons.draw, hint: 'Draw freehand on the board' }
 
   function startToolDrag(e: React.DragEvent, t: Tool) {
     e.dataTransfer.setData('application/x-brandos-tool', t.key)
@@ -1159,8 +1221,8 @@ export default function BoardCanvas({
   }, [more])
 
   const railButton = (t: Tool) => (
-    <div key={t.key} draggable onDragStart={(e) => startToolDrag(e, t)}>
-      <button type="button" className={`rail-btn${t.key === 'line' && tool === 'line' ? ' active' : ''}`} aria-pressed={t.key === 'line' ? tool === 'line' : undefined} onClick={() => runTool(t.key)} disabled={busy} title={t.hint}>
+    <div key={t.key} draggable={t.key !== 'draw'} onDragStart={(e) => startToolDrag(e, t)}>
+      <button type="button" className={`rail-btn${(t.key === 'line' || t.key === 'draw') && tool === t.key ? ' active' : ''}`} aria-pressed={t.key === 'line' || t.key === 'draw' ? tool === t.key : undefined} onClick={() => runTool(t.key)} disabled={busy} title={t.hint}>
         <span className="rail-icon">{t.icon}</span>
         <span className="rail-label">{t.label}</span>
       </button>
@@ -1195,6 +1257,7 @@ export default function BoardCanvas({
             </button>
             <div className="rail-sep" />
             {railButton(imageTool)}
+            {railButton(drawTool)}
             <input ref={audioRef} type="file" accept="audio/*" multiple onChange={handleFile} style={{ display: 'none' }} />
             <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
             {more && (
@@ -1242,7 +1305,7 @@ export default function BoardCanvas({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', overflow: 'hidden', backgroundColor: 'var(--bg-app)', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: `${22 * zoom}px ${22 * zoom}px`, backgroundPosition: `${pan.x}px ${pan.y}px`, cursor: tool === 'line' && !readOnly ? 'crosshair' : readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
+        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', overflow: 'hidden', backgroundColor: 'var(--bg-app)', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: `${22 * zoom}px ${22 * zoom}px`, backgroundPosition: `${pan.x}px ${pan.y}px`, cursor: (tool === 'line' || tool === 'draw') && !readOnly ? 'crosshair' : readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
         <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
           {[...cards].filter((c) => c.type !== 'line').sort((a, b) => Number(b.type === 'column') - Number(a.type === 'column')).map((card) => {
@@ -1273,9 +1336,11 @@ export default function BoardCanvas({
                 ? { background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)', boxShadow: 'none' }
                 : card.type === 'comment' && !hasBg
                   ? { background: '#e9f1ff', borderLeft: '3px solid #5b8def' }
-                  : {}
+                  : card.type === 'drawing' && !hasBg
+                    ? { background: 'transparent', boxShadow: 'none' }
+                    : {}
             const linkFull = card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)
-            const pad = card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || card.type === 'column' || linkFull ? 0 : card.type === 'video' || card.type === 'map' ? 6 : card.type === 'table' || card.type === 'sketch' ? 8 : 12
+            const pad = card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'drawing' ? 0 : card.type === 'color' || card.type === 'column' || linkFull ? 0 : card.type === 'video' || card.type === 'map' ? 6 : card.type === 'table' || card.type === 'sketch' ? 8 : 12
             const interactive = readOnly || (isSel && selected.size === 1)
             const gs = 22 / zoom // the grip stays the same size on screen however far you zoom
             const handles =
@@ -1305,7 +1370,7 @@ export default function BoardCanvas({
                   </div>
                   {card.type === 'table' && <TableCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} onChange={(text) => saveContent(card.id, text)} />}
                 {card.type === 'document' && <DocumentCard key={card.id} content={card.content} readOnly={readOnly} open={editing} onOpen={() => setEditingId(card.id)} onClose={() => setEditingId(null)} onChange={(text) => saveContent(card.id, text)} />}
-                {card.type === 'sketch' && <SketchCard key={card.id} content={card.content} editing={editing} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} onDone={() => setEditingId(null)} />}
+                {(card.type === 'sketch' || card.type === 'drawing') && <SketchCard key={card.id} content={card.content} editing={editing} readOnly={readOnly} transparent={card.type === 'drawing'} onChange={(text) => saveContent(card.id, text)} onDone={() => setEditingId(null)} />}
                 {card.type === 'column' && <ColumnCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
                 {card.type === 'audio' && <AudioCard content={card.content} interactive={interactive} />}
                 {card.type === 'video' && <VideoCard content={card.content} interactive={interactive} />}
@@ -1393,6 +1458,18 @@ export default function BoardCanvas({
             )
           })}
 
+          {(strokes.length > 0 || liveStroke) && (
+            <svg aria-hidden="true" style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 45 }}>
+              {[...strokes, ...(liveStroke ? [liveStroke] : [])].map((st, i) =>
+                st.p.length === 1 ? (
+                  <circle key={i} cx={st.p[0][0]} cy={st.p[0][1]} r={st.w / 2} fill={st.c} />
+                ) : (
+                  <polyline key={i} points={st.p.map((q) => q.join(',')).join(' ')} fill="none" stroke={st.c} strokeWidth={st.w} strokeLinecap="round" strokeLinejoin="round" />
+                ),
+              )}
+            </svg>
+          )}
+
           <LinesLayer lines={lineItems} boxOf={boxOf} selected={selected} zoom={zoom} readOnly={readOnly} draft={draftLine} onSelect={selectLine} />
 
           {uploads.map((u) => (
@@ -1412,6 +1489,22 @@ export default function BoardCanvas({
         </div>
 
         {!readOnly && selectedLine && !draftLine && <LineToolbar line={selectedLine} boxOf={boxOf} pan={pan} zoom={zoom} onChange={(patch) => updateLine(selectedLine.id, (d) => ({ ...d, ...patch }))} onDelete={deleteSelected} />}
+        {tool === 'draw' && !readOnly && (
+          <div data-nodrag role="toolbar" aria-label="Drawing options" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 8, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--accent-border)', borderRadius: 999, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap', maxWidth: 'calc(100% - 20px)', overflowX: 'auto' }}>
+            {DRAWING_INKS.map((c) => (
+              <button key={c} type="button" aria-label={`Pen color ${c}`} onClick={() => setPenColor(c)} style={{ width: 18, height: 18, minHeight: 0, padding: 0, flex: '0 0 auto', borderRadius: '50%', background: c, border: penColor === c ? '2px solid var(--accent)' : '2px solid var(--border-strong)', cursor: 'pointer' }} />
+            ))}
+            <span style={{ width: 1, height: 16, background: 'var(--border-strong)', margin: '0 2px' }} />
+            {[2, 4, 8].map((s) => (
+              <button key={s} type="button" aria-label={`Pen size ${s}`} onClick={() => setPenSize(s)} style={{ width: 24, height: 24, minHeight: 0, padding: 0, flex: '0 0 auto', borderRadius: '50%', border: 'none', background: penSize === s ? 'var(--accent-dim)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <span style={{ width: s + 3, height: s + 3, borderRadius: '50%', background: 'var(--text-primary)' }} />
+              </button>
+            ))}
+            <span style={{ width: 1, height: 16, background: 'var(--border-strong)', margin: '0 2px' }} />
+            <button type="button" onClick={() => setStrokes((prev) => prev.slice(0, -1))} disabled={strokes.length === 0} style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', padding: '4px 8px', minHeight: 0, fontSize: 12.5, cursor: 'pointer', opacity: strokes.length ? 1 : 0.4 }}>Undo</button>
+            <button type="button" onClick={() => setTool('select')} style={{ border: 'none', background: 'var(--accent)', color: '#fff', padding: '5px 14px', minHeight: 0, borderRadius: 999, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
+          </div>
+        )}
         {tool === 'line' && !readOnly && (
           <div aria-hidden="true" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 7, padding: '7px 14px', borderRadius: 999, background: 'var(--bg-card)', border: '1px solid var(--accent-border)', color: 'var(--accent-text)', fontSize: 12.5, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
             Drag from one card to another to connect them · Esc to stop

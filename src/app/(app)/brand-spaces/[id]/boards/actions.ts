@@ -12,9 +12,9 @@ import { MAX_BOARD_DEPTH } from './constants'
 import { MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, styleToJson } from '@/lib/boardStyle'
 
 
-const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo', 'sketch', 'document', 'table', 'column', 'comment', 'audio', 'video', 'map', 'line']
+const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo', 'sketch', 'document', 'table', 'column', 'comment', 'audio', 'video', 'map', 'line', 'drawing']
 // Documents, tables and sketches hold much more than a note does.
-const BIG_TYPES = ['document', 'table', 'sketch']
+const BIG_TYPES = ['document', 'table', 'sketch', 'drawing']
 const contentLimit = (type: string) => (BIG_TYPES.includes(type) ? 50000 : 5000)
 
 // Clients can view boards but not change them.
