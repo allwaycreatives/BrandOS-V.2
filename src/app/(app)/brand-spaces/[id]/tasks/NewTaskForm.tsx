@@ -1,7 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { upload } from '@vercel/blob/client'
+import UploadBar from '@/components/UploadBar'
+import { useFileUpload } from '@/lib/useFileUpload'
 import { createTask } from './actions'
 
 export default function NewTaskForm({
@@ -11,54 +12,43 @@ export default function NewTaskForm({
   brandSpaceId: string
   assigneeOptions: { id: string; label: string }[]
 }) {
-  const [uploading, setUploading] = useState(false)
+  // Attachments keep their original quality (compress: false); you still get progress, retry and cancel.
+  const fileUp = useFileUpload({ compress: false })
   const [uploadedName, setUploadedName] = useState('')
   const [uploadedUrl, setUploadedUrl] = useState('')
-  const [error, setError] = useState('')
+  const uploading = fileUp.uploading
 
-  const [audioUploading, setAudioUploading] = useState(false)
+  const audioUp = useFileUpload({ compress: false })
   const [audioUploadedName, setAudioUploadedName] = useState('')
   const [audioUploadedUrl, setAudioUploadedUrl] = useState('')
-  const [audioError, setAudioError] = useState('')
+  const audioUploading = audioUp.uploading
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    setError('')
-    try {
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
-      })
-      setUploadedUrl(blob.url)
-      setUploadedName(file.name)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed — try again.')
-    } finally {
-      setUploading(false)
+  async function attach(file: File, retrying = false) {
+    setUploadedUrl('')
+    const res = retrying ? await fileUp.retry() : await fileUp.run(file)
+    if (res) {
+      setUploadedUrl(res.url)
+      setUploadedName(res.name)
     }
   }
 
-  async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setAudioUploading(true)
-    setAudioError('')
-    try {
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
-      })
-      setAudioUploadedUrl(blob.url)
-      setAudioUploadedName(file.name)
-    } catch (err) {
-      setAudioError(err instanceof Error ? err.message : 'Upload failed — try again.')
-    } finally {
-      setAudioUploading(false)
+  async function attachAudio(file: File, retrying = false) {
+    setAudioUploadedUrl('')
+    const res = retrying ? await audioUp.retry() : await audioUp.run(file)
+    if (res) {
+      setAudioUploadedUrl(res.url)
+      setAudioUploadedName(res.name)
     }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) attach(file)
+  }
+
+  function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) attachAudio(file)
   }
 
   const createWithId = createTask.bind(null, brandSpaceId)
@@ -78,11 +68,14 @@ export default function NewTaskForm({
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Attach a file</div>
             <input type="file" onChange={handleFileChange} disabled={uploading} />
-            {uploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
+            {fileUp.item && fileUp.item.status !== 'done' && (
+              <div style={{ marginTop: 8, maxWidth: 360 }}>
+                <UploadBar item={fileUp.item} onCancel={fileUp.cancel} onRetry={() => attach(null as unknown as File, true)} onDismiss={fileUp.dismiss} />
+              </div>
+            )}
             {uploadedUrl && !uploading && (
               <div style={{ fontSize: 12, color: 'var(--accent-text)', marginTop: 6 }}>✓ {uploadedName} attached</div>
             )}
-            {error && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{error}</div>}
           </div>
 
           <input name="fileLinkFallback" placeholder="Or paste a link to the file instead" />
@@ -93,11 +86,14 @@ export default function NewTaskForm({
               Large video? Attach just the audio instead so it can be transcribed (optional)
             </div>
             <input type="file" accept="audio/*" onChange={handleAudioFileChange} disabled={audioUploading} />
-            {audioUploading && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Uploading...</div>}
+            {audioUp.item && audioUp.item.status !== 'done' && (
+              <div style={{ marginTop: 8, maxWidth: 360 }}>
+                <UploadBar item={audioUp.item} onCancel={audioUp.cancel} onRetry={() => attachAudio(null as unknown as File, true)} onDismiss={audioUp.dismiss} />
+              </div>
+            )}
             {audioUploadedUrl && !audioUploading && (
               <div style={{ fontSize: 12, color: 'var(--accent-text)', marginTop: 6 }}>✓ {audioUploadedName} attached for transcription</div>
             )}
-            {audioError && <div style={{ fontSize: 12, color: '#e5484d', marginTop: 6 }}>{audioError}</div>}
             <input type="hidden" name="audioUrl" value={audioUploadedUrl} />
           </div>
 

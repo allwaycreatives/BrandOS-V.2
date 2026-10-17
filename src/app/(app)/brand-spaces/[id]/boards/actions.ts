@@ -13,7 +13,7 @@ import { normalizeHex, parseColorCard, serializeColorCard } from '@/lib/boardCol
 import { MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, styleToJson } from '@/lib/boardStyle'
 
 
-const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board']
+const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo']
 
 // Clients can view boards but not change them.
 async function requireEdit(brandSpaceId: string) {

@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { uploadImage } from '@/lib/uploadImage'
+import UploadBar, { type UploadView } from '@/components/UploadBar'
+import TodoCard from './TodoCard'
+import { Icons } from './BoardIcons'
+import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
 import { useRouter } from 'next/navigation'
 import {
   addBoardCardAt,
@@ -32,6 +35,7 @@ type Card = {
   positionX: number
   positionY: number
 }
+type BoardUpload = UploadView & { id: string; x: number; y: number; preview: string }
 type Inner = { id: string; name: string; cards: number; boards: number }
 type Meta = { title?: string; image?: string; kind?: string; site?: string }
 
@@ -43,7 +47,7 @@ type Drag =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 240, color: 140, board: 200 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 140, board: 200, todo: 250 }
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -51,6 +55,8 @@ const PAPER: React.CSSProperties = {
   borderRadius: 6,
   boxShadow: '0 1px 2px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.25)',
 }
+// Milanote-style: a picture floats on the board with no white card around it.
+const IMAGE_FRAME: React.CSSProperties = { background: 'transparent', boxShadow: '0 2px 10px rgba(0,0,0,0.35)' }
 const CURSOR: Record<Handle, string> = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
 
 function parseMeta(raw: string | null): Meta {
@@ -69,6 +75,38 @@ function hostOf(url: string) {
   } catch {
     return url
   }
+}
+
+// Link cards stay clean, like Milanote: a big picture and "From Pinterest", not the page's long title.
+const VISUAL_SITES = /(^|\.)(pinterest\.[a-z.]+|pin\.it|instagram\.com|tiktok\.com|behance\.net|dribbble\.com|unsplash\.com|flickr\.com|vsco\.co|are\.na)$/i
+const SITE_NAMES: [RegExp, string][] = [
+  [/(^|\.)(pinterest\.[a-z.]+|pin\.it)$/i, 'Pinterest'],
+  [/(^|\.)instagram\.com$/i, 'Instagram'],
+  [/(^|\.)tiktok\.com$/i, 'TikTok'],
+  [/(^|\.)(youtube\.com|youtu\.be)$/i, 'YouTube'],
+  [/(^|\.)vimeo\.com$/i, 'Vimeo'],
+  [/(^|\.)behance\.net$/i, 'Behance'],
+  [/(^|\.)dribbble\.com$/i, 'Dribbble'],
+  [/(^|\.)unsplash\.com$/i, 'Unsplash'],
+]
+
+function linkHost(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
+function siteLabel(url: string, metaSite?: string) {
+  const host = linkHost(url)
+  for (const [re, name] of SITE_NAMES) if (re.test(host)) return name
+  return metaSite || hostOf(url)
+}
+
+// Pinterest hands out tiny thumbnails (236 px wide). Ask for the 736 px version so big cards stay sharp.
+function sharpImage(url: string) {
+  return url.replace(/(i\.pinimg\.com\/)\d+x\d*(?:_[A-Z]+)?\//, '$1736x/')
 }
 
 // When a note is clicked, find which character the click landed on, so the cursor can go exactly there.
@@ -130,7 +168,7 @@ export default function BoardCanvas({
   const [cursorGrab, setCursorGrab] = useState(false)
   const [anchor, setAnchor] = useState<{ cx: number; top: number; bottom: number; cw: number } | null>(null)
   const [dialog, setDialog] = useState<{ kind: 'link' | 'board' | 'rename' | 'editlink'; cardId?: string; initial: string } | null>(null)
-  const [notice, setNotice] = useState<{ kind: 'error' | 'info' | 'progress'; text: string; percent?: number | null } | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [barPos, setBarPos] = useState<{ x: number; y: number } | null>(null)
   const [newColorId, setNewColorId] = useState<string | null>(null)
 
@@ -140,8 +178,15 @@ export default function BoardCanvas({
   const pinchDist = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [uploads, setUploads] = useState<BoardUpload[]>([])
+  const [dropping, setDropping] = useState(false)
+  const dragDepth = useRef(0)
+  const uploadsRef = useRef<BoardUpload[]>([])
+  const startUploadsRef = useRef<(files: File[], at?: { x: number; y: number }) => void>(() => {})
+  const uploadFiles = useRef(new Map<string, File>())
+  const uploadCtl = useRef(new Map<string, AbortController>())
+  const uploadedUrls = useRef(new Map<string, string>()) // so a retry after a failed "add card" does not upload again
   const caretRef = useRef<number | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>()
   const colorTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
@@ -507,17 +552,17 @@ export default function BoardCanvas({
   function notify(text: string, kind: 'error' | 'info' = 'error') {
     setNotice({ kind, text })
     clearTimeout(noticeTimer.current)
-    noticeTimer.current = setTimeout(() => setNotice((n) => (n && n.kind !== 'progress' ? null : n)), 7000)
+    noticeTimer.current = setTimeout(() => setNotice(null), 7000)
   }
 
   // New cards appear in the middle of what you are looking at.
-  async function addCard(type: string, content: string) {
+  async function addCard(type: string, content: string, quiet = false, at?: { x: number; y: number }): Promise<{ ok: boolean; message?: string }> {
     const rect = containerRef.current?.getBoundingClientRect()
     const w = WIDTH[type] ?? 210
     const cx = rect ? (rect.width / 2 - pan.x) / zoom : 200
     const cy = rect ? (rect.height / 2 - pan.y) / zoom : 150
-    const x = cx - w / 2 + (Math.random() - 0.5) * 60
-    const y = cy - 50 + (Math.random() - 0.5) * 60
+    const x = at ? at.x : cx - w / 2 + (Math.random() - 0.5) * 60
+    const y = at ? at.y : cy - 50 + (Math.random() - 0.5) * 60
     try {
       const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
@@ -525,38 +570,160 @@ export default function BoardCanvas({
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
       if (type === 'note' || type === 'heading') setEditingId(created.id)
       if (type === 'color') setNewColorId(created.id)
+      return { ok: true }
     } catch (err) {
-      notify(err instanceof Error && /levels deep|name|link|colour/.test(err.message) ? err.message : 'Could not add that card. Please try again.')
+      const message = err instanceof Error && /levels deep|name|link|colour/.test(err.message) ? err.message : 'Could not add that card. Please try again.'
+      if (!quiet) notify(message)
+      return { ok: false, message }
     }
   }
 
-  // Pictures go through one helper (src/lib/uploadImage.ts). This only shows what is happening and adds the card.
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function patchUpload(id: string, patch: Partial<UploadView>) {
+    setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+  }
+
+  function dropUpload(id: string) {
+    uploadFiles.current.delete(id)
+    uploadCtl.current.delete(id)
+    uploadedUrls.current.delete(id)
+    setUploads((prev) => {
+      const gone = prev.find((u) => u.id === id)
+      if (gone) URL.revokeObjectURL(gone.preview)
+      return prev.filter((u) => u.id !== id)
+    })
+  }
+
+  // Wait (briefly) for the real picture to load, so swapping the placeholder for the card does not flash.
+  const preload = (url: string) =>
+    new Promise<void>((resolve) => {
+      const img = new Image()
+      img.onload = img.onerror = () => resolve()
+      img.src = url
+      setTimeout(resolve, 3000)
+    })
+
+  async function runUpload(id: string) {
+    const file = uploadFiles.current.get(id)
+    const spot = uploadsRef.current.find((u) => u.id === id)
+    if (!file || !spot) return // cancelled while waiting in line
+    const controller = new AbortController()
+    uploadCtl.current.set(id, controller)
+    try {
+      let url = uploadedUrls.current.get(id)
+      if (!url) {
+        patchUpload(id, { status: isImageFile(file) ? 'preparing' : 'uploading', percent: 0, error: undefined })
+        const res = await uploadFile(file, {
+          signal: controller.signal,
+          onProgress: (percent, phase) => patchUpload(id, { percent, status: phase }),
+        })
+        url = res.url
+        uploadedUrls.current.set(id, url)
+      }
+      patchUpload(id, { status: 'saving', percent: 100, error: undefined })
+      await preload(url)
+      const saved = await addCard('image', url, true, { x: spot.x, y: spot.y })
+      if (!saved.ok) {
+        patchUpload(id, { status: 'error', error: `Uploaded, but could not add it to the board. ${saved.message ?? ''}`.trim() })
+        return
+      }
+      dropUpload(id) // the real card is already in the same spot
+    } catch (err) {
+      if (controller.signal.aborted) return dropUpload(id)
+      patchUpload(id, { status: 'error', error: friendlyUploadError(err).message })
+    }
+  }
+
+  // Images dropped, pasted or picked land right where you are looking (or where you dropped them),
+  // show up immediately as a faded preview, and fill in as they upload.
+  function startUploads(rawFiles: File[], drop?: { x: number; y: number }) {
+    const files = rawFiles.filter(isImageFile).slice(0, 12)
+    if (!files.length) return
+    const w = WIDTH.image
+    const rect = containerRef.current?.getBoundingClientRect()
+    const base = drop
+      ? { x: drop.x - w / 2, y: drop.y - 60 }
+      : { x: (rect ? (rect.width / 2 - pan.x) / zoom : 200) - w / 2, y: (rect ? (rect.height / 2 - pan.y) / zoom : 150) - 80 }
+    const cols = Math.min(files.length, 3)
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const fresh: BoardUpload[] = files.map((file, i) => {
+      const id = `${stamp}-${i}`
+      uploadFiles.current.set(id, file)
+      return {
+        id,
+        name: file.name,
+        percent: 0,
+        status: 'queued',
+        preview: URL.createObjectURL(file),
+        x: base.x + (i % cols) * (w + 16),
+        y: base.y + Math.floor(i / cols) * (w * 0.85 + 16),
+      }
+    })
+    uploadsRef.current = [...uploadsRef.current, ...fresh]
+    setUploads((prev) => [...prev, ...fresh])
+    // A few at a time: fast on good connections, and does not choke a phone on a big batch.
+    let next = 0
+    const worker = async () => {
+      while (next < fresh.length) await runUpload(fresh[next++].id)
+    }
+    void Promise.all(Array.from({ length: Math.min(3, fresh.length) }, worker))
+  }
+  startUploadsRef.current = startUploads
+  useEffect(() => {
+    uploadsRef.current = uploads
+  }, [uploads])
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (files.length === 0) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    setBusy(true)
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const label = files.length > 1 ? `Uploading ${i + 1} of ${files.length}: ${file.name}` : `Uploading ${file.name}`
-        setNotice({ kind: 'progress', text: label, percent: null })
-        const { url } = await uploadImage(file, {
-          signal: controller.signal,
-          onProgress: (p) => setNotice({ kind: 'progress', text: p.stage ? `${label} · ${p.stage}` : label, percent: p.percent }),
-        })
-        await addCard('image', url)
-      }
-      setNotice(null)
-    } catch (err) {
-      if (controller.signal.aborted) setNotice(null)
-      else notify(err instanceof Error && err.message ? `Upload failed: ${err.message}` : 'Upload failed. Please try again.')
-    } finally {
-      abortRef.current = null
-      setBusy(false)
+    startUploads(files)
+  }
+
+  // Paste a copied image or screenshot (Ctrl/Cmd+V) anywhere on the page, unless you are typing in a field.
+  useEffect(() => {
+    if (readOnly) return
+    function onPaste(e: ClipboardEvent) {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const files = Array.from(e.clipboardData?.files ?? []).filter(isImageFile)
+      if (!files.length) return
+      e.preventDefault()
+      startUploadsRef.current(files)
     }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [readOnly])
+
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  function onDragEnter(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current += 1
+    setDropping(true)
+  }
+  function onDragOver(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+  function onDragLeave(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDropping(false)
+  }
+  function onDrop(e: React.DragEvent) {
+    if (readOnly || !hasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current = 0
+    setDropping(false)
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    startUploads(Array.from(e.dataTransfer.files), { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom })
+  }
+
+  // Checklists save as you type; no need to rebuild the card, the list keeps its own state.
+  function saveTodo(id: string, text: string) {
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: text } : c)))
+    updateBoardCard(id, text).catch(() => {})
   }
 
   function commitEdit(card: Card, value: string) {
@@ -662,15 +829,16 @@ export default function BoardCanvas({
     // A colour card is edited in the bar above it, so there is nothing to open here.
   }
 
-  const tools = [
-    { label: 'Note', glyph: '≡', run: () => addCard('note', '') },
-    { label: 'Title', glyph: 'T', run: () => addCard('heading', '') },
-    { label: 'Image', glyph: '▣', run: () => fileRef.current?.click() },
-    { label: 'Link', glyph: '∞', run: () => setDialog({ kind: 'link', initial: '' }) },
+  const tools: { label: string; icon: React.ReactNode; run: () => void; hint: string }[] = [
+    { label: 'Note', icon: Icons.note, run: () => addCard('note', ''), hint: 'Add a note' },
+    { label: 'Title', icon: Icons.title, run: () => addCard('heading', ''), hint: 'Add a title' },
+    { label: 'To-do', icon: Icons.todo, run: () => addCard('todo', ''), hint: 'Add a to-do list' },
+    { label: 'Link', icon: Icons.link, run: () => setDialog({ kind: 'link', initial: '' }), hint: 'Add a link (Pinterest, YouTube, any page)' },
+    { label: 'Image', icon: Icons.image, run: () => fileRef.current?.click(), hint: 'Add images (or drop / paste them on the board)' },
     ...(canNest
-      ? [{ label: 'Board', glyph: '▤', run: () => setDialog({ kind: 'board', initial: '' }) }]
+      ? [{ label: 'Board', icon: Icons.board, run: () => setDialog({ kind: 'board', initial: '' }), hint: 'Add a board inside this board' }]
       : []),
-    { label: 'Color', glyph: '●', run: () => addCard('color', serializeColorCard({ hex: DEFAULT_COLOR })) },
+    { label: 'Color', icon: Icons.color, run: () => addCard('color', serializeColorCard({ hex: DEFAULT_COLOR })), hint: 'Add a color swatch' },
   ]
 
   // ---------- drawing ----------
@@ -690,6 +858,24 @@ export default function BoardCanvas({
 
   return (
     <div style={{ position: 'relative' }}>
+      <div className={`board-layout${readOnly ? '' : ' has-rail'}`}>
+        {!readOnly && (
+          <div className="board-rail" role="toolbar" aria-label="Add to the board">
+            {tools.map((t) => (
+              <button key={t.label} type="button" className="rail-btn" onClick={t.run} disabled={busy} title={t.hint}>
+                <span className="rail-icon">{t.icon}</span>
+                <span className="rail-label">{t.label}</span>
+              </button>
+            ))}
+            <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
+            <div className="rail-spacer" />
+            <button type="button" className="rail-btn" onClick={deleteSelected} disabled={selected.size === 0} title="Delete the selected cards (or press Delete)">
+              <span className="rail-icon">{Icons.trash}</span>
+              <span className="rail-label">Trash</span>
+            </button>
+          </div>
+        )}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
       <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {!readOnly && (
           <>
@@ -702,18 +888,6 @@ export default function BoardCanvas({
         <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} style={{ padding: '4px 10px', fontSize: 11 }}>{Math.round(zoom * 100)}%</button>
         <button type="button" onClick={() => zoomButton(1.2)} style={{ padding: '4px 10px' }}>+</button>
       </div>
-
-      {!readOnly && (
-        <div className="canvas-tools">
-          {tools.map((t) => (
-            <button key={t.label} type="button" onClick={t.run} disabled={busy} title={`Add ${t.label.toLowerCase()}`} style={{ width: 54, padding: '7px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', background: 'transparent' }}>
-              <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden="true">{t.glyph}</span>
-              <span style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>{t.label === 'Image' && busy ? '...' : t.label}</span>
-            </button>
-          ))}
-          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
-        </div>
-      )}
 
       {dialog && (
         <BoardPrompt
@@ -731,17 +905,8 @@ export default function BoardCanvas({
         <div role={notice.kind === 'error' ? 'alert' : 'status'} style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 7, width: 340, maxWidth: 'calc(100% - 200px)', background: 'var(--bg-card)', border: `1px solid ${notice.kind === 'error' ? 'var(--accent-border)' : 'var(--border-strong)'}`, borderRadius: 12, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 12.5, color: notice.kind === 'error' ? 'var(--accent-text)' : 'var(--text-primary)', overflowWrap: 'anywhere' }}>{notice.text}</div>
-            {notice.kind === 'progress' ? (
-              <button type="button" onClick={() => abortRef.current?.abort()} style={{ fontSize: 12, flexShrink: 0 }}>Cancel</button>
-            ) : (
-              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" style={{ fontSize: 14, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>×</button>
-            )}
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" style={{ fontSize: 14, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>×</button>
           </div>
-          {notice.kind === 'progress' && (
-            <div className="progress-track" style={{ marginTop: 8 }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={notice.percent ?? undefined}>
-              {notice.percent == null ? <div className="progress-indeterminate" /> : <div className="progress-fill" style={{ width: `${Math.max(2, Math.min(100, notice.percent))}%` }} />}
-            </div>
-          )}
         </div>
       )}
 
@@ -753,9 +918,13 @@ export default function BoardCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg-app)', cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', overflow: 'hidden', backgroundColor: 'var(--bg-app)', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: `${22 * zoom}px ${22 * zoom}px`, backgroundPosition: `${pan.x}px ${pan.y}px`, cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
-        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
           {cards.map((card) => {
             const editing = editingId === card.id
             const isSel = selected.has(card.id)
@@ -830,7 +999,7 @@ export default function BoardCanvas({
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, padding: card.type === 'image' ? 6 : card.type === 'color' ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || (card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)) ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
                 {card.type === 'note' && (
                   <>
                     {heading}
@@ -841,16 +1010,20 @@ export default function BoardCanvas({
                     )}
                   </>
                 )}
-                {card.type === 'image' && <img src={card.content} alt="" draggable={false} style={{ width: '100%', borderRadius: 3, display: 'block' }} />}
+                {card.type === 'image' && <img src={card.content} alt="" draggable={false} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: hasBg ? 3 : 6, display: 'block' }} />}
                 {card.type === 'link' && (() => {
                   const meta = parseMeta(card.meta)
                   const showImage = !!meta.image && !brokenImages.has(card.id)
                   const pending = card.meta == null
+                  const site = siteLabel(card.content, meta.site)
+                  const quiet = VISUAL_SITES.test(linkHost(card.content)) && showImage // pictures speak for themselves
+                  const title = quiet ? '' : meta.title || ''
                   return (
                     <div style={{ color: hasBg ? ink : '#1a1a1a' }}>
                       {showImage && (
-                        <div style={{ position: 'relative', margin: '-12px -12px 10px', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
-                          <img src={meta.image} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))} style={{ display: 'block', width: '100%', maxHeight: 170, objectFit: 'cover' }} />
+                        <div style={{ position: 'relative', borderRadius: '6px 6px 0 0', overflow: 'hidden', background: '#eee' }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={sharpImage(meta.image as string)} alt="" draggable={false} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setBrokenImages((prev) => new Set(prev).add(card.id))} style={{ display: 'block', width: '100%', height: 'auto' }} />
                           {meta.kind === 'video' && (
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, paddingLeft: 3 }}>▶</div>
@@ -858,14 +1031,25 @@ export default function BoardCanvas({
                           )}
                         </div>
                       )}
-                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meta.title || hostOf(card.content)}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 11, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pending ? 'Loading preview…' : meta.site || hostOf(card.content)}</span>
-                        <a href={card.content} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'inherit', fontWeight: 600, flexShrink: 0 }}>Open ↗</a>
+                      <div style={{ padding: showImage ? '8px 10px 9px' : '2px 0 0' }}>
+                        {(title || !showImage) && (
+                          <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.3, overflowWrap: 'anywhere', marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title || hostOf(card.content)}</div>
+                        )}
+                        <div style={{ fontSize: 11, opacity: pending ? 0.6 : 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {pending ? (
+                            'Loading preview…'
+                          ) : (
+                            <>
+                              From{' '}
+                              <a href={card.content} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', textDecoration: 'none', fontWeight: 500 }}>{site}</a>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
                 })()}
+                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveTodo(card.id, text)} />}
                 {card.type === 'color' && (() => {
                   const c = parseColorCard(card.content)
                   return (
@@ -889,14 +1073,31 @@ export default function BoardCanvas({
               </div>
             )
           })}
+
+          {uploads.map((u) => (
+            <div key={u.id} data-nodrag style={{ position: 'absolute', left: u.x, top: u.y, width: WIDTH.image, minHeight: 96, borderRadius: 6, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.35)', background: 'var(--bg-card)', cursor: 'default' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u.preview} alt="" draggable={false} onError={(e) => { e.currentTarget.style.display = 'none' }} style={{ width: '100%', display: 'block', opacity: u.status === 'error' ? 0.3 : 0.5 }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 8, background: 'color-mix(in srgb, var(--bg-card) 88%, transparent)' }}>
+                <UploadBar
+                  item={u}
+                  onCancel={u.status === 'saving' ? undefined : () => { uploadCtl.current.get(u.id)?.abort(); dropUpload(u.id) }}
+                  onRetry={() => runUpload(u.id)}
+                  onDismiss={() => dropUpload(u.id)}
+                />
+              </div>
+            </div>
+          ))}
         </div>
+
+        {dropping && <div aria-hidden="true" style={{ position: 'absolute', inset: 8, border: '2px dashed var(--accent)', borderRadius: 8, background: 'rgba(255,105,41,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-text)', fontSize: 14, pointerEvents: 'none', zIndex: 5 }}>Drop images to add them to the board</div>}
 
         {marquee && <div aria-hidden="true" style={{ position: 'absolute', left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: '1px solid var(--accent)', background: 'rgba(255,105,41,0.12)', pointerEvents: 'none', zIndex: 4 }} />}
 
         {cards.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', padding: '0 2rem', pointerEvents: 'none' }}>
             <div style={{ fontFamily: SERIF, fontSize: 20, color: 'var(--text-secondary)' }}>{readOnly ? 'This board is empty.' : 'Start your board'}</div>
-            {!readOnly && <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Pick a tool on the left to add a note, a title, an image, a link or a color.</div>}
+            {!readOnly && <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Pick a tool on the left, or drop images and paste links right onto the board.</div>}
           </div>
         )}
       </div>
@@ -925,10 +1126,13 @@ export default function BoardCanvas({
         )
       })()}
 
+        </div>
+      </div>
+
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Click a note to type · drag empty space to select several cards · hold Space or use Move to pan · Shift-click adds to a selection · scroll or pinch to zoom'}
+          : 'Drop or paste images onto the board · Space + drag to move around · scroll or pinch to zoom'}
       </div>
     </div>
   )
