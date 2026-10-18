@@ -9,11 +9,13 @@ import { TEMPLATES } from './templates'
 import { safeUrl } from '@/lib/embed'
 import { getLinkPreview, metaToJson } from '@/lib/linkPreview'
 import { MAX_BOARD_DEPTH } from './constants'
-import { normalizeHex, parseColorCard, serializeColorCard } from '@/lib/boardColor'
 import { MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, styleToJson } from '@/lib/boardStyle'
 
 
-const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo']
+const CARD_TYPES = ['note', 'heading', 'image', 'link', 'color', 'board', 'todo', 'sketch', 'document', 'table', 'column', 'comment', 'audio', 'video', 'map']
+// Documents, tables and sketches hold much more than a note does.
+const BIG_TYPES = ['document', 'table', 'sketch']
+const contentLimit = (type: string) => (BIG_TYPES.includes(type) ? 50000 : 5000)
 
 // Clients can view boards but not change them.
 async function requireEdit(brandSpaceId: string) {
@@ -97,19 +99,13 @@ export async function addBoardCardAt(boardId: string, type: string, content: str
   if (!CARD_TYPES.includes(type)) throw new Error('Unknown card type.')
   if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Bad position.')
 
-  let text = String(content).slice(0, 5000)
+  let text = String(content).slice(0, contentLimit(type))
   let meta: string | null = null
   if (type === 'link') {
     const url = safeUrl(text)
     if (!url) throw new Error('That does not look like a link.')
     text = url
     meta = metaToJson(await getLinkPreview(url))
-  }
-
-  if (type === 'color') {
-    const c = parseColorCard(text)
-    if (!normalizeHex(c.hex)) throw new Error('That is not a colour code.')
-    text = serializeColorCard(c)
   }
 
   // A board tile: this creates the new board inside this one, and the tile on the canvas opens it.
@@ -167,18 +163,13 @@ export async function adoptInnerBoards(boardId: string) {
 // Returns the card's saved link preview (if it is a link), so the screen can update without a reload.
 export async function updateBoardCard(cardId: string, content: string): Promise<{ content: string; meta: string | null }> {
   const card = await cardForEdit(cardId)
-  let text = String(content).slice(0, 5000)
+  let text = String(content).slice(0, contentLimit(card.type))
   let meta: string | null = card.meta
   if (card.type === 'link') {
     const url = safeUrl(text)
     if (!url) throw new Error('That does not look like a link.')
     text = url
     meta = metaToJson(await getLinkPreview(url))
-  }
-  if (card.type === 'color') {
-    const c = parseColorCard(text)
-    if (!normalizeHex(c.hex)) throw new Error('That is not a colour code.')
-    text = serializeColorCard(c)
   }
   await db.boardCard.update({ where: { id: cardId }, data: { content: text, meta } })
   return { content: text, meta }

@@ -52,6 +52,8 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
             transition: 'opacity 0.35s ease',
             opacity: exiting ? 0 : 1,
             pointerEvents: exiting ? 'none' : 'auto',
+            // safety net: if the page's scripts never start (e.g. offline), fade away anyway instead of a blank screen
+            animation: 'splash-failsafe 0.4s ease 2s forwards',
           }}
         >
           <div className={exiting ? 'app-intro-mark-exit' : 'app-intro-mark'} style={{ width: 96, height: 96 }}>

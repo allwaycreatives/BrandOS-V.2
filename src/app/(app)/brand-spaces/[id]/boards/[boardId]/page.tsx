@@ -38,21 +38,27 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
   const boardsHref = `/brand-spaces/${params.id}/boards`
 
   return (
-    <div>
-      <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <Link href={boardsHref}>All boards</Link>
-        {trail.map((t) => (
-          <span key={t.id} style={{ display: 'contents' }}>
-            <span>›</span>
-            <Link href={`${boardsHref}/${t.id}`}>{t.name}</Link>
-          </span>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 8, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, margin: 0 }}>{board.name}</h1>
+    // Focus mode: while you work on a board, the sidebar and top bar get out of the way.
+    // The BrandOS logo is the way back home.
+    <div className="board-focus">
+      <header className="board-focus-bar">
+        <Link href="/dashboard" className="board-focus-logo" aria-label="BrandOS home" title="Back to BrandOS">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 18, display: 'block' }} />
+        </Link>
+        <nav className="board-focus-trail" aria-label="Where you are">
+          <Link href={boardsHref}>All boards</Link>
+          {trail.map((t) => (
+            <span key={t.id} style={{ display: 'contents' }}>
+              <span aria-hidden="true">›</span>
+              <Link href={`${boardsHref}/${t.id}`}>{t.name}</Link>
+            </span>
+          ))}
+          <span aria-hidden="true">›</span>
+          <strong style={{ fontFamily: SERIF }}>{board.name}</strong>
+        </nav>
         {!readOnly && <BoardActions brandSpaceId={params.id} boardId={board.id} name={board.name} shareToken={board.shareToken} />}
-      </div>
+      </header>
 
       <BoardCanvas
         boardId={board.id}

@@ -1,8 +1,15 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import UploadBar, { type UploadView } from '@/components/UploadBar'
 import TodoCard from './TodoCard'
+import ColorCard, { COLOR_PALETTE } from './ColorCard'
+import CanvasScrollbars from './CanvasScrollbars'
+import TableCard, { DEFAULT_TABLE } from './TableCard'
+import DocumentCard from './DocumentCard'
+import ColumnCard from './ColumnCard'
+import SketchCard from './SketchCard'
+import { AudioCard, MapCard, VideoCard, videoSource } from './MediaCards'
 import { Icons } from './BoardIcons'
 import { friendlyUploadError, isImageFile, uploadFile } from '@/lib/uploadFile'
 import { useRouter } from 'next/navigation'
@@ -20,8 +27,7 @@ import {
 } from '../actions'
 import BoardInspector from './BoardInspector'
 import BoardPrompt from './BoardPrompt'
-import { DEFAULT_COLOR, parseColorCard, serializeColorCard, type ColorCard } from '@/lib/boardColor'
-import { HANDLES, movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
+import { movedEnough, normalizeRect, resizeRect, selectOnDown, type Handle, type Rect } from '@/lib/boardGeometry'
 import { DEFAULT_FS, MAX_CARD_SIZE, MIN_SIZE, mergeStyle, parseStyle, readableText, styleToJson, type CardStyle } from '@/lib/boardStyle'
 
 type Card = {
@@ -47,7 +53,9 @@ type Drag =
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2.5
-const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 140, board: 200, todo: 250 }
+const WIDTH: Record<string, number> = { note: 210, heading: 320, image: 220, link: 260, color: 200, board: 200, todo: 250, sketch: 260, document: 240, table: 340, column: 280, comment: 210, audio: 280, video: 360, map: 320 }
+// These keep their proportions or follow their own content, so only their width can be dragged.
+const WIDTH_ONLY = new Set(['image', 'sketch', 'video', 'map', 'audio', 'table', 'document'])
 const SERIF = "Georgia, 'Times New Roman', serif"
 const PAPER: React.CSSProperties = {
   background: '#ffffff',
@@ -166,11 +174,18 @@ export default function BoardCanvas({
   const [spaceDown, setSpaceDown] = useState(false)
   const [marquee, setMarquee] = useState<Rect | null>(null)
   const [cursorGrab, setCursorGrab] = useState(false)
+  const [popIds, setPopIds] = useState<Set<string>>(new Set()) // cards that just appeared (they pop in)
+  const [view, setView] = useState({ w: 0, h: 0 })
+  const imageAt = useRef<{ x: number; y: number } | null>(null)
+  const audioRef = useRef<HTMLInputElement>(null)
+  const moreBtn = useRef<HTMLButtonElement>(null)
+  const [more, setMore] = useState<{ left: number; top?: number; bottom?: number } | null>(null)
   const [anchor, setAnchor] = useState<{ cx: number; top: number; bottom: number; cw: number } | null>(null)
-  const [dialog, setDialog] = useState<{ kind: 'link' | 'board' | 'rename' | 'editlink'; cardId?: string; initial: string } | null>(null)
+  // The small input box that replaces browser pop-ups, a message strip for errors, and where the bar was dragged to.
+  const [dialog, setDialog] = useState<{ kind: 'link' | 'board' | 'map' | 'video' | 'rename' | 'editlink' | 'editmap'; cardId?: string; initial: string; point?: { x: number; y: number } } | null>(null)
   const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [barPos, setBarPos] = useState<{ x: number; y: number } | null>(null)
-  const [newColorId, setNewColorId] = useState<string | null>(null)
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const selRef = useRef(selected)
   const dragRef = useRef<Drag | null>(null)
@@ -187,8 +202,6 @@ export default function BoardCanvas({
   const uploadCtl = useRef(new Map<string, AbortController>())
   const uploadedUrls = useRef(new Map<string, string>()) // so a retry after a failed "add card" does not upload again
   const caretRef = useRef<number | null>(null)
-  const noticeTimer = useRef<ReturnType<typeof setTimeout>>()
-  const colorTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   const setSelected = (next: Set<string>) => {
     selRef.current = next
@@ -196,6 +209,24 @@ export default function BoardCanvas({
   }
 
   // ---------- pointer handling ----------
+
+  // Moving a column moves everything sitting on it.
+  function withColumnContents(ids: string[]): string[] {
+    const out = new Set(ids)
+    for (const id of ids) {
+      const col = cards.find((c) => c.id === id)
+      if (!col || col.type !== 'column') continue
+      const cw = col.width ?? WIDTH.column
+      const ch = col.height ?? 360
+      for (const c of cards) {
+        if (c.id === id || c.type === 'column') continue
+        const cx = c.positionX + (c.width ?? WIDTH[c.type] ?? 210) / 2
+        const cy = c.positionY + 40
+        if (cx >= col.positionX && cx <= col.positionX + cw && cy >= col.positionY && cy <= col.positionY + ch) out.add(c.id)
+      }
+    }
+    return Array.from(out)
+  }
 
   function handlePointerDown(e: React.PointerEvent) {
     const target = e.target as HTMLElement
@@ -237,12 +268,13 @@ export default function BoardCanvas({
       const additive = e.shiftKey || e.ctrlKey || e.metaKey || multi
       const sel = selectOnDown(selRef.current, id, additive)
       setSelected(sel.next)
+      const dragIds = withColumnContents(sel.dragIds)
       const origin = new Map<string, { x: number; y: number }>()
-      for (const cid of sel.dragIds) {
+      for (const cid of dragIds) {
         const c = cards.find((x) => x.id === cid)
         if (c) origin.set(cid, { x: c.positionX, y: c.positionY })
       }
-      dragRef.current = { kind: 'cards', ids: sel.dragIds, startX: e.clientX, startY: e.clientY, origin, dx: 0, dy: 0, moved: false, clickedId: id, additive, onUp: sel.onUp }
+      dragRef.current = { kind: 'cards', ids: dragIds, startX: e.clientX, startY: e.clientY, origin, dx: 0, dy: 0, moved: false, clickedId: id, additive, onUp: sel.onUp }
       el.setPointerCapture?.(e.pointerId)
       return
     }
@@ -299,10 +331,10 @@ export default function BoardCanvas({
       const card = cards.find((c) => c.id === drag.id)
       if (!card) return
       const min = MIN_SIZE[card.type] ?? { w: 60, h: 40 }
-      const r = resizeRect(drag.start, drag.handle, (e.clientX - drag.startX) / zoom, (e.clientY - drag.startY) / zoom, min, MAX_CARD_SIZE, card.type === 'image')
+      const r = resizeRect(drag.start, drag.handle, (e.clientX - drag.startX) / zoom, (e.clientY - drag.startY) / zoom, min, MAX_CARD_SIZE, WIDTH_ONLY.has(card.type))
       drag.last = r
       const vertical = drag.handle.includes('n') || drag.handle.includes('s')
-      const setHeight = card.type !== 'image' && (vertical || drag.hadHeight)
+      const setHeight = !WIDTH_ONLY.has(card.type) && (vertical || drag.hadHeight)
       setCards((prev) => prev.map((c) => (c.id === drag.id ? { ...c, positionX: r.x, positionY: r.y, width: r.w, height: setHeight ? r.h : null } : c)))
       return
     }
@@ -357,7 +389,7 @@ export default function BoardCanvas({
         }
         // A plain click (not a drag, not an add-to-selection click) on a note or a title: just start typing.
         const clicked = cardsRef.current.find((c) => c.id === drag.clickedId)
-        if (!drag.additive && clicked && (clicked.type === 'note' || clicked.type === 'heading')) {
+        if (!drag.additive && clicked && (clicked.type === 'note' || clicked.type === 'heading' || clicked.type === 'comment')) {
           caretRef.current = caretOffsetAt(e.clientX, e.clientY, containerRef.current?.querySelector<HTMLElement>(`[data-card-id="${clicked.id}"]`) ?? null)
           setEditingId(clicked.id)
         }
@@ -366,7 +398,7 @@ export default function BoardCanvas({
       const card = cards.find((c) => c.id === drag.id)
       const r = drag.last
       const vertical = drag.handle.includes('n') || drag.handle.includes('s')
-      const keepHeight = card && card.type !== 'image' && (vertical || drag.hadHeight)
+      const keepHeight = card && !WIDTH_ONLY.has(card.type) && (vertical || drag.hadHeight)
       if (card) resizeBoardCard(boardId, drag.id, { x: r.x, y: r.y, w: r.w, h: keepHeight ? r.h : null }).catch(() => {})
     } else if (drag.kind === 'marquee') {
       setMarquee(null)
@@ -390,7 +422,19 @@ export default function BoardCanvas({
 
   // A native listener is needed so zooming doesn't also scroll the page.
   const wheelRef = useRef<(e: WheelEvent) => void>()
-  wheelRef.current = (e) => zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.08 : 1 / 1.08)
+  wheelRef.current = (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + scroll, and a pinch on a trackpad (which arrives as Ctrl + scroll)
+      const d = Math.max(-30, Math.min(30, e.deltaY))
+      zoomAt(e.clientX, e.clientY, Math.exp(-d * 0.006))
+      return
+    }
+    const unit = e.deltaMode === 1 ? 16 : 1
+    const sideways = e.shiftKey && e.deltaX === 0
+    const dx = (sideways ? e.deltaY : e.deltaX) * unit
+    const dy = (sideways ? 0 : e.deltaY) * unit
+    setPan((p) => ({ x: p.x - dx, y: p.y - dy }))
+  }
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -401,6 +445,29 @@ export default function BoardCanvas({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setView((v) => (v.w === el.clientWidth && v.h === el.clientHeight ? v : { w: el.clientWidth, h: el.clientHeight }))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // The area the scrollbars cover: everything on the board.
+  const bounds = useMemo(() => {
+    if (cards.length === 0) return null
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const c of cards) {
+      minX = Math.min(minX, c.positionX)
+      minY = Math.min(minY, c.positionY)
+      maxX = Math.max(maxX, c.positionX + (c.width ?? WIDTH[c.type] ?? 210))
+      maxY = Math.max(maxY, c.positionY + (c.height ?? 160))
+    }
+    return { minX, minY, maxX, maxY }
+  }, [cards])
 
   function zoomButton(factor: number) {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -472,23 +539,13 @@ export default function BoardCanvas({
     }
     const next = { cx: Math.round((l + r) / 2 - box.left), top: Math.round(t - box.top), bottom: Math.round(b - box.top), cw: Math.round(box.width) }
     setAnchor((a) => (a && a.cx === next.cx && a.top === next.top && a.bottom === next.bottom && a.cw === next.cw ? a : next))
-  }, [selected, cards, pan, zoom, editingId, readOnly])
+  }, [selected, cards, pan, zoom, editingId, readOnly, popIds])
 
   useEffect(() => {
-    if (newColorId && !(selected.size === 1 && selected.has(newColorId))) setNewColorId(null)
-  }, [selected, newColorId])
-
-  // Leaving the board: save any colour change that was still waiting for its half-second.
-  useEffect(() => {
-    const timers = colorTimers.current
-    return () => {
-      timers.forEach((t, id) => {
-        clearTimeout(t)
-        const latest = cardsRef.current.find((c) => c.id === id)
-        if (latest) updateBoardCard(id, latest.content).catch(() => {})
-      })
-    }
-  }, [])
+    if (!editingId) return
+    const c = cardsRef.current.find((x) => x.id === editingId)
+    if (c && c.type === 'sketch' && !selected.has(editingId)) setEditingId(null)
+  }, [selected, editingId])
 
   const growBox = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
@@ -548,7 +605,7 @@ export default function BoardCanvas({
 
   // ---------- adding, editing, styling, deleting ----------
 
-  // A message on the board (instead of a browser alert box). Errors fade after a few seconds; progress stays until it is done.
+  // A message on the board (instead of a browser alert box). It fades after a few seconds.
   function notify(text: string, kind: 'error' | 'info' = 'error') {
     setNotice({ kind, text })
     clearTimeout(noticeTimer.current)
@@ -566,15 +623,79 @@ export default function BoardCanvas({
     try {
       const { inner: innerInfo, ...created } = await addBoardCardAt(boardId, type, content, x, y)
       setCards((prev) => [...prev, created])
+      setPopIds((prev) => new Set(prev).add(created.id))
+      setTimeout(() => setPopIds((prev) => { const n = new Set(prev); n.delete(created.id); return n }), 600)
       setSelected(new Set([created.id]))
       if (innerInfo) setInner((prev) => ({ ...prev, [innerInfo.id]: innerInfo }))
-      if (type === 'note' || type === 'heading') setEditingId(created.id)
-      if (type === 'color') setNewColorId(created.id)
+      if (type === 'note' || type === 'heading' || type === 'comment' || type === 'sketch' || type === 'document') setEditingId(created.id)
       return { ok: true }
     } catch (err) {
-      const message = err instanceof Error && /levels deep|name|link|colour/.test(err.message) ? err.message : 'Could not add that card. Please try again.'
+      const message = err instanceof Error && /levels deep|name|link/.test(err.message) ? err.message : 'Could not add that card. Please try again.'
       if (!quiet) notify(message)
       return { ok: false, message }
+    }
+  }
+
+  // Every tool in the sidebar, whether it was clicked (lands in the middle of your view) or dragged
+  // onto the board (lands where you let go).
+  async function runTool(key: string, point?: { x: number; y: number }) {
+    const at = (type: string) => (point ? { x: point.x - (WIDTH[type] ?? 210) / 2, y: point.y - 30 } : undefined)
+    if (key === 'note') return void addCard('note', '', false, at('note'))
+    if (key === 'title') return void addCard('heading', '', false, at('heading'))
+    if (key === 'todo') return void addCard('todo', '', false, at('todo'))
+    if (key === 'color') return void addCard('color', COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)], false, at('color'))
+    if (key === 'image') {
+      imageAt.current = point ?? null
+      fileRef.current?.click()
+      return
+    }
+    if (key === 'link') return void setDialog({ kind: 'link', initial: '', point })
+    if (key === 'board') return void setDialog({ kind: 'board', initial: '', point })
+    if (key === 'sketch') return void addCard('sketch', '', false, at('sketch'))
+    if (key === 'document') return void addCard('document', '', false, at('document'))
+    if (key === 'table') return void addCard('table', DEFAULT_TABLE, false, at('table'))
+    if (key === 'column') return void addCard('column', '', false, at('column'))
+    if (key === 'comment') return void addCard('comment', '', false, at('comment'))
+    if (key === 'audio') {
+      imageAt.current = point ?? null
+      audioRef.current?.click()
+      return
+    }
+    if (key === 'map') return void setDialog({ kind: 'map', initial: '', point })
+    if (key === 'video') return void setDialog({ kind: 'video', initial: '', point })
+  }
+
+  // What the little box does with what you typed.
+  async function submitDialog(value: string) {
+    const d = dialog
+    setDialog(null)
+    if (!d) return
+    const card = d.cardId ? cardsRef.current.find((c) => c.id === d.cardId) : undefined
+    const at = (type: string) => (d.point ? { x: d.point.x - (WIDTH[type] ?? 210) / 2, y: d.point.y - 30 } : undefined)
+    const url = /^https?:\/\//i.test(value) ? value : `https://${value}`
+    if (d.kind === 'link') {
+      setBusy(true)
+      try {
+        await addCard('link', url, false, at('link'))
+      } finally {
+        setBusy(false)
+      }
+    } else if (d.kind === 'board') {
+      await addCard('board', value, false, at('board'))
+    } else if (d.kind === 'map') {
+      await addCard('map', value, false, at('map'))
+    } else if (d.kind === 'video') {
+      // Links we cannot play here (TikTok, Instagram…) still make a good card: a picture that opens the video.
+      const type = videoSource(url) ? 'video' : 'link'
+      await addCard(type, url, false, at(type))
+    } else if (d.kind === 'editlink') {
+      if (card) commitEdit(card, url)
+    } else if (d.kind === 'editmap') {
+      if (card) saveContent(card.id, value)
+    } else if (d.kind === 'rename' && card) {
+      if (value === (inner[card.content]?.name ?? '')) return
+      setInner((prev) => ({ ...prev, [card.content]: { ...(prev[card.content] as Inner), name: value } }))
+      renameBoardTile(card.id, value).catch(() => notify('Could not rename that board. Please try again.'))
     }
   }
 
@@ -620,8 +741,9 @@ export default function BoardCanvas({
         uploadedUrls.current.set(id, url)
       }
       patchUpload(id, { status: 'saving', percent: 100, error: undefined })
-      await preload(url)
-      const saved = await addCard('image', url, true, { x: spot.x, y: spot.y })
+      const kind = file.type.startsWith('audio/') ? 'audio' : file.type.startsWith('video/') ? 'video' : 'image'
+      if (kind === 'image') await preload(url)
+      const saved = await addCard(kind, kind === 'image' ? url : `${url}\n${file.name}`, true, { x: spot.x, y: spot.y })
       if (!saved.ok) {
         patchUpload(id, { status: 'error', error: `Uploaded, but could not add it to the board. ${saved.message ?? ''}`.trim() })
         return
@@ -636,7 +758,7 @@ export default function BoardCanvas({
   // Images dropped, pasted or picked land right where you are looking (or where you dropped them),
   // show up immediately as a faded preview, and fill in as they upload.
   function startUploads(rawFiles: File[], drop?: { x: number; y: number }) {
-    const files = rawFiles.filter(isImageFile).slice(0, 12)
+    const files = rawFiles.filter((f) => isImageFile(f) || /^(audio|video)\//.test(f.type)).slice(0, 12)
     if (!files.length) return
     const w = WIDTH.image
     const rect = containerRef.current?.getBoundingClientRect()
@@ -675,7 +797,9 @@ export default function BoardCanvas({
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    startUploads(files)
+    const where = imageAt.current ?? undefined
+    imageAt.current = null
+    startUploads(files, where)
   }
 
   // Paste a copied image or screenshot (Ctrl/Cmd+V) anywhere on the page, unless you are typing in a field.
@@ -694,6 +818,7 @@ export default function BoardCanvas({
   }, [readOnly])
 
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  const hasTool = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('application/x-brandos-tool')
   function onDragEnter(e: React.DragEvent) {
     if (readOnly || !hasFiles(e)) return
     e.preventDefault()
@@ -701,7 +826,7 @@ export default function BoardCanvas({
     setDropping(true)
   }
   function onDragOver(e: React.DragEvent) {
-    if (readOnly || !hasFiles(e)) return
+    if (readOnly || !(hasFiles(e) || hasTool(e))) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
   }
@@ -711,17 +836,24 @@ export default function BoardCanvas({
     if (dragDepth.current === 0) setDropping(false)
   }
   function onDrop(e: React.DragEvent) {
-    if (readOnly || !hasFiles(e)) return
+    if (readOnly) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const point = { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom }
+    if (hasTool(e)) {
+      e.preventDefault()
+      void runTool(e.dataTransfer.getData('application/x-brandos-tool'), point)
+      return
+    }
+    if (!hasFiles(e)) return
     e.preventDefault()
     dragDepth.current = 0
     setDropping(false)
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    startUploads(Array.from(e.dataTransfer.files), { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom })
+    startUploads(Array.from(e.dataTransfer.files), point)
   }
 
-  // Checklists save as you type; no need to rebuild the card, the list keeps its own state.
-  function saveTodo(id: string, text: string) {
+  // Checklists and color cards save as you type; the card keeps its own state.
+  function saveContent(id: string, text: string) {
     setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: text } : c)))
     updateBoardCard(id, text).catch(() => {})
   }
@@ -769,50 +901,6 @@ export default function BoardCanvas({
   }
   const idsHas = (ids: string[], id: string) => ids.includes(id)
 
-  // What the little input box does when you press Enter.
-  async function submitDialog(value: string) {
-    const d = dialog
-    setDialog(null)
-    if (!d) return
-    const card = d.cardId ? cardsRef.current.find((c) => c.id === d.cardId) : undefined
-    if (d.kind === 'link') {
-      setBusy(true)
-      try {
-        await addCard('link', /^https?:\/\//i.test(value) ? value : `https://${value}`)
-      } finally {
-        setBusy(false)
-      }
-    } else if (d.kind === 'editlink') {
-      if (card) commitEdit(card, /^https?:\/\//i.test(value) ? value : `https://${value}`)
-    } else if (d.kind === 'board') {
-      await addCard('board', value)
-    } else if (d.kind === 'rename' && card) {
-      if (value === (inner[card.content]?.name ?? '')) return
-      setInner((prev) => ({ ...prev, [card.content]: { ...(prev[card.content] as Inner), name: value } }))
-      renameBoardTile(card.id, value).catch(() => notify('Could not rename that board. Please try again.'))
-    }
-  }
-
-  // Colour cards: the colour, plus an optional name, type and use. Saved a moment after typing stops.
-  function applyColor(patch: Partial<ColorCard>) {
-    const id = selRef.current.size === 1 ? Array.from(selRef.current)[0] : null
-    const target = id ? cardsRef.current.find((c) => c.id === id) : undefined
-    if (!id || !target || target.type !== 'color') return
-    const next = serializeColorCard({ ...parseColorCard(target.content), ...patch })
-    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, content: next } : c)))
-    const timers = colorTimers.current
-    const pending = timers.get(id)
-    if (pending) clearTimeout(pending)
-    timers.set(
-      id,
-      setTimeout(() => {
-        timers.delete(id)
-        const latest = cardsRef.current.find((c) => c.id === id)
-        if (latest) updateBoardCard(id, latest.content).catch(() => notify('Could not save that colour. Please try again.'))
-      }, 500)
-    )
-  }
-
   function openBoard(card: Card) {
     if (brandSpaceId) router.push(`/brand-spaces/${brandSpaceId}/boards/${card.content}`)
   }
@@ -823,23 +911,73 @@ export default function BoardCanvas({
 
   function startEdit(card: Card) {
     if (card.type === 'board') return openBoard(card)
+    if (card.type === 'document') return setEditingId(card.id) // people with view-only access can read documents too
     if (readOnly) return
-    if (card.type === 'note' || card.type === 'heading') return setEditingId(card.id)
+    if (card.type === 'note' || card.type === 'heading' || card.type === 'comment' || card.type === 'sketch') return setEditingId(card.id)
+    if (card.type === 'map') return setDialog({ kind: 'editmap', cardId: card.id, initial: card.content })
     if (card.type === 'link') setDialog({ kind: 'editlink', cardId: card.id, initial: card.content })
-    // A colour card is edited in the bar above it, so there is nothing to open here.
   }
 
-  const tools: { label: string; icon: React.ReactNode; run: () => void; hint: string }[] = [
-    { label: 'Note', icon: Icons.note, run: () => addCard('note', ''), hint: 'Add a note' },
-    { label: 'Title', icon: Icons.title, run: () => addCard('heading', ''), hint: 'Add a title' },
-    { label: 'To-do', icon: Icons.todo, run: () => addCard('todo', ''), hint: 'Add a to-do list' },
-    { label: 'Link', icon: Icons.link, run: () => setDialog({ kind: 'link', initial: '' }), hint: 'Add a link (Pinterest, YouTube, any page)' },
-    { label: 'Image', icon: Icons.image, run: () => fileRef.current?.click(), hint: 'Add images (or drop / paste them on the board)' },
-    ...(canNest
-      ? [{ label: 'Board', icon: Icons.board, run: () => setDialog({ kind: 'board', initial: '' }), hint: 'Add a board inside this board' }]
-      : []),
-    { label: 'Color', icon: Icons.color, run: () => addCard('color', serializeColorCard({ hex: DEFAULT_COLOR })), hint: 'Add a color swatch' },
+  type Tool = { key: string; label: string; icon: React.ReactNode; hint: string }
+  const mainTools: Tool[] = [
+    { key: 'note', label: 'Note', icon: Icons.note, hint: 'Add a note (or drag it onto the board)' },
+    { key: 'link', label: 'Link', icon: Icons.link, hint: 'Add a link: Pinterest, YouTube, any page' },
+    { key: 'todo', label: 'To-do', icon: Icons.todo, hint: 'Add a to-do list (or drag it onto the board)' },
+    ...(canNest ? [{ key: 'board', label: 'Board', icon: Icons.board, hint: 'Add a board inside this board' }] : []),
   ]
+  const moreTools: Tool[] = [
+    { key: 'sketch', label: 'Sketch', icon: Icons.sketch, hint: 'Draw a quick sketch' },
+    { key: 'color', label: 'Color', icon: Icons.color, hint: 'Add a color swatch' },
+    { key: 'document', label: 'Document', icon: Icons.document, hint: 'Write a longer page' },
+    { key: 'audio', label: 'Audio', icon: Icons.audio, hint: 'Add an audio file' },
+    { key: 'map', label: 'Map', icon: Icons.map, hint: 'Pin a place on a map' },
+    { key: 'video', label: 'Video', icon: Icons.video, hint: 'Add a YouTube / Vimeo link or video file' },
+    { key: 'title', label: 'Heading', icon: Icons.title, hint: 'Add a big title' },
+    { key: 'table', label: 'Table', icon: Icons.table, hint: 'Add a table' },
+    { key: 'comment', label: 'Comment', icon: Icons.comment, hint: 'Add a comment bubble' },
+    { key: 'column', label: 'Column', icon: Icons.column, hint: 'Add a column to group cards' },
+  ]
+  const imageTool: Tool = { key: 'image', label: 'Image', icon: Icons.image, hint: 'Add images (or drop / paste them on the board)' }
+
+  function startToolDrag(e: React.DragEvent, t: Tool) {
+    e.dataTransfer.setData('application/x-brandos-tool', t.key)
+    e.dataTransfer.setData('text/plain', t.label)
+    e.dataTransfer.effectAllowed = 'copy'
+    setTimeout(() => setMore(null), 0) // close the menu once the drag has started
+  }
+
+  function toggleMore() {
+    if (more) return setMore(null)
+    const r = moreBtn.current?.getBoundingClientRect()
+    if (!r) return
+    if (window.innerWidth <= 760) setMore({ left: Math.max(8, Math.min(r.left, window.innerWidth - 292)), bottom: window.innerHeight - r.top + 8 })
+    else setMore({ left: r.right + 8, top: Math.max(8, Math.min(r.top - 8, window.innerHeight - 300)) })
+  }
+
+  useEffect(() => {
+    if (!more) return
+    const close = (e: Event) => {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('.rail-more') || t?.closest('[data-more-button]')) return
+      setMore(null)
+    }
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setMore(null)
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', key)
+    }
+  }, [more])
+
+  const railButton = (t: Tool) => (
+    <div key={t.key} draggable onDragStart={(e) => startToolDrag(e, t)}>
+      <button type="button" className="rail-btn" onClick={() => runTool(t.key)} disabled={busy} title={t.hint}>
+        <span className="rail-icon">{t.icon}</span>
+        <span className="rail-label">{t.label}</span>
+      </button>
+    </div>
+  )
 
   // ---------- drawing ----------
 
@@ -857,17 +995,52 @@ export default function BoardCanvas({
   })
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="board-root" style={{ position: 'relative' }}>
+      {dialog && (
+        <BoardPrompt
+          key={`${dialog.kind}-${dialog.cardId ?? ''}`}
+          title={{ link: 'Paste a link', board: 'Name this board', map: 'Search a place or address', video: 'Paste a video link', rename: 'Rename this board', editlink: 'Edit link', editmap: 'Search a place or address' }[dialog.kind]}
+          placeholder={{ link: 'https://…', board: 'For example: Inspirations', map: 'Like Windhoek, Namibia', video: 'YouTube, Vimeo, or a video file link', rename: 'Board name', editlink: 'https://…', editmap: 'Like Windhoek, Namibia' }[dialog.kind]}
+          initial={dialog.initial}
+          submitLabel={{ link: 'Add', board: 'Create', map: 'Add', video: 'Add', rename: 'Save', editlink: 'Save', editmap: 'Save' }[dialog.kind]}
+          onSubmit={submitDialog}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+
+      {notice && (
+        <div role={notice.kind === 'error' ? 'alert' : 'status'} style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20, width: 340, maxWidth: 'calc(100% - 200px)', background: 'var(--bg-card)', border: `1px solid ${notice.kind === 'error' ? 'var(--accent-border)' : 'var(--border-strong)'}`, borderRadius: 12, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12.5, color: notice.kind === 'error' ? 'var(--accent-text)' : 'var(--text-primary)', overflowWrap: 'anywhere' }}>{notice.text}</div>
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" style={{ fontSize: 14, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>×</button>
+          </div>
+        </div>
+      )}
+
       <div className={`board-layout${readOnly ? '' : ' has-rail'}`}>
         {!readOnly && (
           <div className="board-rail" role="toolbar" aria-label="Add to the board">
-            {tools.map((t) => (
-              <button key={t.label} type="button" className="rail-btn" onClick={t.run} disabled={busy} title={t.hint}>
-                <span className="rail-icon">{t.icon}</span>
-                <span className="rail-label">{t.label}</span>
-              </button>
-            ))}
+            {mainTools.map(railButton)}
+            <button ref={moreBtn} type="button" data-more-button className="rail-btn" onClick={toggleMore} aria-haspopup="menu" aria-expanded={!!more} title="More cards: sketch, color, document, audio, map, video, table…">
+              <span className="rail-icon">{Icons.more}</span>
+              <span className="rail-label">More</span>
+            </button>
+            <div className="rail-sep" />
+            {railButton(imageTool)}
+            <input ref={audioRef} type="file" accept="audio/*" multiple onChange={handleFile} style={{ display: 'none' }} />
             <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFile} style={{ display: 'none' }} />
+            {more && (
+              <div className="rail-more" role="menu" style={{ left: more.left, top: more.top, bottom: more.bottom }}>
+                {moreTools.map((t) => (
+                  <div key={t.key} draggable onDragStart={(e) => startToolDrag(e, t)}>
+                    <button type="button" role="menuitem" className="rail-btn" title={t.hint} onClick={() => { setMore(null); void runTool(t.key) }}>
+                      <span className="rail-icon">{t.icon}</span>
+                      <span className="rail-label">{t.label}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="rail-spacer" />
             <button type="button" className="rail-btn" onClick={deleteSelected} disabled={selected.size === 0} title="Delete the selected cards (or press Delete)">
               <span className="rail-icon">{Icons.trash}</span>
@@ -889,27 +1062,6 @@ export default function BoardCanvas({
         <button type="button" onClick={() => zoomButton(1.2)} style={{ padding: '4px 10px' }}>+</button>
       </div>
 
-      {dialog && (
-        <BoardPrompt
-          key={`${dialog.kind}-${dialog.cardId ?? ''}`}
-          title={{ link: 'Paste a link', board: 'Name this board', rename: 'Rename this board', editlink: 'Edit link' }[dialog.kind]}
-          placeholder={{ link: 'https://…', board: 'For example: Inspirations', rename: 'Board name', editlink: 'https://…' }[dialog.kind]}
-          initial={dialog.initial}
-          submitLabel={{ link: 'Add', board: 'Create', rename: 'Save', editlink: 'Save' }[dialog.kind]}
-          onSubmit={submitDialog}
-          onCancel={() => setDialog(null)}
-        />
-      )}
-
-      {notice && (
-        <div role={notice.kind === 'error' ? 'alert' : 'status'} style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 7, width: 340, maxWidth: 'calc(100% - 200px)', background: 'var(--bg-card)', border: `1px solid ${notice.kind === 'error' ? 'var(--accent-border)' : 'var(--border-strong)'}`, borderRadius: 12, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 12.5, color: notice.kind === 'error' ? 'var(--accent-text)' : 'var(--text-primary)', overflowWrap: 'anywhere' }}>{notice.text}</div>
-            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" style={{ fontSize: 14, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>×</button>
-          </div>
-        </div>
-      )}
-
       <div
         ref={containerRef}
         className="canvas-box"
@@ -925,7 +1077,7 @@ export default function BoardCanvas({
         style={{ position: 'relative', width: '100%', border: '1px solid var(--border)', overflow: 'hidden', backgroundColor: 'var(--bg-app)', backgroundImage: 'radial-gradient(circle, var(--canvas-dot) 1px, transparent 1px)', backgroundSize: `${22 * zoom}px ${22 * zoom}px`, backgroundPosition: `${pan.x}px ${pan.y}px`, cursor: readOnly || panning || cursorGrab ? (cursorGrab ? 'grabbing' : 'grab') : marquee ? 'crosshair' : 'default', touchAction: 'none', userSelect: 'none' }}
       >
         <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
-          {cards.map((card) => {
+          {[...cards].sort((a, b) => Number(b.type === 'column') - Number(a.type === 'column')).map((card) => {
             const editing = editingId === card.id
             const isSel = selected.has(card.id)
             const st: CardStyle = parseStyle(card.style)
@@ -948,12 +1100,22 @@ export default function BoardCanvas({
               borderRadius: 6,
             }
             const paper: React.CSSProperties = { ...PAPER, ...(hasBg ? { background: st.bg } : {}) }
+            const frame: React.CSSProperties =
+              card.type === 'column'
+                ? { background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)', boxShadow: 'none' }
+                : card.type === 'comment' && !hasBg
+                  ? { background: '#e9f1ff', borderLeft: '3px solid #5b8def' }
+                  : {}
+            const linkFull = card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)
+            const pad = card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || card.type === 'column' || linkFull ? 0 : card.type === 'video' || card.type === 'map' ? 6 : card.type === 'table' || card.type === 'sketch' ? 8 : 12
+            const interactive = readOnly || (isSel && selected.size === 1)
+            const gs = 22 / zoom // the grip stays the same size on screen however far you zoom
             const handles =
-              isSel && !readOnly && selected.size === 1
-                ? HANDLES.filter((h) => !(card.type === 'image' && (h === 'n' || h === 's'))).map((h) => (
-                    <div key={h} data-handle={h} style={{ position: 'absolute', left: HANDLE_POS[h].l, top: HANDLE_POS[h].t, width: hs, height: hs, marginLeft: -hs / 2, marginTop: -hs / 2, background: '#ffffff', border: `${1.5 / zoom}px solid var(--accent)`, borderRadius: 2, cursor: CURSOR[h], zIndex: 3 }} />
-                  ))
-                : null
+              isSel && !readOnly && selected.size === 1 ? (
+                <div data-handle="se" title="Drag to resize" style={{ position: 'absolute', right: 4 / zoom, bottom: 4 / zoom, width: gs, height: gs, borderRadius: 6 / zoom, background: 'rgba(20,20,20,0.72)', color: '#fff', cursor: CURSOR.se, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 12 12" width="60%" height="60%" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ pointerEvents: 'none' }}><path d="M10 3L3 10M10 6.5L6.5 10M10 9.5L9.5 10" /></svg>
+                </div>
+              ) : null
             const heading = (
               <>
                 {st.title && <div style={{ ...text, fontSize: fs * 1.2, fontWeight: 700, marginBottom: 2, overflowWrap: 'anywhere' }}>{st.title}</div>}
@@ -964,7 +1126,7 @@ export default function BoardCanvas({
             if (isHeading) {
               const box: React.CSSProperties = hasBg ? { ...paper, padding: '8px 12px', height: '100%', boxSizing: 'border-box' } : { height: '100%' }
               return (
-                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
+                <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={common}>
                   <div style={{ ...box, overflow: card.height ? 'hidden' : undefined }}>
                     {editing ? (
                       <textarea ref={editRef(!!card.height)} defaultValue={card.content} rows={1} onBlur={(e) => commitEdit(card, e.target.value)} onInput={(e) => !card.height && growBox(e.currentTarget)} onKeyDown={editKeys(true)} aria-label="Title text" style={{ ...text, display: 'block', width: '100%', height: card.height ? '100%' : undefined, fontFamily: SERIF, lineHeight: 1.25, padding: 0, margin: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none', overflow: card.height ? 'auto' : 'hidden', userSelect: 'text' }} />
@@ -973,7 +1135,14 @@ export default function BoardCanvas({
                     )}
                     {st.subtitle && !editing && <div style={{ ...text, fontSize: fs * 0.6, fontWeight: 400, opacity: 0.7, marginTop: 4, overflowWrap: 'anywhere' }}>{st.subtitle}</div>}
                   </div>
-                  {handles}
+                  {card.type === 'table' && <TableCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'document' && <DocumentCard key={card.id} content={card.content} readOnly={readOnly} open={editing} onOpen={() => setEditingId(card.id)} onClose={() => setEditingId(null)} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'sketch' && <SketchCard key={card.id} content={card.content} editing={editing} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} onDone={() => setEditingId(null)} />}
+                {card.type === 'column' && <ColumnCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'audio' && <AudioCard content={card.content} interactive={interactive} />}
+                {card.type === 'video' && <VideoCard content={card.content} interactive={interactive} />}
+                {card.type === 'map' && <MapCard content={card.content} interactive={interactive} />}
+                {handles}
                 </div>
               )
             }
@@ -981,7 +1150,7 @@ export default function BoardCanvas({
             if (card.type === 'board') {
               const info = inner[card.content]
               return (
-                <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, display: 'flex', flexDirection: 'column' }}>
+                <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...PAPER, padding: 0, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: 46, flexShrink: 0, borderRadius: '6px 6px 0 0', background: '#f1ece2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#8a7a5c' }} aria-hidden="true">▤</div>
                   <div style={{ padding: '10px 12px 12px', overflow: 'hidden' }}>
                     <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{info?.name ?? 'Board'}</div>
@@ -999,8 +1168,8 @@ export default function BoardCanvas({
             }
 
             return (
-              <div key={card.id} data-card data-card-id={card.id} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: card.type === 'image' ? (hasBg ? 6 : 0) : card.type === 'color' || (card.type === 'link' && !!parseMeta(card.meta).image && !brokenImages.has(card.id)) ? 0 : 12, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
-                {card.type === 'note' && (
+              <div key={card.id} data-card data-card-id={card.id} className={popIds.has(card.id) ? 'card-pop' : undefined} data-selected={isSel || undefined} onDoubleClick={() => startEdit(card)} style={{ ...common, ...paper, ...frame, ...(card.type === 'image' && !hasBg ? IMAGE_FRAME : {}), padding: pad, minHeight: card.type === 'column' && !card.height ? 360 : undefined, overflow: card.type === 'color' || card.height ? 'hidden' : undefined, boxSizing: 'border-box', display: card.type === 'color' ? 'flex' : undefined, flexDirection: card.type === 'color' ? 'column' : undefined }}>
+                {(card.type === 'note' || card.type === 'comment') && (
                   <>
                     {heading}
                     {editing ? (
@@ -1049,26 +1218,8 @@ export default function BoardCanvas({
                     </div>
                   )
                 })()}
-                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveTodo(card.id, text)} />}
-                {card.type === 'color' && (() => {
-                  const c = parseColorCard(card.content)
-                  return (
-                    <>
-                      <div style={{ height: card.height ? undefined : 64, flex: card.height ? 1 : undefined, minHeight: 30, background: c.hex || '#888888' }} />
-                      <div style={{ padding: '8px 10px' }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{c.hex ? c.hex.toUpperCase() : 'No colour yet'}</div>
-                        {c.more && (
-                          <>
-                            {c.name && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, overflowWrap: 'anywhere' }}>{c.name}</div>}
-                            {c.type && <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#666', marginTop: 2 }}>{c.type}</div>}
-                            {c.use && <div style={{ fontSize: 11.5, color: '#555', marginTop: 4, overflowWrap: 'anywhere' }}>{c.use}</div>}
-                            {!c.name && !c.type && !c.use && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Add details in the bar above</div>}
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )
-                })()}
+                {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'color' && <ColorCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} autoFocus={popIds.has(card.id)} onChange={(text) => saveContent(card.id, text)} />}
                 {handles}
               </div>
             )
@@ -1089,6 +1240,8 @@ export default function BoardCanvas({
             </div>
           ))}
         </div>
+
+        <CanvasScrollbars bounds={bounds} pan={pan} zoom={zoom} view={view} onPan={setPan} />
 
         {dropping && <div aria-hidden="true" style={{ position: 'absolute', inset: 8, border: '2px dashed var(--accent)', borderRadius: 8, background: 'rgba(255,105,41,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-text)', fontSize: 14, pointerEvents: 'none', zIndex: 5 }}>Drop images to add them to the board</div>}
 
@@ -1119,9 +1272,6 @@ export default function BoardCanvas({
             manual={barPos}
             onMove={(x, y) => setBarPos({ x, y })}
             onReset={() => setBarPos(null)}
-            colorCard={single && single.type === 'color' ? parseColorCard(single.content) : null}
-            onColor={applyColor}
-            autoFocusHex={!!single && single.id === newColorId}
           />
         )
       })()}
@@ -1129,10 +1279,10 @@ export default function BoardCanvas({
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
+      <div className="board-hint" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
         {readOnly
           ? 'Scroll or pinch to zoom · drag to move around'
-          : 'Drop or paste images onto the board · Space + drag to move around · scroll or pinch to zoom'}
+          : 'Drop or paste images onto the board · scroll to move around · Ctrl + scroll to zoom'}
       </div>
     </div>
   )
