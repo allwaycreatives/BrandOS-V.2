@@ -572,6 +572,7 @@ export default function BoardCanvas({
     const onDown = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null
       if (typingIn(e.target)) return
+      if (document.querySelector('[data-page-overlay]')) return // a page is open: its keys are its own
       if (e.code === 'Space' && !(el && (el.tagName === 'BUTTON' || el.tagName === 'A'))) {
         e.preventDefault()
         setSpaceDown(true)
@@ -1035,6 +1036,7 @@ export default function BoardCanvas({
   useEffect(() => {
     if (readOnly) return
     function onPaste(e: ClipboardEvent) {
+      if (document.querySelector('[data-page-overlay]')) return // a page is open: pasting belongs to the page
       const t = e.target as HTMLElement | null
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
       const files = Array.from(e.clipboardData?.files ?? []).filter(isImageFile)
