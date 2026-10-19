@@ -23,6 +23,7 @@ function previewLine(b: Block, n: number, key: number) {
     case 'callout': return <div key={key} style={{ ...base, background: '#fff1ea', borderRadius: 4, padding: '1px 6px' }}>💡 {text}</div>
     case 'divider': return <div key={key} style={{ borderTop: '1px solid #ddd', margin: '5px 0' }} />
     case 'image': return <div key={key} style={base}>🖼 Image</div>
+    case 'page': return <div key={key} style={{ ...base, color: '#1a1a1a' }}>{b.page?.icon || '📄'} {text || 'Untitled'}</div>
     default: return <div key={key} style={base}>{text}</div>
   }
 }
@@ -59,7 +60,7 @@ export default function DocumentCard({ content, readOnly, open, onOpen, onClose,
   const { title, body } = splitDocument(text)
   const { icon, blocks } = useMemo(() => parseBlocks(body), [body])
   const numbers = useMemo(() => numberingOf(blocks), [blocks])
-  const shown = blocks.map((b, i) => ({ b, n: numbers[i] })).filter(({ b }) => b.type === 'divider' || b.type === 'image' || b.text.trim()).slice(0, 6)
+  const shown = blocks.map((b, i) => ({ b, n: numbers[i] })).filter(({ b }) => b.type === 'divider' || b.type === 'image' || b.type === 'page' || b.text.trim()).slice(0, 6)
 
   return (
     <div style={{ color: '#1a1a1a' }}>
@@ -74,7 +75,7 @@ export default function DocumentCard({ content, readOnly, open, onOpen, onClose,
       {shown.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>{shown.map(({ b, n }, i) => previewLine(b, n, i))}</div>
       ) : (
-        <div style={{ fontSize: 12, color: '#aaa' }}>{readOnly ? 'Empty page' : 'Double-click to start writing'}</div>
+        <div style={{ fontSize: 12, color: '#aaa' }}>{readOnly ? 'Empty page' : 'Click to start writing'}</div>
       )}
       <button type="button" onClick={onOpen} style={{ marginTop: 8, border: 'none', background: 'transparent', padding: 0, minHeight: 0, fontSize: 11.5, color: 'var(--accent-text)', cursor: 'pointer' }}>
         {readOnly ? 'Read' : 'Open page'} →

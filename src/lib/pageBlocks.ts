@@ -6,13 +6,20 @@
 //   # Heading 1   ## Heading 2   ### Heading 3
 //   - bullet   1. numbered   [ ] to-do   [x] done to-do
 //   > quote   !> callout   ---   ![](image-url)
+//   + Page title        a page inside this page; its own lines follow, indented by two spaces (and can nest further)
 //   anything else is a paragraph
 
-export type BlockType = 'p' | 'h1' | 'h2' | 'h3' | 'bullet' | 'number' | 'todo' | 'quote' | 'callout' | 'divider' | 'image'
-export type Block = { id: string; type: BlockType; text: string; done: boolean }
+export type BlockType = 'p' | 'h1' | 'h2' | 'h3' | 'bullet' | 'number' | 'todo' | 'quote' | 'callout' | 'divider' | 'image' | 'page'
+// A "page" block is a link to a page inside this page: `text` is its title and `page` holds what is on it.
+export type Block = { id: string; type: BlockType; text: string; done: boolean; page?: { icon: string; blocks: Block[] } }
+export type PageData = { title: string; icon: string; blocks: Block[] }
 
 let counter = 0
-export const newBlock = (type: BlockType = 'p', text = '', done = false): Block => ({ id: `b${++counter}`, type, text, done })
+export const newBlock = (type: BlockType = 'p', text = '', done = false): Block => {
+  const b: Block = { id: `b${++counter}`, type, text, done }
+  if (type === 'page') b.page = { icon: '', blocks: [newBlock()] }
+  return b
+}
 
 const SOFT_BREAK = '\u2028' // a line break inside one block, so every block still fits on a single saved line
 const ESCAPE = '\u200B' // keeps a paragraph that looks like a marker from turning into a list when it is read back
@@ -29,6 +36,7 @@ export function parseLine(line: string): Block {
   if ((m = /^!> (.*)$/.exec(line))) return newBlock('callout', decode(m[1]))
   if ((m = /^> (.*)$/.exec(line))) return newBlock('quote', decode(m[1]))
   if ((m = /^!\[[^\]]*\]\((.+)\)$/.exec(line))) return newBlock('image', m[1])
+  if ((m = /^\+ (.*)$/.exec(line))) return newBlock('page', decode(m[1]))
   return newBlock('p', decode(line.startsWith(ESCAPE) ? line.slice(1) : line))
 }
 
@@ -45,7 +53,8 @@ export function serializeBlock(b: Block): string {
     case 'callout': return `!> ${t}`
     case 'divider': return '---'
     case 'image': return `![](${b.text})`
-    default: return (parseLine(t).type !== 'p' ? ESCAPE : '') + t
+    case 'page': return `+ ${t}`
+    default: return (parseLine(t).type !== 'p' || /^\s/.test(t) || t.startsWith('@icon:') ? ESCAPE : '') + t
   }
 }
 
@@ -53,11 +62,72 @@ export function parseBlocks(body: string): { icon: string; blocks: Block[] } {
   const lines = body.split('\n')
   let icon = ''
   if (lines[0]?.startsWith('@icon:')) icon = (lines.shift() as string).slice(6).trim()
-  const blocks = lines.map(parseLine)
+  const blocks: Block[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.startsWith('+ ')) {
+      // everything indented underneath belongs to this page
+      const inner: string[] = []
+      while (i + 1 < lines.length && lines[i + 1].startsWith('  ')) inner.push(lines[++i].slice(2))
+      const b = newBlock('page', decode(line.slice(2)))
+      b.page = parseBlocks(inner.join('\n'))
+      blocks.push(b)
+    } else blocks.push(parseLine(line))
+  }
   return { icon, blocks: blocks.length ? blocks : [newBlock()] }
 }
 
-export const serializeBlocks = (icon: string, blocks: Block[]) => (icon ? `@icon:${icon.replace(/\s/g, '')}\n` : '') + blocks.map(serializeBlock).join('\n')
+export function serializeBlocks(icon: string, blocks: Block[]): string {
+  const lines: string[] = []
+  if (icon) lines.push(`@icon:${icon.replace(/\s/g, '')}`)
+  for (const b of blocks) {
+    if (b.type === 'page') {
+      lines.push(`+ ${encode(b.text)}`)
+      for (const l of serializeBlocks(b.page?.icon ?? '', b.page?.blocks?.length ? b.page.blocks : [newBlock()]).split('\n')) lines.push(`  ${l}`)
+    } else lines.push(serializeBlock(b))
+  }
+  return lines.join('\n')
+}
+
+// ---- moving around inside nested pages ----
+// `path` is the ids of the page blocks you went through to get here; an empty path is the document itself.
+export function pageAt(root: PageData, path: string[]): PageData | null {
+  let page = root
+  for (const id of path) {
+    const b = page.blocks.find((x) => x.id === id && x.type === 'page')
+    if (!b?.page) return null
+    page = { title: b.text, icon: b.page.icon, blocks: b.page.blocks }
+  }
+  return page
+}
+
+export function updatePage(root: PageData, path: string[], change: Partial<PageData>): PageData {
+  if (path.length === 0) return { ...root, ...change }
+  const [id, ...rest] = path
+  return {
+    ...root,
+    blocks: root.blocks.map((b) => {
+      if (b.id !== id || b.type !== 'page' || !b.page) return b
+      const child = updatePage({ title: b.text, icon: b.page.icon, blocks: b.page.blocks }, rest, change)
+      return { ...b, text: child.title, page: { icon: child.icon, blocks: child.blocks } }
+    }),
+  }
+}
+
+// The trail shown at the top: the document, then each page you went into.
+export function crumbsOf(root: PageData, path: string[]): { title: string; icon: string }[] {
+  const out = [{ title: root.title, icon: root.icon }]
+  for (let i = 1; i <= path.length; i++) {
+    const p = pageAt(root, path.slice(0, i))
+    if (p) out.push({ title: p.title, icon: p.icon })
+  }
+  return out
+}
+
+// Does a page hold anything worth a warning before it is deleted?
+export function hasContent(b: Block): boolean {
+  return !!b.page?.blocks.some((x) => (x.type === 'page' ? true : x.type === 'divider' || x.type === 'image' || x.text.trim() !== ''))
+}
 
 // A document is its title (first line) and then the page.
 export function splitDocument(content: string) {
@@ -104,6 +174,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   { type: 'callout', label: 'Callout', hint: 'Make a note stand out', words: 'callout note highlight tip' },
   { type: 'divider', label: 'Divider', hint: 'A line between sections', words: 'divider line separator hr' },
   { type: 'image', label: 'Image', hint: 'Upload a picture', words: 'image picture photo upload' },
+  { type: 'page', label: 'Page', hint: 'A page inside this page', words: 'page subpage sub-page child nested new document' },
 ]
 export const filterSlash = (query: string) => {
   const q = query.trim().toLowerCase()

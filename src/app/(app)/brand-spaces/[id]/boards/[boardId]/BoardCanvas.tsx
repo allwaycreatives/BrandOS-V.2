@@ -459,6 +459,8 @@ export default function BoardCanvas({
         }
         // A plain click (not a drag, not an add-to-selection click) on a note or a title: just start typing.
         const clicked = cardsRef.current.find((c) => c.id === drag.clickedId)
+        // A plain click on a document opens its page, like opening a page in Notion. (Shift-click still just selects it.)
+        if (!drag.additive && clicked && clicked.type === 'document') setTimeout(() => setEditingId(clicked.id), 80)
         if (!drag.additive && clicked && (clicked.type === 'note' || clicked.type === 'heading' || clicked.type === 'comment')) {
           caretRef.current = caretOffsetAt(e.clientX, e.clientY, containerRef.current?.querySelector<HTMLElement>(`[data-card-id="${clicked.id}"]`) ?? null)
           setEditingId(clicked.id)

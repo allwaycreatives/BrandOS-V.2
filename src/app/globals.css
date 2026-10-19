@@ -668,3 +668,11 @@ html:has(.board-focus), body:has(.board-focus) { overflow: hidden; }
 .pg-holder { outline: none; border-radius: 8px; }
 .pg-holder:focus { box-shadow: 0 0 0 2px var(--accent); }
 @media (max-width: 860px) { .pg-tools { display: none; } .page-col { padding-top: 32px; } }
+
+/* sub-pages */
+.page-bar-title { display: flex; align-items: center; overflow: hidden; }
+.page-crumb { border: none; background: transparent; padding: 2px 4px; min-height: 0; border-radius: 5px; color: var(--text-secondary); font-size: 13px; cursor: pointer; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.page-crumb:hover { background: var(--accent-dim); color: var(--accent-text); }
+.pg-page { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 3px 0; border: 1px solid var(--border-strong); background: var(--bg-card); cursor: pointer; }
+.pg-page:hover { border-color: var(--accent-border); background: var(--accent-dim); }
+.pg-page-title { font-size: 15.5px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
