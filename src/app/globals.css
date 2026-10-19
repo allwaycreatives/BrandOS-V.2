@@ -642,3 +642,29 @@ html:has(.board-focus), body:has(.board-focus) { overflow: hidden; }
 }
 .rail-more .rail-btn { width: 64px; }
 @media (max-width: 380px) { .rail-more { grid-template-columns: repeat(3, 64px); } }
+
+.rail-btn.active { background: var(--accent-dim); color: var(--accent-text); }
+.rail-btn.active .rail-icon { border-color: var(--accent-border); }
+
+
+/* ---- Documents: the full-screen, Notion-style page ---- */
+.page-overlay { position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column; background: var(--bg-app); color: var(--text-primary); }
+.page-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: calc(8px + env(safe-area-inset-top)) 14px 8px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.page-back { border: 1px solid var(--border-strong); background: transparent; color: var(--text-primary); border-radius: 8px; padding: 6px 12px; min-height: 0; font-size: 13px; cursor: pointer; flex: 0 0 auto; }
+.page-back:hover { background: var(--accent-dim); }
+.page-bar-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-secondary); }
+.page-bar-status { flex: 0 0 auto; font-size: 12px; color: var(--text-muted); }
+.page-scroll { flex: 1 1 auto; overflow-y: auto; }
+.page-col { max-width: 760px; margin: 0 auto; padding: 56px clamp(16px, 7vw, 72px) 30vh; box-sizing: border-box; }
+.page-add-icon { border: none; background: transparent; color: var(--text-muted); font-size: 13px; padding: 4px 0; min-height: 0; cursor: pointer; opacity: 0.0; transition: opacity 0.12s; }
+.page-col:hover .page-add-icon, .page-add-icon:focus { opacity: 1; }
+.pg-row { position: relative; }
+.pg-tools { position: absolute; left: -58px; top: 2px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.12s; }
+.pg-row:hover .pg-tools, .pg-row:focus-within .pg-tools { opacity: 1; }
+.pg-btn { width: 26px; height: 26px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 14px; cursor: pointer; user-select: none; }
+.pg-btn:hover { background: var(--accent-dim); color: var(--accent-text); }
+.pg-grab { cursor: grab; font-size: 12px; letter-spacing: -2px; }
+.pg-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: 1px 0; }
+.pg-holder { outline: none; border-radius: 8px; }
+.pg-holder:focus { box-shadow: 0 0 0 2px var(--accent); }
+@media (max-width: 860px) { .pg-tools { display: none; } .page-col { padding-top: 32px; } }

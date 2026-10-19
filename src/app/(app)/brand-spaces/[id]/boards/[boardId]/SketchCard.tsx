@@ -29,9 +29,12 @@ export const serializeSketch = (s: Sketch) => JSON.stringify(s)
 const small: React.CSSProperties = { border: 'none', background: 'transparent', padding: '2px 6px', minHeight: 0, fontSize: 11.5, color: '#666', cursor: 'pointer', borderRadius: 4 }
 
 // A tiny drawing pad. Double-click a sketch to draw on it; it scales with the card like a picture.
-export default function SketchCard({ content, editing, readOnly, onChange, onDone }: { content: string; editing: boolean; readOnly: boolean; onChange: (text: string) => void; onDone: () => void }) {
+export const DRAWING_INKS = ['#ff6929', '#ffffff', '#4ec9e4', '#f2c94c', '#6fcf97', '#eb5757', '#1a1a1a']
+
+export default function SketchCard({ content, editing, readOnly, transparent = false, onChange, onDone }: { content: string; editing: boolean; readOnly: boolean; transparent?: boolean; onChange: (text: string) => void; onDone: () => void }) {
   const [sketch, setSketch] = useState<Sketch>(() => parseSketch(content))
-  const [ink, setInk] = useState(INKS[0])
+  const palette = transparent ? DRAWING_INKS : INKS
+  const [ink, setInk] = useState(palette[0])
   const [size, setSize] = useState(SIZES[0])
   const [live, setLive] = useState<Stroke | null>(null)
   const svg = useRef<SVGSVGElement>(null)
@@ -113,18 +116,18 @@ export default function SketchCard({ content, editing, readOnly, onChange, onDon
           onPointerMove={move}
           onPointerUp={up}
           onPointerCancel={up}
-          style={{ display: 'block', width: '100%', height: 'auto', touchAction: editing ? 'none' : undefined, cursor: editing ? 'crosshair' : 'inherit', background: '#fff', borderRadius: 3 }}
+          style={{ display: 'block', width: '100%', height: 'auto', touchAction: editing ? 'none' : undefined, cursor: editing ? 'crosshair' : 'inherit', background: transparent ? 'transparent' : '#fff', borderRadius: transparent ? 0 : 3, outline: transparent && editing ? '1px dashed rgba(150,150,150,0.7)' : undefined }}
         >
           {sketch.strokes.map((s, i) => draw(s, i))}
           {live && draw(live, 'live')}
         </svg>
-        {empty && !editing && (
+        {empty && !editing && !transparent && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#b0b0b0', pointerEvents: 'none' }}>{readOnly ? 'Empty sketch' : 'Double-click to sketch'}</div>
         )}
       </div>
       {editing && !readOnly && (
-        <div data-nodrag style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          {INKS.map((c) => (
+        <div data-nodrag style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8, ...(transparent ? { padding: '6px 8px', background: '#fff', borderRadius: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.3)' } : {}) }}>
+          {palette.map((c) => (
             <button key={c} type="button" aria-label={`Ink ${c}`} onClick={() => setInk(c)} style={{ width: 16, height: 16, minHeight: 0, padding: 0, borderRadius: '50%', background: c, border: ink === c ? '2px solid #888' : '2px solid transparent', outline: ink === c ? '1px solid #fff' : 'none', cursor: 'pointer' }} />
           ))}
           <span style={{ width: 1, height: 14, background: '#ddd', margin: '0 2px' }} />
