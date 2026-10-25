@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 const WARM_KEY = 'brandos-warm-v3-at'
 const WARM_EVERY_MS = 10 * 60 * 1000
 const ROOTS = ['/dashboard', '/projects', '/tasks', '/campaigns', '/calendar', '/ideas', '/brand-spaces', '/templates']
-const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/discovery', '/share', '/review', '/brief', '/invite']
+const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/discovery', '/share', '/review', '/brief', '/invite', '/gallery']
 
 function post(msg: Record<string, unknown>) {
   navigator.serviceWorker?.ready.then((reg) => reg.active?.postMessage(msg)).catch(() => {})

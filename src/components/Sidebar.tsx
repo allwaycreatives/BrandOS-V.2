@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 const GROUP_OF: Record<string, string> = {
   Overview: '', Discovery: 'Brand', Strategy: 'Brand', 'Brand Kit': 'Brand', Boards: 'Brand', Family: 'Brand',
   Projects: 'Work', Campaigns: 'Work', Ideas: 'Work', Calendar: 'Work', Tasks: 'Work',
-  Reviews: 'Clients', People: 'Clients',
+  Reviews: 'Clients', Galleries: 'Clients', People: 'Clients',
 }
 const GROUPS = ['', 'Brand', 'Work', 'Clients']
 
@@ -76,6 +76,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
         { label: 'Campaigns', href: `/brand-spaces/${brandSpaceId}/campaigns`, icon: '◈' },
         { label: 'Ideas', href: `/brand-spaces/${brandSpaceId}/ideas`, icon: '✧' },
         { label: 'Reviews', href: `/brand-spaces/${brandSpaceId}/reviews`, icon: '✔' },
+        { label: 'Galleries', href: `/brand-spaces/${brandSpaceId}/galleries`, icon: '▥' },
         { label: 'Calendar', href: `/brand-spaces/${brandSpaceId}/calendar`, icon: '▦' },
         { label: 'Boards', href: `/brand-spaces/${brandSpaceId}/boards`, icon: '▤' },
         { label: 'Tasks', href: `/brand-spaces/${brandSpaceId}/tasks`, icon: '☑' },
@@ -87,7 +88,7 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
   // Show only what this person can actually open.
   const currentRole = brands.find((b) => b.id === brandSpaceId)?.role
   const brandItems = allBrandItems.filter((item) => {
-    if (currentRole === 'client') return !['Strategy', 'Projects', 'Campaigns', 'Ideas', 'Reviews', 'People', 'Family'].includes(item.label)
+    if (currentRole === 'client') return !['Strategy', 'Projects', 'Campaigns', 'Ideas', 'Reviews', 'Galleries', 'People', 'Family'].includes(item.label)
     if (item.label === 'People') return currentRole === 'owner'
     return true
   })

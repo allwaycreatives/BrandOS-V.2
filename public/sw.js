@@ -12,6 +12,7 @@ const OFFLINE_URL = '/offline.html'
 const NAV_TIMEOUT = 4000
 const MAX_PAGES = 250
 const MAX_IMAGES = 200
+const MAX_CACHED_IMAGE = 6 * 1024 * 1024 // never keep big originals in the offline cache
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -102,7 +103,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (url.pathname.startsWith('/api/')) return
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/gallery/')) return
   if (url.pathname.startsWith('/_next/static/') || /\.(woff2?|ttf|otf)$/.test(url.pathname)) {
     event.respondWith(cacheFirst(request, STATIC))
     return
@@ -148,7 +149,7 @@ async function cachedImage(request) {
   try {
     // re-ask with CORS so the answer is a normal (not opaque) response we can store
     const res = await fetch(request.url, { mode: 'cors' })
-    if (res.ok) { c.put(request.url, res.clone()); trim(IMAGES, MAX_IMAGES) }
+    if (res.ok && Number(res.headers.get('content-length') || 0) <= MAX_CACHED_IMAGE) { c.put(request.url, res.clone()); trim(IMAGES, MAX_IMAGES) }
     return res
   } catch (e) {
     try { return await fetch(request) } catch (e2) { return Response.error() }
@@ -221,7 +222,7 @@ async function replay() {
 }
 
 /* ---------- pre-loading pages so they open offline ---------- */
-const SKIP = /^\/(api|sign-in|sign-up|share|invite|review|brief|discovery)(\/|$)|\/(delete|import)(\/|$)/
+const SKIP = /^\/(api|sign-in|sign-up|share|invite|review|brief|discovery|gallery)(\/|$)|\/(delete|import)(\/|$)/
 async function warm(urls) {
   const c = await caches.open(PAGES)
   const seen = new Set()
@@ -296,7 +297,8 @@ async function warm(urls) {
     try {
       if (await ic.match(src)) continue
       const res = await fetch(src, { mode: 'cors' })
-      if (res.ok) await ic.put(src, res)
+      if (res.ok && Number(res.headers.get('content-length') || 0) <= MAX_CACHED_IMAGE) await ic.put(src, res)
+      else if (res.body) res.body.cancel()
     } catch (e) {}
   }
   trim(IMAGES, MAX_IMAGES)

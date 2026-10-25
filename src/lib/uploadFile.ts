@@ -16,6 +16,16 @@ export type UploadOptions = {
   signal?: AbortSignal
   /** Shrink large JPEG/PNG/WebP images before uploading. Default true. */
   compress?: boolean
+  /** Skip our server relay and send straight to storage (needed for gallery originals). */
+  direct?: boolean
+  /** Which route hands out the upload permission. Default /api/upload. */
+  handleUploadUrl?: string
+  /** Extra info passed to that route (it checks who may upload where). */
+  clientPayload?: string
+  /** Where the file is stored. Default: the file name. */
+  pathname?: string
+  /** How long with no movement before an upload counts as stuck. Default 15 s; big files use more. */
+  stallMs?: number
 }
 
 const MAX_EDGE = 2400 // longest side, in pixels, after shrinking
@@ -201,6 +211,7 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
   if (signal?.aborted) throw cancelled()
 
   let body = file
+  if (opts.direct) return await uploadDirect(file, opts)
   if (compress && isImageFile(file)) {
     onProgress?.(0, 'preparing')
     body = await prepareImage(file)
@@ -252,17 +263,19 @@ async function uploadDirect(body: File, opts: UploadOptions, maxAttempts = MAX_A
     try {
       // -1 means "no percentage available": the bar pulses instead of filling.
       onProgress?.(withProgress ? 0 : -1, attempt === 1 ? 'uploading' : 'retrying')
-      arm(withProgress ? STALL_MS : plainTimeoutMs(body.size))
-      const blob = await upload(body.name, body, {
+      arm(withProgress ? (opts.stallMs ?? STALL_MS) : plainTimeoutMs(body.size))
+      const blob = await upload(opts.pathname ?? body.name, body, {
         access: 'public',
-        handleUploadUrl: '/api/upload',
+        handleUploadUrl: opts.handleUploadUrl ?? '/api/upload',
+        ...(opts.clientPayload ? { clientPayload: opts.clientPayload } : {}),
+        contentType: body.type || 'application/octet-stream',
         multipart: body.size > MULTIPART_ABOVE,
         abortSignal: controller.signal,
         ...(withProgress
           ? {
               onUploadProgress: (e: { percentage: number }) => {
                 gotProgress = true
-                arm(STALL_MS)
+                arm(opts.stallMs ?? STALL_MS)
                 onProgress?.(Math.min(100, Math.round(e.percentage)), 'uploading')
               },
             }

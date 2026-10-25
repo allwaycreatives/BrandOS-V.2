@@ -94,6 +94,7 @@ model BrandSpace {
   campaigns            Campaign[]
   ideas                Idea[]
   deliverables         Deliverable[]
+  galleries            Gallery[]
   styleSummary         String?  // what this client likes and keeps changing
   styleSummaryAt       DateTime?
   parent               BrandSpace?  @relation("BrandFamily", fields: [parentId], references: [id], onDelete: SetNull)
@@ -257,6 +258,7 @@ model Project {
   tasks         Task[]
   boards        Board[]
   deliverables  Deliverable[]
+  galleries     Gallery[]
 }
 
 model CalendarItem {
@@ -469,4 +471,53 @@ model Template {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+// A delivery of photos and videos for a client, shared with one link. The files go straight from the
+// browser to Blob storage in pieces, so they can be gigabytes. Originals are kept untouched.
+model Gallery {
+  id            String    @id @default(cuid())
+  brandSpaceId  String
+  projectId     String?   // the project this delivery belongs to, like a photo shoot
+  title         String
+  description   String?
+  eventDate     DateTime?
+  expiresAt     DateTime? // after this day the link stops working
+  shareToken    String    @unique
+  published     Boolean   @default(false)
+  allowDownload Boolean   @default(true)
+  passcodeHash  String?   // when set, the client must enter the passcode first
+  coverItemId   String?
+  coverStyle    String    @default("full")  // full | split | classic
+  theme         String    @default("light") // light | dark: how the client's page looks
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  brandSpace BrandSpace    @relation(fields: [brandSpaceId], references: [id], onDelete: Cascade)
+  project    Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  items      GalleryItem[]
+
+  @@index([brandSpaceId])
+  @@index([projectId])
+}
+
+// One photo, video or file in a gallery. url is the untouched original; thumbUrl and webUrl are small
+// copies made in the browser so the page loads fast.
+model GalleryItem {
+  id          String   @id @default(cuid())
+  galleryId   String
+  name        String
+  url         String
+  thumbUrl    String?
+  webUrl      String?
+  contentType String   @default("application/octet-stream")
+  kind        String   @default("file") // image | video | file
+  size        Float    @default(0)      // bytes of the original
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+
+  gallery Gallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId])
 }

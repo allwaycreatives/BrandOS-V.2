@@ -8,6 +8,8 @@ import DeleteProjectButton from '../DeleteProjectButton'
 import SaveTemplateButton from '@/components/SaveTemplateButton'
 import { createDeliverable } from '../../reviews/actions'
 import { REVIEW_STATUS } from '../../reviews/constants'
+import { createGallery } from '../../galleries/actions'
+import { formatBytes } from '@/lib/galleryFormat'
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 const SERIF = "Georgia, 'Times New Roman', serif"
@@ -25,6 +27,10 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
     .catch(() => [])
 
   const deliverables = await db.deliverable.findMany({ where: { projectId: project.id }, orderBy: { updatedAt: 'desc' } }).catch(() => [])
+
+  const galleries = await db.gallery
+    .findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true } } } })
+    .catch(() => [])
 
   const stageIndex = PROJECT_STAGES.findIndex((s) => s.key === project.status)
 
@@ -119,6 +125,35 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
         <input name="title" required placeholder="What are you sending?" style={{ flex: 1, minWidth: 180 }} />
         <input name="url" required placeholder="Link to it" style={{ flex: 1, minWidth: 180 }} />
         <button type="submit">Add for review</button>
+      </form>
+
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Photo & video delivery</div>
+      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>Full-quality photos and videos, delivered to the client with one private link.</div>
+      <div style={{ marginBottom: 10 }}>
+        {galleries.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nothing delivered yet.</div>}
+        {galleries.map((g) => {
+          const thumb = g.items.find((i) => i.id === g.coverItemId)?.thumbUrl || g.items.find((i) => i.thumbUrl)?.thumbUrl
+          return (
+            <Link key={g.id} href={`/brand-spaces/${params.id}/galleries/${g.id}`} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
+              <span style={{ width: 52, height: 52, borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
+                {thumb && <img src={thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+              </span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: 'block', fontWeight: 600 }}>{g.title}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {g.items.length} item{g.items.length === 1 ? '' : 's'} · {formatBytes(g.items.reduce((n, i) => n + i.size, 0))}
+                </span>
+              </span>
+              <span style={{ fontSize: 12, color: g.published ? 'var(--accent-text)' : 'var(--text-muted)' }}>{g.published ? '● Delivered' : '○ Draft'}</span>
+            </Link>
+          )
+        })}
+      </div>
+      <form action={createGallery} style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
+        <input type="hidden" name="brandSpaceId" value={params.id} />
+        <input type="hidden" name="projectId" value={project.id} />
+        <input name="title" required defaultValue={project.name} placeholder="Gallery name" style={{ flex: 1, minWidth: 180 }} />
+        <button type="submit">Create gallery</button>
       </form>
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Boards</div>
