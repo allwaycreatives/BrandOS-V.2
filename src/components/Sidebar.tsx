@@ -181,7 +181,11 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
 
       <div className="sidebar-footer" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
         <img src="/aw-logo.png" alt="" style={{ width: 14, height: 14, objectFit: 'contain', opacity: 0.7 }} />
-        {!collapsed && <span>by All Way Creatives</span>}
+        {!collapsed && (
+          <span>
+            by All Way Creatives · <a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</a> · <a href="/terms" style={{ textDecoration: 'underline' }}>Terms</a>
+          </span>
+        )}
       </div>
     </aside>
     </>

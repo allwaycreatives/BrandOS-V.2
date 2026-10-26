@@ -31,6 +31,23 @@ A gallery uses Drive if its creator had connected Google Drive when they created
 BrandOS only asks for the narrow `drive.file` permission: it can see only the files and folders it creates itself
 ("BrandOS Galleries" → "<brand> · <gallery>" → "_previews"), never the rest of the Drive.
 
+## Consent screen fields (Google Auth Platform → Branding)
+
+Use your own domain (Google does not accept `*.vercel.app` as an authorized domain, so attach a custom domain to the
+Vercel project first, e.g. `brandos.yourdomain.com`, and use it everywhere, including the redirect URI above).
+
+| Field | Value |
+|---|---|
+| App name | BrandOS |
+| Application home page | `https://YOUR-DOMAIN/` |
+| Application privacy policy link | `https://YOUR-DOMAIN/privacy` |
+| Application terms of service link | `https://YOUR-DOMAIN/terms` |
+| Authorized domains | your root domain, e.g. `yourdomain.com` (verify it in Google Search Console) |
+| Developer contact email | an inbox you read |
+
+Skip the app logo for now: adding one can trigger Google's brand verification, which slows publishing.
+Also set `NEXT_PUBLIC_CONTACT_EMAIL` in Vercel so the policy pages show your real contact address.
+
 ## Good to know
 
 - Big downloads are fetched in 48 MB pieces, so a single file of any size works with "Download all" (zip) and with

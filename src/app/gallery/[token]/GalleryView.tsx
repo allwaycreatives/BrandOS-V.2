@@ -300,7 +300,9 @@ export default function GalleryView({
         )}
         <footer style={{ textAlign: 'center', marginTop: 90 }}>
           <div className="g-eyebrow" style={{ color: 'var(--g-muted)' }}>Delivered by {brand}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--g-muted)', opacity: 0.7, marginTop: 8 }}>Made with Brand OS</div>
+          <div style={{ fontSize: 11.5, color: 'var(--g-muted)', opacity: 0.7, marginTop: 8 }}>
+            Made with Brand OS · <a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</a> · <a href="/terms" style={{ textDecoration: 'underline' }}>Terms</a>
+          </div>
         </footer>
       </main>
 
