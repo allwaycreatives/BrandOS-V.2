@@ -33,8 +33,10 @@ BrandOS only asks for the narrow `drive.file` permission: it can see only the fi
 
 ## Consent screen fields (Google Auth Platform → Branding)
 
-Use your own domain (Google does not accept `*.vercel.app` as an authorized domain, so attach a custom domain to the
-Vercel project first, e.g. `brandos.yourdomain.com`, and use it everywhere, including the redirect URI above).
+Use your exact site address everywhere (for example `brand-os-v-2.vercel.app`, or a custom domain later), including the
+redirect URI above. For "Authorized domains" enter that exact address, not just `vercel.app`. Google may ask you to prove
+you own it: in Google Search Console add a URL-prefix property for `https://YOUR-DOMAIN/`, choose the HTML tag method,
+copy the `content` value into `GOOGLE_SITE_VERIFICATION` in Vercel, redeploy, then click Verify.
 
 | Field | Value |
 |---|---|
@@ -42,7 +44,7 @@ Vercel project first, e.g. `brandos.yourdomain.com`, and use it everywhere, incl
 | Application home page | `https://YOUR-DOMAIN/` |
 | Application privacy policy link | `https://YOUR-DOMAIN/privacy` |
 | Application terms of service link | `https://YOUR-DOMAIN/terms` |
-| Authorized domains | your root domain, e.g. `yourdomain.com` (verify it in Google Search Console) |
+| Authorized domains | your exact site address, e.g. `brand-os-v-2.vercel.app` (verify in Google Search Console if asked) |
 | Developer contact email | an inbox you read |
 
 Skip the app logo for now: adding one can trigger Google's brand verification, which slows publishing.

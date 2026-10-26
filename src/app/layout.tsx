@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: 'BrandOS',
   description: 'Brand OS helps creatives discover their brand, manage it, and grow it, with every brand, project and task in one simple place.',
   manifest: '/manifest.json',
+  // Lets Google Search Console confirm you own this site (needed for the Google sign-in consent screen).
+  // Paste the code Search Console gives you into GOOGLE_SITE_VERIFICATION in Vercel, then redeploy.
+  ...(process.env.GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } } : {}),
 }
 
 export const viewport: Viewport = {
