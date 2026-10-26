@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadFile, prepareImage } from '@/lib/uploadFile'
 import { formatBytes, kindOf, safeFileName } from '@/lib/galleryFormat'
+import { createDriveSession, driveUpload } from '@/lib/driveUpload'
 import { addGalleryItem } from '../actions'
 
 type Status = 'queued' | 'preparing' | 'uploading' | 'saving' | 'done' | 'error'
@@ -94,7 +95,7 @@ function videoDerived(file: File): Promise<Derived> {
   })
 }
 
-export default function GalleryUploader({ galleryId }: { galleryId: string }) {
+export default function GalleryUploader({ galleryId, storage = 'blob' }: { galleryId: string; storage?: 'blob' | 'drive' }) {
   const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [dragging, setDragging] = useState(false)
@@ -102,6 +103,7 @@ export default function GalleryUploader({ galleryId }: { galleryId: string }) {
   const active = useRef<Map<string, number>>(new Map())
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const input = useRef<HTMLInputElement>(null)
+  const session = useMemo(() => (storage === 'drive' ? createDriveSession(galleryId) : null), [storage, galleryId])
 
   const update = useCallback((id: string, patch: Partial<Job>) => setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j))), [])
 
@@ -119,30 +121,30 @@ export default function GalleryUploader({ galleryId }: { galleryId: string }) {
         const kind = kindOf(file.type, file.name)
         const d = kind === 'image' ? await imageDerived(file) : kind === 'video' ? await videoDerived(file) : NONE
 
-        const base = `galleries/${galleryId}/${itemId}`
-        const common = { direct: true, compress: false, handleUploadUrl: '/api/gallery-upload', clientPayload: JSON.stringify({ galleryId }), stallMs: 60_000 }
         update(job.id, { status: 'uploading' })
-
-        let thumbUrl: string | null = null
-        let webUrl: string | null = null
-        if (d.thumb) thumbUrl = (await uploadFile(new File([d.thumb], 'thumb.jpg', { type: 'image/jpeg' }), { ...common, pathname: `${base}/thumb.jpg` })).url
-        if (d.web) {
-          const ext = d.web.type === 'image/webp' ? 'webp' : 'jpg'
-          webUrl = (await uploadFile(new File([d.web], `web.${ext}`, { type: d.web.type }), { ...common, pathname: `${base}/web.${ext}` })).url
+        let res
+        if (storage === 'drive' && session) {
+          // Straight into the owner's Google Drive, in resumable chunks.
+          const [folder, previews] = [await session.folderId(), await session.previewsId()]
+          const thumbId = d.thumb ? await driveUpload(d.thumb, { name: `${itemId}-thumb.jpg`, mimeType: 'image/jpeg', parentId: previews, session }) : null
+          const webId = d.web ? await driveUpload(d.web, { name: `${itemId}-web.${d.web.type === 'image/webp' ? 'webp' : 'jpg'}`, mimeType: d.web.type, parentId: previews, session }) : null
+          const fileId = await driveUpload(file, { name: file.name, mimeType: file.type || 'application/octet-stream', parentId: folder, session, onProgress: (p) => update(job.id, { pct: p }) })
+          update(job.id, { status: 'saving', pct: 100 })
+          res = await addGalleryItem(galleryId, { name: file.name, drive: { fileId, thumbId, webId }, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height })
+        } else {
+          const base = `galleries/${galleryId}/${itemId}`
+          const common = { direct: true, compress: false, handleUploadUrl: '/api/gallery-upload', clientPayload: JSON.stringify({ galleryId }), stallMs: 60_000 }
+          let thumbUrl: string | null = null
+          let webUrl: string | null = null
+          if (d.thumb) thumbUrl = (await uploadFile(new File([d.thumb], 'thumb.jpg', { type: 'image/jpeg' }), { ...common, pathname: `${base}/thumb.jpg` })).url
+          if (d.web) {
+            const ext = d.web.type === 'image/webp' ? 'webp' : 'jpg'
+            webUrl = (await uploadFile(new File([d.web], `web.${ext}`, { type: d.web.type }), { ...common, pathname: `${base}/web.${ext}` })).url
+          }
+          const original = await uploadFile(file, { ...common, pathname: `${base}/${safeFileName(file.name)}`, onProgress: (p) => p >= 0 && update(job.id, { pct: p }) })
+          update(job.id, { status: 'saving', pct: 100 })
+          res = await addGalleryItem(galleryId, { name: file.name, url: original.url, thumbUrl, webUrl, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height })
         }
-        const original = await uploadFile(file, { ...common, pathname: `${base}/${safeFileName(file.name)}`, onProgress: (p) => p >= 0 && update(job.id, { pct: p }) })
-
-        update(job.id, { status: 'saving', pct: 100 })
-        const res = await addGalleryItem(galleryId, {
-          name: file.name,
-          url: original.url,
-          thumbUrl,
-          webUrl,
-          contentType: file.type || 'application/octet-stream',
-          size: file.size,
-          width: d.width,
-          height: d.height,
-        })
         if ('error' in res) throw new Error(res.error)
         update(job.id, { status: 'done', pct: 100 })
         scheduleRefresh()
@@ -150,7 +152,7 @@ export default function GalleryUploader({ galleryId }: { galleryId: string }) {
         update(job.id, { status: 'error', error: (e as Error).message || 'Upload failed.' })
       }
     },
-    [galleryId, update, scheduleRefresh],
+    [galleryId, storage, session, update, scheduleRefresh],
   )
 
   const pump = useCallback(() => {

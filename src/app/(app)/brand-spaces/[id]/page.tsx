@@ -210,6 +210,10 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
     db.task.findMany({ where: { ...bs, status: { not: 'done' }, dueDate: { lt: startOfToday } }, orderBy: { dueDate: 'asc' }, take: 3, select: { id: true, title: true } }).catch(() => []),
   ])
 
+  // Photo and video deliveries for this brand (clients never see this tile)
+  const galleryRows = role === 'client' ? [] : await db.gallery.findMany({ where: bs, select: { published: true } }).catch(() => [])
+  const deliveredGalleries = galleryRows.filter((g) => g.published).length
+
   // Brand family: the shared brand this one belongs to, and any founder brands under it.
   const { user, organizationId } = await getOrCreateCurrentUser()
   const allBrands = await getUserBrands(user.id, organizationId)
@@ -324,6 +328,7 @@ export default async function BrandSpacePage({ params }: { params: { id: string 
         <Tile href={`${base}/campaigns`} label="Campaigns" value={activeCampaigns} caption="active" />
         <Tile href={`${base}/projects`} label="Projects" value={activeProjects} caption="in progress" />
         <Tile href={`${base}/reviews`} label="Reviews" value={waitingReviews} caption={changeItems.length > 0 ? `${changeItems.length} with changes` : 'out with clients'} hot={changeItems.length > 0} />
+        {role !== 'client' && <Tile href={`${base}/galleries`} label="Galleries" value={galleryRows.length} caption={deliveredGalleries > 0 ? `${deliveredGalleries} delivered` : 'photo & video delivery'} />}
         <Tile href={`${base}/ideas`} label="Ideas" value={openIdeas} caption="parked" />
         <Tile href={`${base}/calendar`} label="Calendar" value={calendarOpen} caption="content to publish" />
         <Tile href={`${base}/boards`} label="Boards" value={boardCount} caption="moodboards and plans" />

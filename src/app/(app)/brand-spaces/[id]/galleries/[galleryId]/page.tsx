@@ -14,7 +14,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 
-  const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, project: { select: { id: true, name: true } } } }).catch(() => null)
+  const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, project: { select: { id: true, name: true } }, driveConnection: { select: { email: true } } } }).catch(() => null)
   if (!gallery || gallery.brandSpaceId !== params.id) notFound()
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
@@ -43,7 +43,18 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       <ShareBox galleryId={gallery.id} token={gallery.shareToken} published={gallery.published} />
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Add files</div>
-      <GalleryUploader galleryId={gallery.id} />
+      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
+        {gallery.storage === 'drive' ? (
+          gallery.driveConnection ? (
+            <>Files are kept in your Google Drive ({gallery.driveConnection.email}), in the folder “BrandOS Galleries”.</>
+          ) : (
+            <span style={{ color: '#c0392b' }}>This gallery’s Google Drive is not connected any more, so its files can’t be shown or added to. <a href={`/api/google/connect?returnTo=${encodeURIComponent(`/brand-spaces/${params.id}/galleries/${gallery.id}`)}`} style={{ textDecoration: 'underline' }}>Connect Google Drive</a></span>
+          )
+        ) : (
+          <>Files are kept in BrandOS storage.</>
+        )}
+      </div>
+      <GalleryUploader galleryId={gallery.id} storage={gallery.storage === 'drive' ? 'drive' : 'blob'} />
 
       <div style={{ fontWeight: 600, fontSize: 14, margin: '28px 0 10px' }}>Files</div>
       {items.length === 0 ? (

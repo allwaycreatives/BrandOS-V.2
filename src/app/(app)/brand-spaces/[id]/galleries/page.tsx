@@ -1,14 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
-import { assertBrandSpaceAccess } from '@/lib/auth'
+import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
+import { driveConfigured } from '@/lib/googleDrive'
+import StorageCard from './StorageCard'
 import { formatBytes } from '@/lib/galleryFormat'
 import { createGallery } from './actions'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date | null) => (d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
-export default async function GalleriesPage({ params }: { params: { id: string } }) {
+export default async function GalleriesPage({ params, searchParams }: { params: { id: string }; searchParams: { drive?: string } }) {
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
   const { brandSpace } = access
@@ -16,6 +18,8 @@ export default async function GalleriesPage({ params }: { params: { id: string }
   const galleries = await db.gallery
     .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true } }, project: { select: { name: true } } } })
     .catch(() => [])
+  const { user } = await getOrCreateCurrentUser()
+  const conn = await db.googleConnection.findUnique({ where: { userId: user.id } }).catch(() => null)
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
 
   return (
@@ -27,6 +31,8 @@ export default async function GalleriesPage({ params }: { params: { id: string }
         <div className="topbar-greeting">Galleries</div>
         <div className="topbar-sub">Deliver photos and videos to {brandSpace.name} in full quality, even gigabytes of them, with one private link.</div>
       </div>
+
+      <StorageCard configured={driveConfigured()} email={conn?.email ?? null} returnTo={`/brand-spaces/${params.id}/galleries`} flag={searchParams.drive} />
 
       <form action={createGallery} className="card" style={{ display: 'flex', gap: 8, marginBottom: 22, flexWrap: 'wrap' }}>
         <input type="hidden" name="brandSpaceId" value={params.id} />

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ZipWriter } from '@/lib/zipStream'
-import { downloadUrlOf, formatBytes } from '@/lib/galleryFormat'
+import { downloadUrlOf, formatBytes, isServedByBrandOS } from '@/lib/galleryFormat'
+import { canSaveToDisk, rangedStream, saveLargeFile } from '@/lib/rangedFetch'
 import { GALLERY_CSS, themeVars } from '@/lib/galleryTheme'
 
 export type ViewItem = {
@@ -23,6 +24,7 @@ type Dl =
   | { state: 'idle' }
   | { state: 'zipping'; done: number; total: number; bytes: number; totalBytes: number }
   | { state: 'sequential'; done: number; total: number }
+  | { state: 'single'; name: string; bytes: number; total: number }
   | { state: 'finished'; note: string }
   | { state: 'error'; message: string }
 
@@ -141,10 +143,18 @@ export default function GalleryView({
       const zip = new ZipWriter((chunk) => writable.write(chunk))
       for (let i = 0; i < list.length; i++) {
         setDl({ state: 'zipping', done: i, total: list.length, bytes, totalBytes: zipTotal })
-        const res = await fetch(list[i].full!)
-        if (!res.ok || !res.body) throw new Error(`Could not read ${list[i].name}`)
-        await zip.addFile(list[i].name, res.body, (n) => {
+        let body: ReadableStream<Uint8Array>
+        if (isServedByBrandOS(list[i].full!)) {
+          // fetched piece by piece, so even a huge video never runs into a time limit
+          body = rangedStream(list[i].full!, list[i].size)
+        } else {
+          const res = await fetch(list[i].full!)
+          if (!res.ok || !res.body) throw new Error(`Could not read ${list[i].name}`)
+          body = res.body
+        }
+        await zip.addFile(list[i].name, body, (n) => {
           bytes += n
+          setDl({ state: 'zipping', done: i, total: list.length, bytes, totalBytes: zipTotal })
         })
         setDl({ state: 'zipping', done: i + 1, total: list.length, bytes, totalBytes: zipTotal })
       }
@@ -157,7 +167,24 @@ export default function GalleryView({
     }
   }
 
-  const busy = dl.state === 'zipping' || dl.state === 'sequential'
+  // Big files from Google Drive are saved to disk in pieces (Chrome, Edge); everything else is a normal download.
+  async function onDownloadClick(e: React.MouseEvent, it: ViewItem) {
+    if (!it.full || !isServedByBrandOS(it.full) || it.size < 100 * 1024 * 1024 || !canSaveToDisk()) return
+    e.preventDefault()
+    let bytes = 0
+    setDl({ state: 'single', name: it.name, bytes: 0, total: it.size })
+    try {
+      const saved = await saveLargeFile(it.full, it.size, it.name, (n) => {
+        bytes += n
+        setDl({ state: 'single', name: it.name, bytes, total: it.size })
+      })
+      setDl(saved ? { state: 'finished', note: `${it.name} is saved.` } : { state: 'idle' })
+    } catch (err) {
+      setDl({ state: 'error', message: `${(err as Error).message || 'The download stopped.'}` })
+    }
+  }
+
+  const busy = dl.state === 'zipping' || dl.state === 'sequential' || dl.state === 'single'
   const cur = open !== null ? visible[open] : null
   const onCover = !!cover && coverStyle !== 'classic' && coverStyle !== 'split'
 
@@ -194,7 +221,7 @@ export default function GalleryView({
           )}
         </button>
         {allowDownload && it.full && (
-          <a className="g-dl" href={downloadUrlOf(it.full)} download={it.name} aria-label={`Download ${it.name}`} title="Download" style={{ position: 'absolute', right: 8, bottom: 8, background: 'rgba(20,20,20,.55)', backdropFilter: 'blur(6px)', color: '#fff', borderRadius: 18, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>↓</a>
+          <a className="g-dl" href={downloadUrlOf(it.full)} download={it.name} onClick={(e) => onDownloadClick(e, it)} aria-label={`Download ${it.name}`} title="Download" style={{ position: 'absolute', right: 8, bottom: 8, background: 'rgba(20,20,20,.55)', backdropFilter: 'blur(6px)', color: '#fff', borderRadius: 18, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>↓</a>
         )}
       </div>
     )
@@ -288,6 +315,14 @@ export default function GalleryView({
               </div>
             </>
           )}
+          {dl.state === 'single' && (
+            <>
+              <div style={{ marginBottom: 8 }}>Saving {dl.name}: {formatBytes(dl.bytes)} of {formatBytes(dl.total)}. Keep this page open.</div>
+              <div style={{ height: 3, background: 'color-mix(in srgb, var(--g-bg) 25%, transparent)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${dl.total ? Math.min(100, (dl.bytes / dl.total) * 100) : 0}%`, height: '100%', background: 'var(--g-bg)', transition: 'width .3s' }} />
+              </div>
+            </>
+          )}
           {dl.state === 'sequential' && <div>Starting download {dl.done + 1} of {dl.total}… your browser will save them one by one.</div>}
           {dl.state === 'finished' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{dl.note}</span><button className="g-link" onClick={() => setDl({ state: 'idle' })}>OK</button></div>
@@ -318,7 +353,7 @@ export default function GalleryView({
           <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', gap: 12, fontSize: 12.5, letterSpacing: '.06em' }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{open + 1} / {visible.length} <span style={{ color: 'var(--g-muted)', marginLeft: 8 }}>{cur.name}</span></span>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-              {allowDownload && cur.full && <a href={downloadUrlOf(cur.full)} download={cur.name} style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', padding: '8px 12px', borderRadius: 999, border: '1px solid var(--g-line)' }}>Download · {formatBytes(cur.size)}</a>}
+              {allowDownload && cur.full && <a href={downloadUrlOf(cur.full)} download={cur.name} onClick={(e) => onDownloadClick(e, cur)} style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', padding: '8px 12px', borderRadius: 999, border: '1px solid var(--g-line)' }}>Download · {formatBytes(cur.size)}</a>}
               <button className="g-iconbtn" onClick={() => setOpen(null)} aria-label="Close">×</button>
             </span>
           </div>

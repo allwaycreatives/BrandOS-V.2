@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { del } from '@vercel/blob'
 import { db } from '@/lib/db'
-import { assertBrandSpaceAccess } from '@/lib/auth'
+import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
+import { accessTokenFor, deleteDriveFiles, driveConfigured, fileInfo, revokeToken, decrypt } from '@/lib/googleDrive'
 import { newGalleryToken, hashPasscode, isGalleryBlobUrl } from '@/lib/gallery'
 import { kindOf } from '@/lib/galleryFormat'
 
@@ -61,8 +62,11 @@ export async function createGallery(formData: FormData) {
   if (!brandSpaceId || !title) return
   await requireEdit(brandSpaceId)
   const projectId = await projectIdFor(brandSpaceId, formData.get('projectId'))
+  // If this person connected Google Drive, the files live in their Drive (their space, their quota).
+  const { user } = await getOrCreateCurrentUser()
+  const conn = driveConfigured() ? await db.googleConnection.findUnique({ where: { userId: user.id } }).catch(() => null) : null
   const g = await db.gallery.create({
-    data: { brandSpaceId, projectId, title, eventDate: parseDate(formData.get('eventDate')), shareToken: newGalleryToken() },
+    data: { brandSpaceId, projectId, title, eventDate: parseDate(formData.get('eventDate')), shareToken: newGalleryToken(), storage: conn ? 'drive' : 'blob', driveConnectionId: conn?.id ?? null },
   })
   refresh(brandSpaceId)
   if (projectId) revalidatePath(`/brand-spaces/${brandSpaceId}/projects/${projectId}`)
@@ -105,30 +109,52 @@ export async function setGalleryPasscode(galleryId: string, formData: FormData) 
 
 export type NewGalleryItem = {
   name: string
-  url: string
+  url?: string
   thumbUrl?: string | null
   webUrl?: string | null
+  drive?: { fileId: string; thumbId?: string | null; webId?: string | null }
   contentType: string
   size: number
   width?: number | null
   height?: number | null
 }
 
-// Called by the browser after a file has finished uploading to storage.
+// Called by the browser after a file has finished uploading.
 export async function addGalleryItem(galleryId: string, input: NewGalleryItem): Promise<{ ok: true; id: string } | { error: string }> {
   try {
-    const g = await galleryForEdit(galleryId)
-    if (!isGalleryBlobUrl(input.url, galleryId)) return { error: 'That file is not in this gallery.' }
-    const thumbUrl = isGalleryBlobUrl(input.thumbUrl, galleryId) ? input.thumbUrl! : null
-    const webUrl = isGalleryBlobUrl(input.webUrl, galleryId) ? input.webUrl! : null
+    const g = await db.gallery.findUnique({ where: { id: galleryId }, include: { driveConnection: true } })
+    if (!g) return { error: 'Gallery not found.' }
+    await requireEdit(g.brandSpaceId)
     const name = String(input.name || 'file').slice(0, 255)
     const contentType = String(input.contentType || 'application/octet-stream').slice(0, 120)
     const kind = kindOf(contentType, name)
     const int = (n: unknown) => (typeof n === 'number' && isFinite(n) && n > 0 && n < 100000 ? Math.round(n) : null)
+    let size = Math.max(0, Number(input.size) || 0)
 
-    const item = await db.galleryItem.create({
-      data: { galleryId, name, url: input.url, thumbUrl, webUrl, contentType, kind, size: Math.max(0, Number(input.size) || 0), width: int(input.width), height: int(input.height) },
-    })
+    let files: { url: string; thumbUrl: string | null; webUrl: string | null; driveFileId: string | null; driveThumbId: string | null; driveWebId: string | null }
+    if (g.storage === 'drive') {
+      const d = input.drive
+      if (!d?.fileId || !g.driveConnection || !g.driveFolderId || !g.drivePreviewsId) return { error: 'This gallery is stored in Google Drive.' }
+      // Make sure these files really sit in this gallery's folder in the owner's Drive.
+      const token = await accessTokenFor(g.driveConnection)
+      const orig = await fileInfo(token, d.fileId)
+      if (!orig?.parents?.includes(g.driveFolderId)) return { error: 'That file is not in this gallery.' }
+      if (orig.size) size = Number(orig.size) || size
+      const okPreview = async (id?: string | null) => (id && (await fileInfo(token, id))?.parents?.includes(g.drivePreviewsId!) ? id : null)
+      files = { url: `drive:${d.fileId}`, thumbUrl: null, webUrl: null, driveFileId: d.fileId, driveThumbId: await okPreview(d.thumbId), driveWebId: await okPreview(d.webId) }
+    } else {
+      if (!isGalleryBlobUrl(input.url, galleryId)) return { error: 'That file is not in this gallery.' }
+      files = {
+        url: input.url!,
+        thumbUrl: isGalleryBlobUrl(input.thumbUrl, galleryId) ? input.thumbUrl! : null,
+        webUrl: isGalleryBlobUrl(input.webUrl, galleryId) ? input.webUrl! : null,
+        driveFileId: null,
+        driveThumbId: null,
+        driveWebId: null,
+      }
+    }
+
+    const item = await db.galleryItem.create({ data: { galleryId, name, contentType, kind, size, width: int(input.width), height: int(input.height), ...files } })
     if (!g.coverItemId && kind === 'image') await db.gallery.update({ where: { id: galleryId }, data: { coverItemId: item.id } })
     return { ok: true, id: item.id }
   } catch (e) {
@@ -137,7 +163,7 @@ export async function addGalleryItem(galleryId: string, input: NewGalleryItem): 
 }
 
 export async function deleteGalleryItem(itemId: string) {
-  const item = await db.galleryItem.findUnique({ where: { id: itemId }, include: { gallery: true } })
+  const item = await db.galleryItem.findUnique({ where: { id: itemId }, include: { gallery: { include: { driveConnection: true } } } })
   if (!item) return
   await requireEdit(item.gallery.brandSpaceId)
   await db.galleryItem.delete({ where: { id: itemId } })
@@ -145,7 +171,8 @@ export async function deleteGalleryItem(itemId: string) {
     const next = await db.galleryItem.findFirst({ where: { galleryId: item.galleryId, kind: 'image' }, orderBy: { createdAt: 'asc' } })
     await db.gallery.update({ where: { id: item.galleryId }, data: { coverItemId: next?.id ?? null } })
   }
-  await deleteBlobs([item.url, item.thumbUrl, item.webUrl])
+  if (item.gallery.driveConnection) await deleteDriveFiles(item.gallery.driveConnection, [item.driveFileId, item.driveThumbId, item.driveWebId])
+  await deleteBlobs([item.driveFileId ? null : item.url, item.thumbUrl, item.webUrl])
   refresh(item.gallery.brandSpaceId, item.galleryId)
 }
 
@@ -160,8 +187,23 @@ export async function setGalleryCover(galleryId: string, itemId: string) {
 export async function deleteGallery(galleryId: string) {
   const g = await galleryForEdit(galleryId)
   const items = await db.galleryItem.findMany({ where: { galleryId } })
+  const conn = g.driveConnectionId ? await db.googleConnection.findUnique({ where: { id: g.driveConnectionId } }) : null
   await db.gallery.delete({ where: { id: galleryId } })
-  await deleteBlobs(items.flatMap((i) => [i.url, i.thumbUrl, i.webUrl]))
+  if (conn && g.driveFolderId) await deleteDriveFiles(conn, [g.driveFolderId]) // removes the folder and everything in it
+  await deleteBlobs(items.flatMap((i) => [i.driveFileId ? null : i.url, i.thumbUrl, i.webUrl]))
   refresh(g.brandSpaceId)
   redirect(`/brand-spaces/${g.brandSpaceId}/galleries`)
+}
+
+// Stop using Google Drive: the key is revoked and forgotten. Files already in Drive stay there, but
+// galleries kept in that Drive stop being served until it is connected again.
+export async function disconnectGoogleDrive() {
+  const { user } = await getOrCreateCurrentUser()
+  const conn = await db.googleConnection.findUnique({ where: { userId: user.id } })
+  if (!conn) return
+  try {
+    await revokeToken(decrypt(conn.refreshToken))
+  } catch {}
+  await db.googleConnection.delete({ where: { id: conn.id } })
+  revalidatePath('/brand-spaces', 'layout')
 }

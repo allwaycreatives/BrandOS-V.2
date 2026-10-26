@@ -16,8 +16,9 @@ const lookup = (token: string) =>
 export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
   const g = await lookup(params.token)
   if (!g || !g.published) return { title: 'Gallery' }
-  const cover = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.thumbUrl)
-  const image = cover?.thumbUrl || undefined
+  const cover = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.thumbUrl || i.driveThumbId)
+  const site = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+  const image = cover?.driveThumbId ? (site ? `${site}/api/gallery/${g.shareToken}/file/${cover.id}?v=t` : undefined) : cover?.thumbUrl || undefined
   // The title is shown when the link is shared; the pictures stay behind the passcode if there is one.
   return { title: `${g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.title, description: `A gallery from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
 }
@@ -55,15 +56,36 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     )
   }
 
+  // Files in Google Drive are served through BrandOS (so the gallery's passcode, expiry and download rules apply);
+  // files in BrandOS storage are linked directly.
+  const SMALL = 8 * 1024 * 1024
+  const urls = (i: (typeof g.items)[number]) => {
+    if (i.driveFileId) {
+      const base = `/api/gallery/${g.shareToken}/file/${i.id}`
+      const original = `${base}?v=o`
+      return {
+        thumb: i.driveThumbId ? `${base}?v=t` : null,
+        web: i.driveWebId ? `${base}?v=w` : null,
+        // a small original can be shown as is, but only when downloads are allowed (the server enforces this too)
+        small: g.allowDownload && i.kind === 'image' && i.size <= SMALL ? original : null,
+        original,
+        hasWeb: !!i.driveWebId,
+      }
+    }
+    return { thumb: i.thumbUrl, web: i.webUrl, small: i.kind === 'image' ? i.url : null, original: i.url, hasWeb: !!i.webUrl }
+  }
+
   const items: ViewItem[] = naturalSort(g.items).map((i) => {
-    const display = i.webUrl || (i.kind === 'image' ? i.url : null)
+    const u = urls(i)
+    const display = u.web || u.small
     // When downloads are off we do not hand out the original of a picture that has a smaller copy to look at.
-    const hideOriginal = !g.allowDownload && i.kind === 'image' && !!i.webUrl
-    return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: i.thumbUrl, display, full: hideOriginal ? null : i.url }
+    const hideOriginal = !g.allowDownload && i.kind === 'image' && u.hasWeb
+    return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original }
   })
   const coverItem = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.kind === 'image')
   // Sharpest copy that is still light: the 2400px copy, else a small original, else the preview.
-  const cover = coverItem ? coverItem.webUrl || (coverItem.kind === 'image' && coverItem.size <= 8 * 1024 * 1024 ? coverItem.url : null) || coverItem.thumbUrl : null
+  const cu = coverItem ? urls(coverItem) : null
+  const cover = cu ? cu.web || cu.small || cu.thumb : null
 
   return (
     <GalleryView

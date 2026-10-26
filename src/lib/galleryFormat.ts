@@ -28,7 +28,9 @@ export function safeFileName(name: string): string {
   return (cleaned || 'file').slice(0, 180)
 }
 
-export const downloadUrlOf = (url: string) => url + (url.includes('?') ? '&' : '?') + 'download=1'
+// Files served by BrandOS (from Google Drive) use dl=1; files in BrandOS storage use download=1.
+export const downloadUrlOf = (url: string) => url + (url.includes('?') ? '&' : '?') + (url.startsWith('/api/gallery/') ? 'dl=1' : 'download=1')
+export const isServedByBrandOS = (url: string) => url.startsWith('/api/gallery/')
 
 export const naturalSort = <T extends { name: string }>(items: T[]) =>
   [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))

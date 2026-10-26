@@ -488,6 +488,10 @@ model Gallery {
   allowDownload Boolean   @default(true)
   passcodeHash  String?   // when set, the client must enter the passcode first
   coverItemId   String?
+  storage         String    @default("blob") // blob (BrandOS storage) | drive (the owner's Google Drive)
+  driveConnectionId String?
+  driveFolderId   String?   // this gallery's folder in Google Drive
+  drivePreviewsId String?   // sub-folder for the small preview copies
   coverStyle    String    @default("full")  // full | split | classic
   theme         String    @default("light") // light | dark: how the client's page looks
   createdAt     DateTime  @default(now())
@@ -495,6 +499,7 @@ model Gallery {
 
   brandSpace BrandSpace    @relation(fields: [brandSpaceId], references: [id], onDelete: Cascade)
   project    Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  driveConnection GoogleConnection? @relation(fields: [driveConnectionId], references: [id], onDelete: SetNull)
   items      GalleryItem[]
 
   @@index([brandSpaceId])
@@ -507,9 +512,12 @@ model GalleryItem {
   id          String   @id @default(cuid())
   galleryId   String
   name        String
-  url         String
+  url         String   // untouched original (a storage address, or "drive:<id>" for Google Drive)
   thumbUrl    String?
   webUrl      String?
+  driveFileId  String?  // Google Drive: the original
+  driveThumbId String?  // Google Drive: small preview
+  driveWebId   String?  // Google Drive: 2400px viewing copy
   contentType String   @default("application/octet-stream")
   kind        String   @default("file") // image | video | file
   size        Float    @default(0)      // bytes of the original
@@ -520,4 +528,18 @@ model GalleryItem {
   gallery Gallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
 
   @@index([galleryId])
+}
+
+// A Google Drive that a person connected so galleries can keep their files there (their own space and quota).
+// The permission is limited to files and folders BrandOS itself creates. The refresh token is stored encrypted.
+model GoogleConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  email        String
+  refreshToken String
+  rootFolderId String?  // the "BrandOS Galleries" folder
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  galleries Gallery[]
 }
