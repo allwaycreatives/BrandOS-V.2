@@ -5,9 +5,15 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { formatBytes, naturalSort } from '@/lib/galleryFormat'
 import { updateGallery, setGalleryPasscode } from '../actions'
 import GalleryUploader from './GalleryUploader'
+import LinkEditor from './LinkEditor'
 import { ShareBox, ItemTile, DeleteGalleryButton } from './GalleryControls'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
+const COVER_ART = [
+  { key: 'full', label: 'Full', art: <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }}><div style={{ position: 'absolute', left: '50%', top: '58%', transform: 'translateX(-50%)', width: '50%', height: 3, background: '#fff', opacity: 0.9 }} /></div> },
+  { key: 'split', label: 'Split', art: <div style={{ position: 'absolute', inset: 0, display: 'flex' }}><div style={{ flex: 1, background: '#f3f1ed', position: 'relative' }}><div style={{ position: 'absolute', left: '18%', top: '45%', width: '64%', height: 3, background: '#222' }} /></div><div style={{ flex: 1, background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }} /></div> },
+  { key: 'classic', label: 'Classic', art: <div style={{ position: 'absolute', inset: 0, background: '#f3f1ed' }}><div style={{ position: 'absolute', left: '30%', top: '12%', width: '40%', height: 3, background: '#222' }} /><div style={{ position: 'absolute', left: '14%', right: '14%', top: '32%', bottom: '10%', background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }} /></div> },
+]
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 
 export default async function GalleryManagePage({ params }: { params: { id: string; galleryId: string } }) {
@@ -40,7 +46,8 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
         </div>
       </div>
 
-      <ShareBox galleryId={gallery.id} token={gallery.shareToken} published={gallery.published} />
+      <ShareBox galleryId={gallery.id} token={gallery.slug || gallery.shareToken} published={gallery.published} />
+      <LinkEditor galleryId={gallery.id} slug={gallery.slug} suggestFrom={gallery.coverTitle || gallery.title} hasPasscode={!!gallery.passcodeHash} />
 
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Add files</div>
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -67,10 +74,63 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
         </div>
       )}
 
-      <div style={{ fontWeight: 600, fontSize: 14, margin: '32px 0 8px' }}>Settings</div>
+      <div style={{ fontWeight: 600, fontSize: 14, margin: '32px 0 4px' }}>Cover & welcome message</div>
+      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>This is the first thing your client sees, before the photos. Leave a line empty to hide it.</div>
+      <form action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12, alignItems: 'end', marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
+          Cover title
+          <input name="coverTitle" defaultValue={gallery.coverTitle ?? ''} placeholder={gallery.title} style={{ width: '100%', marginTop: 4 }} />
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--text-muted)' }}>For example “El Shaddai Falcons Academy 2026 Spelling Bee Competition”. Empty uses the gallery name.</span>
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          Subtitle
+          <input name="coverSubtitle" defaultValue={gallery.coverSubtitle ?? ''} placeholder="Photo highlights" style={{ width: '100%', marginTop: 4 }} />
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          Prepared for
+          <input name="preparedFor" defaultValue={gallery.preparedFor ?? ''} placeholder="El Shaddai Falcons Academy" style={{ width: '100%', marginTop: 4 }} />
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
+          Thank-you message
+          <textarea name="description" rows={4} defaultValue={gallery.description ?? ''} placeholder="Thank you for trusting us with such a special day. It was an honour to capture it." style={{ width: '100%', marginTop: 4, resize: 'vertical' }} />
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--text-muted)' }}>Shown on the cover, under the title. Two or three sentences look best.</span>
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          Page look
+          <select name="theme" defaultValue={gallery.theme} style={{ width: '100%', marginTop: 4 }}>
+            <option value="light">Light, like a printed album</option>
+            <option value="dark">Dark, like a cinema</option>
+          </select>
+        </label>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Cover style</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {COVER_ART.map((c) => (
+              <label key={c.key} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12 }}>
+                <input type="radio" name="coverStyle" value={c.key} defaultChecked={gallery.coverStyle === c.key} style={{ display: 'none' }} className="cover-radio" />
+                <span className="cover-art" style={{ display: 'block', position: 'relative', width: 120, height: 76, borderRadius: 8, overflow: 'hidden', border: '2px solid var(--border)', marginBottom: 4 }}>{c.art}</span>
+                {c.label}
+              </label>
+            ))}
+          </div>
+          <style dangerouslySetInnerHTML={{ __html: '.cover-radio:checked + .cover-art { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-dim); }' }} />
+        </div>
+        {/* the details below belong to the same save button */}
+        <input type="hidden" name="title" value={gallery.title} />
+        <input type="hidden" name="projectId" value={gallery.projectId ?? ''} />
+        <input type="hidden" name="eventDate" value={day(gallery.eventDate)} />
+        <input type="hidden" name="expiresAt" value={day(gallery.expiresAt)} />
+        {gallery.allowDownload && <input type="hidden" name="allowDownload" value="on" />}
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="primary" type="submit">Save cover</button>
+          <a href={`/gallery/${gallery.slug || gallery.shareToken}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>See how it looks ↗</a>
+        </div>
+      </form>
+
+      <div style={{ fontWeight: 600, fontSize: 14, margin: '26px 0 8px' }}>Details</div>
       <form action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10, alignItems: 'end', marginBottom: 14 }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Name
+          Gallery name (only you see this)
           <input name="title" required defaultValue={gallery.title} style={{ width: '100%', marginTop: 4 }} />
         </label>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -90,39 +150,18 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
             ))}
           </select>
         </label>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Client page look
-          <select name="theme" defaultValue={gallery.theme} style={{ width: '100%', marginTop: 4 }}>
-            <option value="light">Light, like a printed album</option>
-            <option value="dark">Dark, like a cinema</option>
-          </select>
-        </label>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Cover style</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {[
-              { key: 'full', label: 'Full', art: <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }}><div style={{ position: 'absolute', left: '50%', top: '58%', transform: 'translateX(-50%)', width: '50%', height: 3, background: '#fff', opacity: 0.9 }} /></div> },
-              { key: 'split', label: 'Split', art: <div style={{ position: 'absolute', inset: 0, display: 'flex' }}><div style={{ flex: 1, background: '#f3f1ed', position: 'relative' }}><div style={{ position: 'absolute', left: '18%', top: '45%', width: '64%', height: 3, background: '#222' }} /></div><div style={{ flex: 1, background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }} /></div> },
-              { key: 'classic', label: 'Classic', art: <div style={{ position: 'absolute', inset: 0, background: '#f3f1ed' }}><div style={{ position: 'absolute', left: '30%', top: '12%', width: '40%', height: 3, background: '#222' }} /><div style={{ position: 'absolute', left: '14%', right: '14%', top: '32%', bottom: '10%', background: 'linear-gradient(180deg,#8a7a68,#2c2620)' }} /></div> },
-            ].map((c) => (
-              <label key={c.key} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12 }}>
-                <input type="radio" name="coverStyle" value={c.key} defaultChecked={gallery.coverStyle === c.key} style={{ display: 'none' }} className="cover-radio" />
-                <span className="cover-art" style={{ display: 'block', position: 'relative', width: 120, height: 76, borderRadius: 8, overflow: 'hidden', border: '2px solid var(--border)', marginBottom: 4 }}>{c.art}</span>
-                {c.label}
-              </label>
-            ))}
-          </div>
-          <style dangerouslySetInnerHTML={{ __html: '.cover-radio:checked + .cover-art { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-dim); }' }} />
-        </div>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
-          Message to your client
-          <input name="description" defaultValue={gallery.description ?? ''} placeholder="Thank you! Here are your photos." style={{ width: '100%', marginTop: 4 }} />
-        </label>
         <label style={{ fontSize: 13, display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="checkbox" name="allowDownload" defaultChecked={gallery.allowDownload} />
           Let the client download
         </label>
-        <button className="primary" type="submit">Save</button>
+        {/* keep the cover settings when only the details are saved */}
+        <input type="hidden" name="coverTitle" value={gallery.coverTitle ?? ''} />
+        <input type="hidden" name="coverSubtitle" value={gallery.coverSubtitle ?? ''} />
+        <input type="hidden" name="preparedFor" value={gallery.preparedFor ?? ''} />
+        <input type="hidden" name="description" value={gallery.description ?? ''} />
+        <input type="hidden" name="theme" value={gallery.theme} />
+        <input type="hidden" name="coverStyle" value={gallery.coverStyle} />
+        <button className="primary" type="submit">Save details</button>
       </form>
 
       <form action={setGalleryPasscode.bind(null, gallery.id)} className="card" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>

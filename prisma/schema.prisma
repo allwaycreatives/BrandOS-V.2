@@ -479,8 +479,12 @@ model Gallery {
   id            String    @id @default(cuid())
   brandSpaceId  String
   projectId     String?   // the project this delivery belongs to, like a photo shoot
-  title         String
-  description   String?
+  title         String    // the name you see in BrandOS
+  coverTitle    String?   // the title your client sees on the cover (defaults to the name)
+  coverSubtitle String?
+  preparedFor   String?   // "Prepared for ..." line on the cover
+  slug          String?   @unique // an easy-to-read link, like /gallery/spelling-bee-2026
+  description   String?   // the thank-you message shown on the cover
   eventDate     DateTime?
   expiresAt     DateTime? // after this day the link stops working
   shareToken    String    @unique

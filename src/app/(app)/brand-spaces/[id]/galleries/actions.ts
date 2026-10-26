@@ -7,7 +7,7 @@ import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
 import { accessTokenFor, deleteDriveFiles, driveConfigured, fileInfo, revokeToken, decrypt } from '@/lib/googleDrive'
 import { newGalleryToken, hashPasscode, isGalleryBlobUrl } from '@/lib/gallery'
-import { kindOf } from '@/lib/galleryFormat'
+import { kindOf, checkSlug } from '@/lib/galleryFormat'
 
 async function requireEdit(brandSpaceId: string) {
   const access = await assertBrandSpaceAccess(brandSpaceId)
@@ -81,6 +81,9 @@ export async function updateGallery(galleryId: string, formData: FormData) {
     where: { id: galleryId },
     data: {
       title,
+      coverTitle: String(formData.get('coverTitle') || '').trim().slice(0, 200) || null,
+      coverSubtitle: String(formData.get('coverSubtitle') || '').trim().slice(0, 200) || null,
+      preparedFor: String(formData.get('preparedFor') || '').trim().slice(0, 200) || null,
       description: String(formData.get('description') || '').trim().slice(0, 2000) || null,
       eventDate: parseDate(formData.get('eventDate')),
       expiresAt: parseDate(formData.get('expiresAt')),
@@ -206,4 +209,26 @@ export async function disconnectGoogleDrive() {
   } catch {}
   await db.googleConnection.delete({ where: { id: conn.id } })
   revalidatePath('/brand-spaces', 'layout')
+}
+
+// Gives the gallery an easy-to-read link. The original private link keeps working too.
+export async function setGallerySlug(galleryId: string, raw: string): Promise<{ ok: true; slug: string | null } | { error: string }> {
+  try {
+    const g = await galleryForEdit(galleryId)
+    const text = (raw || '').trim()
+    if (!text) {
+      await db.gallery.update({ where: { id: galleryId }, data: { slug: null } })
+      refresh(g.brandSpaceId, galleryId)
+      return { ok: true, slug: null }
+    }
+    const c = checkSlug(text)
+    if (!c.ok) return { error: c.error }
+    const [bySlug, byToken] = await Promise.all([db.gallery.findUnique({ where: { slug: c.slug } }), db.gallery.findUnique({ where: { shareToken: c.slug } })])
+    if ((bySlug && bySlug.id !== galleryId) || (byToken && byToken.id !== galleryId)) return { error: 'That link is already used by another gallery. Try adding a word or a number.' }
+    await db.gallery.update({ where: { id: galleryId }, data: { slug: c.slug } })
+    refresh(g.brandSpaceId, galleryId)
+    return { ok: true, slug: c.slug }
+  } catch (e) {
+    return { error: (e as Error).message || 'Could not save the link.' }
+  }
 }

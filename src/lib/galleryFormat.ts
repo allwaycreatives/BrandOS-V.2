@@ -34,3 +34,23 @@ export const isServedByBrandOS = (url: string) => url.startsWith('/api/gallery/'
 
 export const naturalSort = <T extends { name: string }>(items: T[]) =>
   [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+
+/** Turns "El Shaddai Falcons · Spelling Bee 2026" into "el-shaddai-falcons-spelling-bee-2026". */
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50)
+    .replace(/-+$/, '')
+}
+
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/
+export function checkSlug(raw: string): { ok: true; slug: string } | { ok: false; error: string } {
+  const slug = raw.trim().toLowerCase()
+  if (!SLUG_RE.test(slug)) return { ok: false, error: 'Use 3 to 60 letters, numbers or dashes, with no spaces. For example: spelling-bee-2026' }
+  if (slug.includes('--')) return { ok: false, error: 'Please use single dashes between words.' }
+  return { ok: true, slug }
+}

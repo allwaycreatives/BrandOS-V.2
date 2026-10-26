@@ -10,8 +10,12 @@ import GalleryView, { type ViewItem } from './GalleryView'
 
 export const dynamic = 'force-dynamic'
 
-const lookup = (token: string) =>
-  db.gallery.findUnique({ where: { shareToken: token }, include: { items: true, brandSpace: { select: { name: true } } } }).catch(() => null)
+// The address can be the private code or the readable link the photographer chose.
+const lookup = async (key: string) => {
+  const include = { items: true, brandSpace: { select: { name: true } } }
+  const byCode = await db.gallery.findUnique({ where: { shareToken: key }, include }).catch(() => null)
+  return byCode ?? (await db.gallery.findUnique({ where: { slug: key }, include }).catch(() => null))
+}
 
 export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
   const g = await lookup(params.token)
@@ -20,7 +24,7 @@ export async function generateMetadata({ params }: { params: { token: string } }
   const site = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
   const image = cover?.driveThumbId ? (site ? `${site}/api/gallery/${g.shareToken}/file/${cover.id}?v=t` : undefined) : cover?.thumbUrl || undefined
   // The title is shown when the link is shared; the pictures stay behind the passcode if there is one.
-  return { title: `${g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.title, description: `A gallery from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
+  return { title: `${g.coverTitle || g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.coverTitle || g.title, description: `A gallery from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
 }
 
 function Centered({ theme, children }: { theme: string; children: React.ReactNode }) {
@@ -39,7 +43,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
   if (g.expiresAt && Date.now() > g.expiresAt.getTime() + 12 * 3600 * 1000) {
     return (
       <Centered theme={g.theme}>
-        <h1 className="g-serif" style={{ fontSize: 40, fontWeight: 500, margin: 0 }}>{g.title}</h1>
+        <h1 className="g-serif" style={{ fontSize: 40, fontWeight: 500, margin: 0 }}>{g.coverTitle || g.title}</h1>
         <div style={{ color: 'var(--g-muted)', fontSize: 14 }}>This gallery link has expired. Please ask {g.brandSpace.name} to send you a new one.</div>
       </Centered>
     )
@@ -49,7 +53,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     return (
       <Centered theme={g.theme}>
         <div className="g-eyebrow" style={{ color: 'var(--g-muted)' }}>{g.brandSpace.name}</div>
-        <h1 className="g-serif" style={{ fontSize: 'clamp(36px, 7vw, 56px)', fontWeight: 500, margin: 0, lineHeight: 1.05 }}>{g.title}</h1>
+        <h1 className="g-serif" style={{ fontSize: 'clamp(36px, 7vw, 56px)', fontWeight: 500, margin: 0, lineHeight: 1.05 }}>{g.coverTitle || g.title}</h1>
         <div style={{ color: 'var(--g-muted)', fontSize: 14, marginBottom: 10 }}>This gallery is private. Enter the passcode you were given.</div>
         <PasscodeForm token={g.shareToken} />
       </Centered>
@@ -89,8 +93,10 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
 
   return (
     <GalleryView
-      title={g.title}
+      title={g.coverTitle || g.title}
       brand={g.brandSpace.name}
+      subtitle={g.coverSubtitle}
+      preparedFor={g.preparedFor}
       description={g.description}
       dateLabel={g.eventDate ? g.eventDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''}
       cover={cover}

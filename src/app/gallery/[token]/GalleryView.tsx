@@ -48,10 +48,12 @@ function Pic({ src, alt, style }: { src: string; alt: string; style?: React.CSSP
 }
 
 export default function GalleryView({
-  title, brand, description, dateLabel, cover, allowDownload, theme, coverStyle, items,
+  title, brand, subtitle, preparedFor, description, dateLabel, cover, allowDownload, theme, coverStyle, items,
 }: {
   title: string
   brand: string
+  subtitle: string | null
+  preparedFor: string | null
   description: string | null
   dateLabel: string
   cover: string | null
@@ -190,13 +192,24 @@ export default function GalleryView({
 
   const eyebrow = { color: 'inherit', opacity: 0.85 } as const
   const scrollToGrid = () => gridRef.current?.scrollIntoView({ behavior: 'smooth' })
+  // Long titles (like a full event name) get a smaller size so they always fit nicely.
+  const n = title.length
+  const titleSize = (big: boolean) =>
+    big ? (n <= 18 ? 'clamp(44px, 9vw, 112px)' : n <= 36 ? 'clamp(38px, 7vw, 84px)' : 'clamp(30px, 5.4vw, 66px)') : n <= 18 ? 'clamp(38px, 6.4vw, 84px)' : n <= 36 ? 'clamp(32px, 5.2vw, 64px)' : 'clamp(28px, 4.2vw, 52px)'
+  const forLine = [preparedFor ? `Prepared for ${preparedFor}` : '', dateLabel].filter(Boolean).join('   ·   ')
+
+  // The welcome: brand, title, subtitle, who it is for, and the thank-you message, all before the photos.
   const titleBlock = (big: boolean, light: boolean) => (
     <div className="g-rise" style={{ position: 'relative', textAlign: 'center', padding: '0 24px', color: light ? '#fff' : 'var(--g-fg)', maxWidth: 1000 }}>
       <div className="g-eyebrow g-rise" style={eyebrow}>{brand}</div>
       <div style={{ width: 1, height: big ? 48 : 32, background: 'currentColor', opacity: 0.5, margin: '22px auto' }} />
-      <h1 className="g-serif g-rise d1" style={{ fontSize: big ? 'clamp(44px, 9vw, 112px)' : 'clamp(38px, 6.4vw, 84px)', fontWeight: 500, lineHeight: 0.98, letterSpacing: '-0.01em', margin: 0 }}>{title}</h1>
-      {dateLabel && <div className="g-eyebrow g-rise d2" style={{ ...eyebrow, marginTop: 26 }}>{dateLabel}</div>}
-      <div className="g-rise d3" style={{ marginTop: 40 }}>
+      <h1 className="g-serif g-rise d1" style={{ fontSize: titleSize(big), fontWeight: 500, lineHeight: 1.02, letterSpacing: '-0.01em', margin: 0, textWrap: 'balance' as const }}>{title}</h1>
+      {subtitle && <div className="g-serif g-rise d2" style={{ fontSize: 'clamp(20px, 2.8vw, 32px)', fontStyle: 'italic', opacity: 0.92, marginTop: 14 }}>{subtitle}</div>}
+      {forLine && <div className="g-eyebrow g-rise d2" style={{ ...eyebrow, marginTop: 26 }}>{forLine}</div>}
+      {description && (
+        <p className="g-serif g-rise d3" style={{ maxWidth: 620, margin: '28px auto 0', fontSize: 'clamp(18px, 2.1vw, 23px)', fontStyle: 'italic', lineHeight: 1.6, opacity: 0.92, whiteSpace: 'pre-wrap' }}>{description}</p>
+      )}
+      <div className="g-rise d3" style={{ marginTop: description ? 36 : 40 }}>
         <button className="g-link" onClick={scrollToGrid}>View gallery ↓</button>
       </div>
     </div>
@@ -249,7 +262,7 @@ export default function GalleryView({
           )}
         </header>
       ) : (
-        <header style={{ position: 'relative', minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--g-card)' }}>
+        <header style={{ position: 'relative', minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--g-card)', padding: '72px 0' }}>
           {cover && (
             <>
               <img className="g-kb" src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -284,9 +297,6 @@ export default function GalleryView({
 
       {/* ---------- Grid ---------- */}
       <main ref={gridRef} style={{ maxWidth: 1600, margin: '0 auto', padding: '40px 14px 90px', scrollMarginTop: 60 }}>
-        {description && (
-          <p className="g-serif" style={{ maxWidth: 720, margin: '0 auto 44px', textAlign: 'center', fontSize: 'clamp(20px, 2.6vw, 28px)', fontStyle: 'italic', lineHeight: 1.45, color: 'var(--g-fg)', opacity: 0.85, whiteSpace: 'pre-wrap' }}>{description}</p>
-        )}
         {visible.length === 0 ? (
           <div className="g-serif" style={{ textAlign: 'center', color: 'var(--g-muted)', padding: '70px 0', fontSize: 26, fontStyle: 'italic' }}>Your photos are on their way.</div>
         ) : (

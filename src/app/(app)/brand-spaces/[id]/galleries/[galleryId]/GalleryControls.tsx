@@ -5,6 +5,7 @@ import { deleteGallery, deleteGalleryItem, setGalleryCover, setGalleryPublished 
 import { formatBytes } from '@/lib/galleryFormat'
 
 export function ShareBox({ galleryId, token, published }: { galleryId: string; token: string; published: boolean }) {
+  // token is the part of the address after /gallery/ (the readable link if there is one, otherwise the private code)
   const [copied, setCopied] = useState(false)
   const [pending, start] = useTransition()
   const link = typeof window !== 'undefined' ? `${window.location.origin}/gallery/${token}` : `/gallery/${token}`
