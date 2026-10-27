@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { del } from '@vercel/blob'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
-import { accessTokenFor, deleteDriveFiles, driveConfigured, fileInfo, revokeToken, decrypt } from '@/lib/googleDrive'
+import { accessTokenFor, deleteDriveFiles, driveConfigured, fileInfo, revokeToken, decrypt, DRIVE_API } from '@/lib/googleDrive'
 import { newGalleryToken, hashPasscode, isGalleryBlobUrl } from '@/lib/gallery'
 import { kindOf, checkSlug } from '@/lib/galleryFormat'
 
@@ -120,6 +120,8 @@ export type NewGalleryItem = {
   size: number
   width?: number | null
   height?: number | null
+  capturedAt?: string | null // when the photo was taken
+  setId?: string | null // the section it was uploaded into
 }
 
 // Called by the browser after a file has finished uploading.
@@ -157,7 +159,11 @@ export async function addGalleryItem(galleryId: string, input: NewGalleryItem): 
       }
     }
 
-    const item = await db.galleryItem.create({ data: { galleryId, name, contentType, kind, size, width: int(input.width), height: int(input.height), ...files } })
+    const taken = input.capturedAt ? new Date(input.capturedAt) : null
+    const capturedAt = taken && !isNaN(taken.getTime()) && taken.getFullYear() > 1990 && taken.getTime() < Date.now() + 86400000 ? taken : null
+    let setId: string | null = null
+    if (input.setId) setId = (await db.gallerySet.findFirst({ where: { id: input.setId, galleryId } }))?.id ?? null
+    const item = await db.galleryItem.create({ data: { galleryId, name, contentType, kind, size, width: int(input.width), height: int(input.height), capturedAt, setId, ...files } })
     if (!g.coverItemId && kind === 'image') await db.gallery.update({ where: { id: galleryId }, data: { coverItemId: item.id } })
     return { ok: true, id: item.id }
   } catch (e) {
@@ -230,5 +236,131 @@ export async function setGallerySlug(galleryId: string, raw: string): Promise<{ 
     return { ok: true, slug: c.slug }
   } catch (e) {
     return { error: (e as Error).message || 'Could not save the link.' }
+  }
+}
+
+/* ---------- sections (sets), order and bulk actions ---------- */
+
+export async function createSet(galleryId: string, name: string): Promise<{ ok: true; id: string } | { error: string }> {
+  const g = await galleryForEdit(galleryId)
+  const clean = String(name || '').trim().slice(0, 80)
+  if (!clean) return { error: 'Give the section a name.' }
+  const last = await db.gallerySet.findFirst({ where: { galleryId }, orderBy: { sortOrder: 'desc' } })
+  const set = await db.gallerySet.create({ data: { galleryId, name: clean, sortOrder: (last?.sortOrder ?? 0) + 1 } })
+  refresh(g.brandSpaceId, galleryId)
+  return { ok: true, id: set.id }
+}
+
+async function setForEdit(setId: string) {
+  const set = await db.gallerySet.findUnique({ where: { id: setId }, include: { gallery: true } })
+  if (!set) throw new Error('Section not found.')
+  await requireEdit(set.gallery.brandSpaceId)
+  return set
+}
+
+export async function renameSet(setId: string, name: string) {
+  const set = await setForEdit(setId)
+  const clean = String(name || '').trim().slice(0, 80)
+  if (!clean) return
+  await db.gallerySet.update({ where: { id: setId }, data: { name: clean } })
+  refresh(set.gallery.brandSpaceId, set.galleryId)
+}
+
+// The photos in a deleted section are not deleted; they go back to the first section.
+export async function deleteSet(setId: string) {
+  const set = await setForEdit(setId)
+  await db.gallerySet.delete({ where: { id: setId } })
+  refresh(set.gallery.brandSpaceId, set.galleryId)
+}
+
+export async function moveSet(setId: string, direction: -1 | 1) {
+  const set = await setForEdit(setId)
+  const all = await db.gallerySet.findMany({ where: { galleryId: set.galleryId }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] })
+  const i = all.findIndex((x) => x.id === setId)
+  const j = i + direction
+  if (i < 0 || j < 0 || j >= all.length) return
+  const reordered = [...all]
+  ;[reordered[i], reordered[j]] = [reordered[j], reordered[i]]
+  await Promise.all(reordered.map((x, n) => db.gallerySet.update({ where: { id: x.id }, data: { sortOrder: n + 1 } })))
+  refresh(set.gallery.brandSpaceId, set.galleryId)
+}
+
+export async function renameMainSet(galleryId: string, name: string) {
+  const g = await galleryForEdit(galleryId)
+  const clean = String(name || '').trim().slice(0, 80)
+  if (!clean) return
+  await db.gallery.update({ where: { id: galleryId }, data: { mainSetName: clean } })
+  refresh(g.brandSpaceId, galleryId)
+}
+
+export async function setSortMode(galleryId: string, mode: string) {
+  const g = await galleryForEdit(galleryId)
+  if (!['name', 'date', 'date_desc'].includes(mode)) return
+  await db.gallery.update({ where: { id: galleryId }, data: { sortMode: mode } })
+  refresh(g.brandSpaceId, galleryId)
+}
+
+// Move chosen photos into a section (null = the first section).
+export async function moveItems(galleryId: string, itemIds: string[], setId: string | null) {
+  const g = await galleryForEdit(galleryId)
+  let target: string | null = null
+  if (setId) {
+    const set = await db.gallerySet.findFirst({ where: { id: setId, galleryId } })
+    if (!set) throw new Error('Section not found.')
+    target = set.id
+  }
+  await db.galleryItem.updateMany({ where: { id: { in: itemIds.slice(0, 2000) }, galleryId }, data: { setId: target } })
+  refresh(g.brandSpaceId, galleryId)
+}
+
+export async function deleteItems(galleryId: string, itemIds: string[]) {
+  const g = await db.gallery.findUnique({ where: { id: galleryId }, include: { driveConnection: true } })
+  if (!g) return
+  await requireEdit(g.brandSpaceId)
+  const items = await db.galleryItem.findMany({ where: { id: { in: itemIds.slice(0, 2000) }, galleryId } })
+  if (!items.length) return
+  await db.galleryItem.deleteMany({ where: { id: { in: items.map((i) => i.id) } } })
+  if (g.coverItemId && items.some((i) => i.id === g.coverItemId)) {
+    const next = await db.galleryItem.findFirst({ where: { galleryId, kind: 'image' }, orderBy: { createdAt: 'asc' } })
+    await db.gallery.update({ where: { id: galleryId }, data: { coverItemId: next?.id ?? null } })
+  }
+  if (g.driveConnection) await deleteDriveFiles(g.driveConnection, items.flatMap((i) => [i.driveFileId, i.driveThumbId, i.driveWebId]))
+  await deleteBlobs(items.flatMap((i) => [i.driveFileId ? null : i.url, i.thumbUrl, i.webUrl]))
+  refresh(g.brandSpaceId, galleryId)
+}
+
+// Reads each photo's real "date taken" from Google Drive for photos that were uploaded without one,
+// so the gallery can be put in the order things actually happened.
+export async function readCaptureDates(galleryId: string): Promise<{ ok: true; found: number; total: number } | { error: string }> {
+  try {
+    const g = await db.gallery.findUnique({ where: { id: galleryId }, include: { driveConnection: true } })
+    if (!g) return { error: 'Gallery not found.' }
+    await requireEdit(g.brandSpaceId)
+    if (!g.driveConnection) return { error: 'Dates can only be read from photos kept in Google Drive.' }
+    const todo = await db.galleryItem.findMany({ where: { galleryId, capturedAt: null, driveFileId: { not: null } }, select: { id: true, driveFileId: true } })
+    const token = await accessTokenFor(g.driveConnection)
+    let found = 0
+    let next = 0
+    const worker = async () => {
+      while (next < todo.length) {
+        const it = todo[next++]
+        try {
+          const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(it.driveFileId!)}?fields=imageMediaMetadata(time),createdTime`, { headers: { authorization: `Bearer ${token}` } })
+          if (!res.ok) continue
+          const j = await res.json().catch(() => ({}))
+          const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(j?.imageMediaMetadata?.time || '')
+          if (!m) continue
+          const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]))
+          if (isNaN(d.getTime())) continue
+          await db.galleryItem.update({ where: { id: it.id }, data: { capturedAt: d } })
+          found++
+        } catch {}
+      }
+    }
+    await Promise.all(Array.from({ length: 6 }, worker))
+    refresh(g.brandSpaceId, galleryId)
+    return { ok: true, found, total: todo.length }
+  } catch (e) {
+    return { error: (e as Error).message || 'Could not read the dates.' }
   }
 }

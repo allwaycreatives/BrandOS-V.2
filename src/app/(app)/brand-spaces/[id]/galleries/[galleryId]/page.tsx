@@ -2,11 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess } from '@/lib/auth'
-import { formatBytes, naturalSort } from '@/lib/galleryFormat'
+import { formatBytes } from '@/lib/galleryFormat'
 import { updateGallery, setGalleryPasscode } from '../actions'
 import GalleryUploader from './GalleryUploader'
 import LinkEditor from './LinkEditor'
-import { ShareBox, ItemTile, DeleteGalleryButton } from './GalleryControls'
+import { ShareBox, DeleteGalleryButton } from './GalleryControls'
+import FilesGrid, { type AdminItem } from './FilesGrid'
+
+export const maxDuration = 120 // reading the dates of many photos can take a little while
 
 const SERIF = "Georgia, 'Times New Roman', serif"
 const COVER_ART = [
@@ -20,11 +23,23 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 
-  const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, project: { select: { id: true, name: true } }, driveConnection: { select: { email: true } } } }).catch(() => null)
+  const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, sets: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }, project: { select: { id: true, name: true } }, driveConnection: { select: { email: true } } } }).catch(() => null)
   if (!gallery || gallery.brandSpaceId !== params.id) notFound()
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
-  const items = naturalSort(gallery.items)
+  const items = gallery.items
+  // Pictures of files kept in Google Drive are fetched through BrandOS, so they show even before the gallery is published.
+  const adminUrl = (id: string, v: string) => `/api/gallery-admin/${gallery.id}/file/${id}?v=${v}`
+  const adminItems: AdminItem[] = items.map((i) => ({
+    id: i.id,
+    name: i.name,
+    kind: i.kind as AdminItem['kind'],
+    size: i.size,
+    preview: i.driveThumbId ? adminUrl(i.id, 't') : i.thumbUrl || (i.kind === 'image' && i.size < 6 * 1024 * 1024 ? (i.driveFileId ? adminUrl(i.id, 'o') : i.url) : null),
+    view: i.kind === 'file' ? null : i.driveFileId ? adminUrl(i.id, i.kind === 'image' ? 'w' : 'o') : i.kind === 'image' ? i.webUrl || i.url : i.url,
+    setId: i.setId,
+    capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null,
+  }))
   const bytes = items.reduce((n, i) => n + i.size, 0)
   const photos = items.filter((i) => i.kind === 'image').length
   const videos = items.filter((i) => i.kind === 'video').length
@@ -61,18 +76,10 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
           <>Files are kept in BrandOS storage.</>
         )}
       </div>
-      <GalleryUploader galleryId={gallery.id} storage={gallery.storage === 'drive' ? 'drive' : 'blob'} />
+      <GalleryUploader galleryId={gallery.id} storage={gallery.storage === 'drive' ? 'drive' : 'blob'} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} />
 
       <div style={{ fontWeight: 600, fontSize: 14, margin: '28px 0 10px' }}>Files</div>
-      {items.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nothing here yet.</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
-          {items.map((i) => (
-            <ItemTile key={i.id} galleryId={gallery.id} item={{ id: i.id, name: i.name, kind: i.kind, size: i.size, thumbUrl: i.thumbUrl, url: i.url }} isCover={gallery.coverItemId === i.id} />
-          ))}
-        </div>
-      )}
+      <FilesGrid galleryId={gallery.id} items={adminItems} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} coverItemId={gallery.coverItemId} sortMode={gallery.sortMode} canReadDates={gallery.storage === 'drive' && !!gallery.driveConnection} />
 
       <div style={{ fontWeight: 600, fontSize: 14, margin: '32px 0 4px' }}>Cover & welcome message</div>
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>This is the first thing your client sees, before the photos. Leave a line empty to hide it.</div>

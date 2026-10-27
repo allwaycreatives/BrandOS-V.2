@@ -496,6 +496,8 @@ model Gallery {
   driveConnectionId String?
   driveFolderId   String?   // this gallery's folder in Google Drive
   drivePreviewsId String?   // sub-folder for the small preview copies
+  sortMode      String    @default("date") // how photos are ordered: name | date | date_desc
+  mainSetName   String    @default("Photos") // the name of the first section (photos not put in a set)
   coverStyle    String    @default("full")  // full | split | classic
   theme         String    @default("light") // light | dark: how the client's page looks
   createdAt     DateTime  @default(now())
@@ -505,6 +507,7 @@ model Gallery {
   project    Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   driveConnection GoogleConnection? @relation(fields: [driveConnectionId], references: [id], onDelete: SetNull)
   items      GalleryItem[]
+  sets       GallerySet[]
 
   @@index([brandSpaceId])
   @@index([projectId])
@@ -527,11 +530,15 @@ model GalleryItem {
   size        Float    @default(0)      // bytes of the original
   width       Int?
   height      Int?
+  capturedAt  DateTime? // when the photo was taken (from the camera), used to put photos in order
+  setId       String?   // the section it belongs to; empty means the first section
   createdAt   DateTime @default(now())
 
-  gallery Gallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  set     GallerySet? @relation(fields: [setId], references: [id], onDelete: SetNull)
 
   @@index([galleryId])
+  @@index([setId])
 }
 
 // A Google Drive that a person connected so galleries can keep their files there (their own space and quota).
@@ -546,4 +553,18 @@ model GoogleConnection {
   updatedAt    DateTime @updatedAt
 
   galleries Gallery[]
+}
+
+// A section of a gallery, like "Winners & graduation". Clients see them as tabs and headings.
+model GallerySet {
+  id        String   @id @default(cuid())
+  galleryId String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  gallery Gallery       @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  items   GalleryItem[]
+
+  @@index([galleryId])
 }

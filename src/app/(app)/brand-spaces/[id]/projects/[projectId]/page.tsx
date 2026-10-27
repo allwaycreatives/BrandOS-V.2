@@ -29,7 +29,7 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
   const deliverables = await db.deliverable.findMany({ where: { projectId: project.id }, orderBy: { updatedAt: 'desc' } }).catch(() => [])
 
   const galleries = await db.gallery
-    .findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true } } } })
+    .findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true, driveThumbId: true } } } })
     .catch(() => [])
 
   const stageIndex = PROJECT_STAGES.findIndex((s) => s.key === project.status)
@@ -132,7 +132,8 @@ export default async function ProjectPage({ params }: { params: { id: string; pr
       <div style={{ marginBottom: 10 }}>
         {galleries.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nothing delivered yet.</div>}
         {galleries.map((g) => {
-          const thumb = g.items.find((i) => i.id === g.coverItemId)?.thumbUrl || g.items.find((i) => i.thumbUrl)?.thumbUrl
+          const ci = g.items.find((i) => i.id === g.coverItemId && (i.thumbUrl || i.driveThumbId)) ?? g.items.find((i) => i.thumbUrl || i.driveThumbId)
+          const thumb = ci ? (ci.driveThumbId ? `/api/gallery-admin/${g.id}/file/${ci.id}?v=t` : ci.thumbUrl) : null
           return (
             <Link key={g.id} href={`/brand-spaces/${params.id}/galleries/${g.id}`} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13.5 }}>
               <span style={{ width: 52, height: 52, borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>

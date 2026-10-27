@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { unlockCookieName, unlockCookieValue } from '@/lib/gallery'
-import { naturalSort } from '@/lib/galleryFormat'
 import { GALLERY_CSS, themeVars } from '@/lib/galleryTheme'
 import PasscodeForm from './PasscodeForm'
 import GalleryView, { type ViewItem } from './GalleryView'
@@ -12,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 // The address can be the private code or the readable link the photographer chose.
 const lookup = async (key: string) => {
-  const include = { items: true, brandSpace: { select: { name: true } } }
+  const include = { items: true, sets: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] }, brandSpace: { select: { name: true } } }
   const byCode = await db.gallery.findUnique({ where: { shareToken: key }, include }).catch(() => null)
   return byCode ?? (await db.gallery.findUnique({ where: { slug: key }, include }).catch(() => null))
 }
@@ -79,12 +78,12 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     return { thumb: i.thumbUrl, web: i.webUrl, small: i.kind === 'image' ? i.url : null, original: i.url, hasWeb: !!i.webUrl }
   }
 
-  const items: ViewItem[] = naturalSort(g.items).map((i) => {
+  const items: ViewItem[] = g.items.map((i) => {
     const u = urls(i)
     const display = u.web || u.small
     // When downloads are off we do not hand out the original of a picture that has a smaller copy to look at.
     const hideOriginal = !g.allowDownload && i.kind === 'image' && u.hasWeb
-    return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original }
+    return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original, setId: i.setId, capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null }
   })
   const coverItem = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.kind === 'image')
   // Sharpest copy that is still light: the 2400px copy, else a small original, else the preview.
@@ -103,6 +102,10 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
       allowDownload={g.allowDownload}
       theme={g.theme}
       coverStyle={g.coverStyle}
+      sets={g.sets.map((x) => ({ id: x.id, name: x.name }))}
+      mainSetName={g.mainSetName}
+      sortMode={g.sortMode}
+      favKey={g.shareToken}
       items={items}
     />
   )

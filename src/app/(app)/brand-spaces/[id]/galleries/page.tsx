@@ -16,7 +16,7 @@ export default async function GalleriesPage({ params, searchParams }: { params: 
   const { brandSpace } = access
 
   const galleries = await db.gallery
-    .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true } }, project: { select: { name: true } } } })
+    .findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, include: { items: { select: { id: true, size: true, thumbUrl: true, driveThumbId: true } }, project: { select: { name: true } } } })
     .catch(() => [])
   const { user } = await getOrCreateCurrentUser()
   const conn = await db.googleConnection.findUnique({ where: { userId: user.id } }).catch(() => null)
@@ -51,7 +51,8 @@ export default async function GalleriesPage({ params, searchParams }: { params: 
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 16 }}>
         {galleries.map((g) => {
-          const cover = g.items.find((i) => i.id === g.coverItemId)?.thumbUrl || g.items.find((i) => i.thumbUrl)?.thumbUrl
+          const coverItem = g.items.find((i) => i.id === g.coverItemId && (i.thumbUrl || i.driveThumbId)) ?? g.items.find((i) => i.thumbUrl || i.driveThumbId)
+          const cover = coverItem ? coverItem.driveThumbId ? `/api/gallery-admin/${g.id}/file/${coverItem.id}?v=t` : coverItem.thumbUrl : null
           const bytes = g.items.reduce((n, i) => n + i.size, 0)
           return (
             <Link key={g.id} href={`/brand-spaces/${params.id}/galleries/${g.id}`} style={{ display: 'block' }}>

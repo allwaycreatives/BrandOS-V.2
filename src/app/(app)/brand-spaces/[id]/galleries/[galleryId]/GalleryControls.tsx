@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { deleteGallery, deleteGalleryItem, setGalleryCover, setGalleryPublished } from '../actions'
-import { formatBytes } from '@/lib/galleryFormat'
+import { deleteGallery, setGalleryPublished } from '../actions'
 
 export function ShareBox({ galleryId, token, published }: { galleryId: string; token: string; published: boolean }) {
   // token is the part of the address after /gallery/ (the readable link if there is one, otherwise the private code)
@@ -29,48 +28,6 @@ export function ShareBox({ galleryId, token, published }: { galleryId: string; t
         {pending ? '…' : published ? 'Unpublish' : 'Publish'}
       </button>
       {!published && <div style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}>Draft: the link shows nothing until you publish.</div>}
-    </div>
-  )
-}
-
-export function ItemTile({
-  galleryId,
-  item,
-  isCover,
-}: {
-  galleryId: string
-  item: { id: string; name: string; kind: string; size: number; thumbUrl: string | null; url: string }
-  isCover: boolean
-}) {
-  const [pending, start] = useTransition()
-  const preview = item.thumbUrl || (item.kind === 'image' && item.size < 6 * 1024 * 1024 ? item.url : null)
-  return (
-    <div style={{ opacity: pending ? 0.5 : 1 }}>
-      <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'var(--bg-card)', border: `1px solid ${isCover ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {preview ? <img src={preview} alt={item.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8, textAlign: 'center' }}>{item.kind === 'video' ? '▶ Video' : 'File'}</span>}
-        {item.kind === 'video' && preview && <span style={{ position: 'absolute', right: 6, bottom: 6, background: 'rgba(0,0,0,.65)', color: '#fff', fontSize: 11, padding: '1px 6px', borderRadius: 4 }}>▶</span>}
-        {isCover && <span style={{ position: 'absolute', left: 6, top: 6, background: 'var(--accent)', color: '#000', fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>Cover</span>}
-      </div>
-      <div style={{ fontSize: 11.5, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.name}>{item.name}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <span style={{ flex: 1 }}>{formatBytes(item.size)}</span>
-        {!isCover && item.kind !== 'file' && (
-          <button type="button" disabled={pending} onClick={() => start(async () => { await setGalleryCover(galleryId, item.id) })} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 11, color: 'var(--text-secondary)' }}>
-            Make cover
-          </button>
-        )}
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            if (!confirm(`Delete “${item.name}”? It is removed from storage too.`)) return
-            start(async () => { await deleteGalleryItem(item.id) })
-          }}
-          style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 11, color: 'var(--text-muted)' }}
-        >
-          Delete
-        </button>
-      </div>
     </div>
   )
 }

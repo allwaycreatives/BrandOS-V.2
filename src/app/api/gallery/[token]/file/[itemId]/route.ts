@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { unlockCookieName, unlockCookieValue } from '@/lib/gallery'
-import { accessTokenFor, DRIVE_API } from '@/lib/googleDrive'
+import { streamDriveFile } from '@/lib/driveStream'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,35 +30,11 @@ export async function GET(request: Request, { params }: { params: { token: strin
   if (!fileId) return text(404, 'Not found')
   if (variant === 'o' && !gallery.allowDownload && (asDownload || item.kind !== 'video')) return text(403, 'Downloads are turned off for this gallery')
 
-  const range = request.headers.get('range')
-  const ask = async (force: boolean) =>
-    fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { authorization: `Bearer ${await accessTokenFor(gallery.driveConnection!, force)}`, ...(range ? { range } : {}) } })
-  let up: Response
-  try {
-    up = await ask(false)
-    if (up.status === 401) up = await ask(true)
-  } catch {
-    return text(502, 'Google Drive is not reachable right now')
-  }
-  if (up.status === 404 || up.status === 403) return text(404, 'Not found')
-  if (!up.ok && up.status !== 206) return text(502, 'Google Drive could not provide this file')
-
-  const headers = new Headers()
-  headers.set('content-type', variant === 'o' ? item.contentType || 'application/octet-stream' : up.headers.get('content-type') || 'image/jpeg')
-  headers.set('accept-ranges', 'bytes')
-  for (const h of ['content-length', 'content-range']) {
-    const v = up.headers.get(h)
-    if (v && !up.headers.get('content-encoding')) headers.set(h, v)
-  }
-  if (variant === 'o') {
-    headers.set('cache-control', 'private, no-store')
-    if (asDownload) {
-      const ascii = item.name.replace(/[^\x20-\x7e]+/g, '_').replace(/["\\]/g, '_')
-      headers.set('content-disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(item.name)}`)
-    }
-  } else {
-    // Previews are small and safe to cache; with a passcode they may only live in the visitor's own browser.
-    headers.set('cache-control', gallery.passcodeHash ? 'private, max-age=3600' : 'public, max-age=3600, s-maxage=3600')
-  }
-  return new Response(up.body, { status: up.status === 206 ? 206 : 200, headers })
+  const cacheControl = variant === 'o' ? 'private, no-store' : gallery.passcodeHash ? 'private, max-age=3600' : 'public, max-age=3600, s-maxage=3600'
+  return streamDriveFile(gallery.driveConnection, fileId, request, {
+    // previews keep Drive's own type (jpeg/webp); originals use the type we recorded when they were uploaded
+    contentType: variant === 'o' ? item.contentType || 'application/octet-stream' : '',
+    cacheControl,
+    downloadName: variant === 'o' && asDownload ? item.name : undefined,
+  })
 }

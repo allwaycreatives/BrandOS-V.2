@@ -8,7 +8,7 @@ import { createDriveSession, driveUpload } from '@/lib/driveUpload'
 import { addGalleryItem } from '../actions'
 
 type Status = 'queued' | 'preparing' | 'uploading' | 'saving' | 'done' | 'error'
-type Job = { id: string; file: File; status: Status; pct: number; error?: string }
+type Job = { id: string; file: File; status: Status; pct: number; error?: string; preview?: string; setId: string | null }
 
 const THUMB_EDGE = 720
 const MAX_ACTIVE = 3
@@ -95,7 +95,7 @@ function videoDerived(file: File): Promise<Derived> {
   })
 }
 
-export default function GalleryUploader({ galleryId, storage = 'blob' }: { galleryId: string; storage?: 'blob' | 'drive' }) {
+export default function GalleryUploader({ galleryId, storage = 'blob', sets = [], mainSetName = 'Photos' }: { galleryId: string; storage?: 'blob' | 'drive'; sets?: { id: string; name: string }[]; mainSetName?: string }) {
   const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [dragging, setDragging] = useState(false)
@@ -103,6 +103,8 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
   const active = useRef<Map<string, number>>(new Map())
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const input = useRef<HTMLInputElement>(null)
+  const [target, setTarget] = useState('') // which section new files go into ('' = the first one)
+  const targetRef = useRef('')
   const session = useMemo(() => (storage === 'drive' ? createDriveSession(galleryId) : null), [storage, galleryId])
 
   const update = useCallback((id: string, patch: Partial<Job>) => setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j))), [])
@@ -120,6 +122,8 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
         update(job.id, { status: 'preparing', pct: 0, error: undefined })
         const kind = kindOf(file.type, file.name)
         const d = kind === 'image' ? await imageDerived(file) : kind === 'video' ? await videoDerived(file) : NONE
+        if (d.thumb) update(job.id, { preview: URL.createObjectURL(d.thumb) }) // show the picture right away
+        const capturedAt = file.lastModified ? new Date(file.lastModified).toISOString() : null
 
         update(job.id, { status: 'uploading' })
         let res
@@ -130,7 +134,7 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
           const webId = d.web ? await driveUpload(d.web, { name: `${itemId}-web.${d.web.type === 'image/webp' ? 'webp' : 'jpg'}`, mimeType: d.web.type, parentId: previews, session }) : null
           const fileId = await driveUpload(file, { name: file.name, mimeType: file.type || 'application/octet-stream', parentId: folder, session, onProgress: (p) => update(job.id, { pct: p }) })
           update(job.id, { status: 'saving', pct: 100 })
-          res = await addGalleryItem(galleryId, { name: file.name, drive: { fileId, thumbId, webId }, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height })
+          res = await addGalleryItem(galleryId, { name: file.name, drive: { fileId, thumbId, webId }, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height, capturedAt, setId: job.setId })
         } else {
           const base = `galleries/${galleryId}/${itemId}`
           const common = { direct: true, compress: false, handleUploadUrl: '/api/gallery-upload', clientPayload: JSON.stringify({ galleryId }), stallMs: 60_000 }
@@ -143,7 +147,7 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
           }
           const original = await uploadFile(file, { ...common, pathname: `${base}/${safeFileName(file.name)}`, onProgress: (p) => p >= 0 && update(job.id, { pct: p }) })
           update(job.id, { status: 'saving', pct: 100 })
-          res = await addGalleryItem(galleryId, { name: file.name, url: original.url, thumbUrl, webUrl, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height })
+          res = await addGalleryItem(galleryId, { name: file.name, url: original.url, thumbUrl, webUrl, contentType: file.type || 'application/octet-stream', size: file.size, width: d.width, height: d.height, capturedAt, setId: job.setId })
         }
         if ('error' in res) throw new Error(res.error)
         update(job.id, { status: 'done', pct: 100 })
@@ -175,7 +179,7 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
     (list: FileList | File[]) => {
       const files = Array.from(list).filter((f) => f.size > 0)
       if (!files.length) return
-      const fresh: Job[] = files.map((file) => ({ id: crypto.randomUUID(), file, status: 'queued', pct: 0 }))
+      const fresh: Job[] = files.map((file) => ({ id: crypto.randomUUID(), file, status: 'queued', pct: 0, setId: targetRef.current || null }))
       setJobs((prev) => [...prev, ...fresh])
       queue.current.push(...fresh)
       pump()
@@ -209,6 +213,15 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
 
   return (
     <div>
+      {sets.length > 0 && (
+        <label style={{ display: 'block', fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          Add new files to{' '}
+          <select value={target} onChange={(e) => { setTarget(e.target.value); targetRef.current = e.target.value }} style={{ fontSize: 12.5, padding: '4px 8px' }}>
+            <option value="">{mainSetName}</option>
+            {sets.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
+      )}
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -240,6 +253,9 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
           <div style={{ marginTop: 10, maxHeight: 260, overflowY: 'auto' }}>
             {jobs.filter((j) => j.status !== 'done').slice(0, 60).map((j) => (
               <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12.5 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
+                  {j.preview && <img src={j.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                </span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.file.name}</span>
                 <span style={{ color: 'var(--text-muted)' }}>{formatBytes(j.file.size)}</span>
                 <span style={{ width: 120, textAlign: 'right', color: j.status === 'error' ? '#c0392b' : 'var(--text-secondary)' }}>
@@ -248,6 +264,16 @@ export default function GalleryUploader({ galleryId, storage = 'blob' }: { galle
                 {j.status === 'error' && <button type="button" onClick={() => retry(j)} style={{ padding: '2px 10px', fontSize: 12 }}>Retry</button>}
               </div>
             ))}
+            {jobs.some((j) => j.status === 'done' && j.preview) && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Just uploaded</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {jobs.filter((j) => j.status === 'done' && j.preview).slice(-60).map((j) => (
+                    <img key={j.id} src={j.preview} alt={j.file.name} title={j.file.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                  ))}
+                </div>
+              </div>
+            )}
             {jobs.some((j) => j.status === 'error') && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>{jobs.find((j) => j.status === 'error')?.error}</div>}
           </div>
         </div>

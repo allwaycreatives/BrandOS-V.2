@@ -15,6 +15,16 @@ export const GALLERY_CSS = `
 .g-btn{background:var(--g-btn);color:var(--g-btn-fg);border:1px solid var(--g-btn);border-radius:999px;padding:11px 24px;font-size:12.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:opacity .25s,transform .25s;font-family:inherit}
 .g-btn:hover{opacity:.84}.g-btn:active{transform:scale(.98)}.g-btn:disabled{opacity:.45;cursor:default}
 .g-btn.ghost{background:transparent;color:var(--g-fg);border-color:var(--g-line)}
+.g-cta{display:inline-flex;align-items:center;gap:14px;padding:14px 26px 14px 30px;border-radius:999px;border:1px solid currentColor;background:color-mix(in srgb,currentColor 10%,transparent);color:inherit;font:inherit;font-size:12px;font-weight:500;letter-spacing:.24em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background .3s,transform .3s}
+.g-cta:hover{background:color-mix(in srgb,currentColor 22%,transparent);transform:translateY(-2px)}
+.g-cta .g-arrow{display:inline-flex;width:26px;height:26px;border-radius:13px;border:1px solid currentColor;align-items:center;justify-content:center;font-size:13px;animation:g-bob 2.4s ease-in-out infinite}
+@keyframes g-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+.g-ts{text-shadow:0 2px 30px rgba(0,0,0,.55)}
+.g-heart{position:absolute;left:8px;top:8px;width:34px;height:34px;border-radius:17px;border:none;background:rgba(20,20,20,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s,transform .2s}
+.g-tile:hover .g-heart,.g-tile:focus-within .g-heart,.g-heart.on{opacity:1}
+.g-heart.on{color:#ff6b81}
+.g-heart:active{transform:scale(.9)}
+@media (hover:none){.g-heart{opacity:1}}
 .g-link{background:none;border:none;color:inherit;font:inherit;cursor:pointer;letter-spacing:.2em;text-transform:uppercase;font-size:11.5px;padding:6px 2px;border-bottom:1px solid currentColor;opacity:.9}
 .g-input{width:100%;background:transparent;border:1px solid var(--g-line);color:var(--g-fg);border-radius:999px;padding:12px 18px;font-size:15px;text-align:center;outline:none;font-family:inherit}
 .g-input:focus{border-color:var(--g-fg)}
