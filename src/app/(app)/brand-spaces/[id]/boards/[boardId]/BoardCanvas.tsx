@@ -1405,13 +1405,6 @@ export default function BoardCanvas({
                     )}
                     {st.subtitle && !editing && <div style={{ ...text, fontSize: fs * 0.6, fontWeight: 400, opacity: 0.7, marginTop: 4, overflowWrap: 'anywhere' }}>{st.subtitle}</div>}
                   </div>
-                  {card.type === 'table' && <TableCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} onChange={(text) => saveContent(card.id, text)} />}
-                {card.type === 'document' && <DocumentCard key={card.id} content={card.content} readOnly={readOnly} open={editing} onOpen={() => setEditingId(card.id)} onClose={() => setEditingId(null)} onChange={(text) => saveContent(card.id, text)} />}
-                {(card.type === 'sketch' || card.type === 'drawing') && <SketchCard key={card.id} content={card.content} editing={editing} readOnly={readOnly} transparent={card.type === 'drawing'} onChange={(text) => saveContent(card.id, text)} onDone={() => setEditingId(null)} />}
-                {card.type === 'column' && <ColumnCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
-                {card.type === 'audio' && <AudioCard content={card.content} interactive={interactive} />}
-                {card.type === 'video' && <VideoCard content={card.content} interactive={interactive} />}
-                {card.type === 'map' && <MapCard content={card.content} interactive={interactive} />}
                 {handles}
                 </div>
               )
@@ -1490,6 +1483,13 @@ export default function BoardCanvas({
                 })()}
                 {card.type === 'todo' && <TodoCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
                 {card.type === 'color' && <ColorCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} autoFocus={popIds.has(card.id)} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'table' && <TableCard key={card.id} content={card.content} readOnly={readOnly} selected={isSel} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'document' && <DocumentCard key={card.id} content={card.content} readOnly={readOnly} open={editing} onOpen={() => setEditingId(card.id)} onClose={() => setEditingId(null)} onChange={(text) => saveContent(card.id, text)} />}
+                {(card.type === 'sketch' || card.type === 'drawing') && <SketchCard key={card.id} content={card.content} editing={editing} readOnly={readOnly} transparent={card.type === 'drawing'} onChange={(text) => saveContent(card.id, text)} onDone={() => setEditingId(null)} />}
+                {card.type === 'column' && <ColumnCard key={card.id} content={card.content} readOnly={readOnly} onChange={(text) => saveContent(card.id, text)} />}
+                {card.type === 'audio' && <AudioCard content={card.content} interactive={interactive} />}
+                {card.type === 'video' && <VideoCard content={card.content} interactive={interactive} />}
+                {card.type === 'map' && <MapCard content={card.content} interactive={interactive} />}
                 {handles}
               </div>
             )
