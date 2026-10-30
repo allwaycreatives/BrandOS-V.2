@@ -7,6 +7,8 @@ export const metadata: Metadata = { title: `Terms of Service · ${APP_NAME}`, de
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" intro={`These terms are the agreement between you and ${COMPANY} about using ${APP_NAME}. Please read them. By creating an account or using ${APP_NAME} you agree to them.`}>
+      <p>{APP_NAME} was previously called BrandOS. These terms apply to it under either name.</p>
+
       <h2>1. Who can use {APP_NAME}</h2>
       <p>You must be old enough to form a binding contract where you live (and at least 16). If you use {APP_NAME} for a business or on behalf of someone else, you confirm you have the authority to accept these terms for them.</p>
 

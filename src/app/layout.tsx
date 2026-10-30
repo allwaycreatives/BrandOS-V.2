@@ -10,8 +10,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const poppins = Poppins({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-poppins' })
 
 export const metadata: Metadata = {
-  title: 'BrandOS',
-  description: 'Brand OS helps creatives discover their brand, manage it, and grow it, with every brand, project and task in one simple place.',
+  title: 'Brand Console',
+  description: 'Brand Console helps creatives discover their brand, manage it, and grow it, with every brand, project and task in one simple place.',
   manifest: '/manifest.json',
   // Lets Google Search Console confirm you own this site (needed for the Google sign-in consent screen).
   // Paste the code Search Console gives you into GOOGLE_SITE_VERIFICATION in Vercel, then redeploy.
@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 }
 
 // Sets the saved theme before the page paints, so there is no flash. Dark unless you chose light.
-const THEME_SCRIPT = "(function(){try{var t=localStorage.getItem('brandos-theme');if(t!=='light'&&t!=='dark'){t='dark'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}})()"
+const THEME_SCRIPT = "(function(){try{var t=localStorage.getItem('brandos-theme');if(t!=='light'&&t!=='dark'){t='dark'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}try{if(sessionStorage.getItem('bc-intro'))document.documentElement.setAttribute('data-intro','seen')}catch(e){}})()"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

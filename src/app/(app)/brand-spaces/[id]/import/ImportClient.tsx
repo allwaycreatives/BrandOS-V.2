@@ -136,7 +136,7 @@ export default function ImportClient({
       <div className="card">
         {step(1, 'Teach ChatGPT the format (once)')}
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.55, marginBottom: 10 }}>
-          Copy this and paste it into ChatGPT once, for example into the project or custom instructions. It only describes the layout. ChatGPT already knows your brand. After that, just ask it for {kind === 'posts' ? 'posts' : 'a strategy'} &quot;in Brand OS format&quot;.
+          Copy this and paste it into ChatGPT once, for example into the project or custom instructions. It only describes the layout. ChatGPT already knows your brand. After that, just ask it for {kind === 'posts' ? 'posts' : 'a strategy'} &quot;in Brand Console format&quot;.
         </div>
         {kind === 'posts' && hasNames && (
           <label style={{ fontSize: 12.5, display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>

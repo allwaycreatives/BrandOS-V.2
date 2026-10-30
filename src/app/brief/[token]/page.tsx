@@ -19,7 +19,7 @@ export default async function BriefPage({ params }: { params: { token: string } 
         Tell us what you need. It takes about two minutes, and there is nothing to sign up for.
       </p>
       <BriefForm token={params.token} brandName={brand.name} />
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand OS</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand Console</div>
     </main>
   )
 }

@@ -3,7 +3,7 @@ import { CONTENT_TYPES } from './contentOptions'
 import { parseStrategy, type Strategy } from './strategy'
 
 // ---------------------------------------------------------------------------
-// The "Brand OS format": a plain document that ChatGPT (or anyone) writes and Brand OS reads.
+// The "Brand Console format": a plain document that ChatGPT (or anyone) writes and Brand Console reads.
 // One block per post, laid out like the post panel: title, properties, then the brief at the bottom.
 // The parser is forgiving about bold marks, bullets, numbering and capital letters, and it never guesses
 // silently: anything it could not understand becomes a warning shown in the preview.

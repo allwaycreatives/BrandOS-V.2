@@ -20,10 +20,10 @@ export default function StorageCard({ configured, email, returnTo, flag }: { con
           <div style={{ fontWeight: 600, fontSize: 14 }}>Where your files are kept</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
             {email
-              ? <>Your Google Drive ({email}). Your clients download from BrandOS; the files stay private in your Drive.</>
+              ? <>Your Google Drive ({email}). Your clients download from Brand Console; the files stay private in your Drive.</>
               : configured
-                ? <>Connect Google Drive to keep delivery files in your own Drive (15 GB free) instead of BrandOS storage.</>
-                : <>BrandOS storage. Google Drive isn’t set up for this app yet.</>}
+                ? <>Connect Google Drive to keep delivery files in your own Drive (15 GB free) instead of Brand Console storage.</>
+                : <>Brand Console storage. Google Drive isn’t set up for this app yet.</>}
           </div>
         </div>
         {email ? (

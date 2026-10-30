@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" intro={`${APP_NAME} helps creatives discover their brand, manage their work and deliver it to clients. This policy explains what information we collect, why, who it is shared with, and the choices you have. We have tried to write it in plain language.`}>
       <h2>1. Who we are</h2>
-      <p>{APP_NAME} is operated by {COMPANY} (“we”, “us”). You can reach us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> for anything about your privacy or your data.</p>
+      <p>{APP_NAME} (previously called BrandOS) is operated by {COMPANY} (“we”, “us”). You can reach us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> for anything about your privacy or your data.</p>
 
       <h2>2. Information we collect</h2>
       <h3>Information you give us</h3>
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
       <h3>What we access</h3>
       <ul>
         <li><strong>Your Google account email address,</strong> to show you which account is connected.</li>
-        <li><strong>Only the files and folders that {APP_NAME} itself creates in your Drive.</strong> We ask for the narrow <code>drive.file</code> permission, which does not allow us to see, list or read anything else in your Drive. {APP_NAME} creates a folder called “BrandOS Galleries”, and inside it a folder for each gallery you create, with a “_previews” sub-folder for small preview copies.</li>
+        <li><strong>Only the files and folders that {APP_NAME} itself creates in your Drive.</strong> We ask for the narrow <code>drive.file</code> permission, which does not allow us to see, list or read anything else in your Drive. {APP_NAME} creates a folder called “Brand Console Galleries” (connections made before the rename use “BrandOS Galleries”), and inside it a folder for each gallery you create, with a “_previews” sub-folder for small preview copies.</li>
       </ul>
       <h3>Why we use it</h3>
       <ul>

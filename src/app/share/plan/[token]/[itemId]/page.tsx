@@ -90,7 +90,7 @@ export default async function PlanPostPage({ params }: { params: { token: string
           {next ? <Link href={`${base}/${next}`} style={{ fontSize: 13, color: 'var(--accent-text)' }}>Next post →</Link> : <span />}
         </div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand OS</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand Console</div>
     </main>
   )
 }

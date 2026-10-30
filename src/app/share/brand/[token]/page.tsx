@@ -68,7 +68,7 @@ export default async function SharedBrandPage({ params }: { params: { token: str
       )}
 
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 40 }}>
-        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand OS</Link>
+        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand Console</Link>
       </div>
     </main>
   )

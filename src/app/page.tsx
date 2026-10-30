@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@clerk/nextjs/server'
 import { LegalFooter } from '@/components/LegalPage'
+import BrandLogo from '@/components/BrandLogo'
 import { APP_NAME, COMPANY } from '@/lib/legal'
 
 export const dynamic = 'force-dynamic'
@@ -30,7 +31,7 @@ export default function HomePage() {
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto', padding: '26px 22px 0' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <img src="/brandos-logo.png" alt={APP_NAME} style={{ height: 26, width: 'auto' }} />
+        <BrandLogo variant="full" height={56} alt={APP_NAME} />
         <nav style={{ display: 'flex', gap: 18, alignItems: 'center', fontSize: 14 }}>
           <Link href="/sign-in" style={{ color: 'var(--text-secondary)' }}>Sign in</Link>
           <Link href="/sign-up" style={{ padding: '8px 16px', borderRadius: 999, background: 'var(--accent)', color: '#000', fontWeight: 600 }}>Get started</Link>
@@ -63,7 +64,7 @@ export default function HomePage() {
       <section id="google-drive" className="card" style={{ marginTop: 44, padding: 'clamp(22px, 4vw, 34px)' }}>
         <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 32px)', fontWeight: 600, margin: '0 0 10px' }}>Your files stay in your Google Drive</h2>
         <p style={{ fontSize: 15.5, lineHeight: 1.7, color: 'var(--text-secondary)', margin: '0 0 10px', maxWidth: 760 }}>
-          When you deliver photos and videos, you can connect your own Google Drive so the files are kept in your space, not ours. {APP_NAME} asks only for permission to the files and folders it creates itself (a “BrandOS Galleries” folder), so it can never see the rest of your Drive. Your clients download through a private, branded {APP_NAME} link, and you stay in control with a passcode, an expiry date and a download switch.
+          When you deliver photos and videos, you can connect your own Google Drive so the files are kept in your space, not ours. {APP_NAME} asks only for permission to the files and folders it creates itself (a “Brand Console Galleries” folder), so it can never see the rest of your Drive. Your clients download through a private, branded {APP_NAME} link, and you stay in control with a passcode, an expiry date and a download switch.
         </p>
         <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-muted)', margin: 0 }}>
           Read exactly how we handle Google data in our <Link href="/privacy#google" style={{ color: 'var(--accent-text)', textDecoration: 'underline' }}>Privacy Policy</Link>.

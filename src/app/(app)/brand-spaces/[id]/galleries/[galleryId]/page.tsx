@@ -28,7 +28,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
   const items = gallery.items
-  // Pictures of files kept in Google Drive are fetched through BrandOS, so they show even before the gallery is published.
+  // Pictures of files kept in Google Drive are fetched through Brand Console, so they show even before the gallery is published.
   const adminUrl = (id: string, v: string) => `/api/gallery-admin/${gallery.id}/file/${id}?v=${v}`
   const adminItems: AdminItem[] = items.map((i) => ({
     id: i.id,
@@ -68,12 +68,12 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
         {gallery.storage === 'drive' ? (
           gallery.driveConnection ? (
-            <>Files are kept in your Google Drive ({gallery.driveConnection.email}), in the folder “BrandOS Galleries”.</>
+            <>Files are kept in your Google Drive ({gallery.driveConnection.email}), in the Brand Console folder it created there.</>
           ) : (
             <span style={{ color: '#c0392b' }}>This gallery’s Google Drive is not connected any more, so its files can’t be shown or added to. <a href={`/api/google/connect?returnTo=${encodeURIComponent(`/brand-spaces/${params.id}/galleries/${gallery.id}`)}`} style={{ textDecoration: 'underline' }}>Connect Google Drive</a></span>
           )
         ) : (
-          <>Files are kept in BrandOS storage.</>
+          <>Files are kept in Brand Console storage.</>
         )}
       </div>
       <GalleryUploader galleryId={gallery.id} storage={gallery.storage === 'drive' ? 'drive' : 'blob'} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} />

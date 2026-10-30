@@ -59,8 +59,8 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     )
   }
 
-  // Files in Google Drive are served through BrandOS (so the gallery's passcode, expiry and download rules apply);
-  // files in BrandOS storage are linked directly.
+  // Files in Google Drive are served through Brand Console (so the gallery's passcode, expiry and download rules apply);
+  // files in Brand Console storage are linked directly.
   const SMALL = 8 * 1024 * 1024
   const urls = (i: (typeof g.items)[number]) => {
     if (i.driveFileId) {

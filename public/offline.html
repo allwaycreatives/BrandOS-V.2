@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BrandOS — offline</title>
+<title>Brand Console — offline</title>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:24px}
 h1{font-size:22px;margin:0 0 8px}p{color:#aaa;margin:0 0 20px;line-height:1.5}a,button{background:#fff;color:#000;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer}</style></head>
-<body><div><h1>You're offline</h1><p>This page isn't saved on this device yet.<br>Open BrandOS once while connected to the internet and wait for<br>"Saved for offline use" to appear. After that it works offline.</p>
+<body><div><h1>You're offline</h1><p>This page isn't saved on this device yet.<br>Open Brand Console once while connected to the internet and wait for<br>"Saved for offline use" to appear. After that it works offline.</p>
 <a href="/dashboard">Go to dashboard</a> <button id="r">Try again</button><p id="m" style="margin-top:16px"></p><script>document.getElementById("r").onclick=function(){document.getElementById("m").textContent=navigator.onLine?"Reloading…":"Still offline.";setTimeout(function(){location.reload()},600)}</script></div></body></html>

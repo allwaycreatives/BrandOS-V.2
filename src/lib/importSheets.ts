@@ -2,7 +2,7 @@ import type { Strategy } from './strategy'
 import { IMPORT_PLATFORMS } from './importFormat'
 
 // The text a person pastes into ChatGPT ONCE (project instructions, custom instructions, or a first message).
-// It describes the layout only. ChatGPT already knows the brand; this just teaches it how to hand the work to Brand OS.
+// It describes the layout only. ChatGPT already knows the brand; this just teaches it how to hand the work to Brand Console.
 export function postFormatSheet(strategy: Strategy | null): string {
   const names = strategy
     ? [
@@ -12,9 +12,9 @@ export function postFormatSheet(strategy: Strategy | null): string {
       ].filter(Boolean)
     : []
 
-  return `BRAND OS FORMAT (for content posts)
+  return `BRAND CONSOLE FORMAT (for content posts)
 
-When I ask for posts "in Brand OS format", answer with ONLY the posts. Nothing before them and nothing after. One block per post, laid out exactly like this:
+When I ask for posts "in Brand Console format", answer with ONLY the posts. Nothing before them and nothing after. One block per post, laid out exactly like this:
 
 ## Post title
 Platform: Instagram
@@ -50,9 +50,9 @@ ${names.length ? '\n' + names.join('\n') + '\n' : ''}`
 }
 
 export function strategyFormatSheet(): string {
-  return `BRAND OS FORMAT (for a content strategy)
+  return `BRAND CONSOLE FORMAT (for a content strategy)
 
-When I ask for a content strategy "in Brand OS format", answer with ONLY this, laid out exactly like this:
+When I ask for a content strategy "in Brand Console format", answer with ONLY this, laid out exactly like this:
 
 Mission: (one or two sentences)
 Season: (the name of the current season or chapter)

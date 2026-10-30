@@ -1,4 +1,4 @@
-// Discovery question set for BrandOS.
+// Discovery question set for Brand Console.
 // Questions are tagged with a `track` so the flow can be filtered based
 // on what the person actually wants help with (brand identity, marketing,
 // or both) — see the `engagementType` selector in DiscoveryForm.tsx.

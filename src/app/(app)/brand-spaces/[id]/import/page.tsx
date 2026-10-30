@@ -28,7 +28,7 @@ export default async function ImportPage({ params, searchParams }: { params: { i
       </Link>
       <div style={{ marginTop: 8, marginBottom: 20 }}>
         <div className="topbar-greeting">Import from ChatGPT</div>
-        <div className="topbar-sub">Let ChatGPT write it in Brand OS format, paste it here, check it, and import. Nothing is created until you press Import.</div>
+        <div className="topbar-sub">Let ChatGPT write it in Brand Console format, paste it here, check it, and import. Nothing is created until you press Import.</div>
       </div>
       <ImportClient
         brandSpaceId={params.id}

@@ -55,7 +55,7 @@ export default async function ReviewPage({ params }: { params: { token: string }
         )}
         <div style={{ height: d.feedback.length > 0 ? 0 : 28 }} />
       </ReviewWorkspace>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand OS</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 28 }}>Made with Brand Console</div>
     </main>
   )
 }

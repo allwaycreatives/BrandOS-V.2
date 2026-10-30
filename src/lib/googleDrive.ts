@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto'
 
 // Server-only helpers for keeping gallery files in a person's own Google Drive.
-// BrandOS only gets the "drive.file" permission: it can see just the files and folders it creates itself.
+// Brand Console only gets the "drive.file" permission: it can see just the files and folders it creates itself.
 
 export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email'
 const AUTH_URL = process.env.GOOGLE_AUTH_URL || 'https://accounts.google.com/o/oauth2/v2/auth'

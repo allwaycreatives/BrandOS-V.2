@@ -28,7 +28,7 @@ export function safeFileName(name: string): string {
   return (cleaned || 'file').slice(0, 180)
 }
 
-// Files served by BrandOS (from Google Drive) use dl=1; files in BrandOS storage use download=1.
+// Files served by Brand Console (from Google Drive) use dl=1; files in Brand Console storage use download=1.
 export const downloadUrlOf = (url: string) => url + (url.includes('?') ? '&' : '?') + (url.startsWith('/api/gallery/') ? 'dl=1' : 'download=1')
 export const isServedByBrandOS = (url: string) => url.startsWith('/api/gallery/')
 

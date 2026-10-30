@@ -6,7 +6,7 @@ import { accessTokenFor, createFolder, DriveAuthError, folderExists } from '@/li
 export const dynamic = 'force-dynamic'
 
 // Gives the photographer's browser a one-hour key so it can send files straight into the gallery's Drive folder.
-// (Files go from the browser to Google; they never pass through BrandOS.)
+// (Files go from the browser to Google; they never pass through Brand Console.)
 export async function POST(request: Request) {
   try {
     const { galleryId } = (await request.json()) as { galleryId?: string }
@@ -19,10 +19,10 @@ export async function POST(request: Request) {
 
     const token = await accessTokenFor(conn)
 
-    // Folders: "BrandOS Galleries" > "<brand> · <gallery>" > "_previews"
+    // Folders: "Brand Console Galleries" > "<brand> · <gallery>" > "_previews"
     let rootId = conn.rootFolderId
     if (!rootId || !(await folderExists(token, rootId))) {
-      rootId = await createFolder(token, 'BrandOS Galleries')
+      rootId = await createFolder(token, 'Brand Console Galleries')
       await db.googleConnection.update({ where: { id: conn.id }, data: { rootFolderId: rootId } })
     }
     let folderId = gallery.driveFolderId

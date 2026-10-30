@@ -676,3 +676,39 @@ html:has(.board-focus), body:has(.board-focus) { overflow: hidden; }
 .pg-page { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 3px 0; border: 1px solid var(--border-strong); background: var(--bg-card); cursor: pointer; }
 .pg-page:hover { border-color: var(--accent-border); background: var(--accent-dim); }
 .pg-page-title { font-size: 15.5px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+
+/* ================= Brand Console logo, splash and loader ================= */
+.bc-logo{display:inline-flex;align-items:center;line-height:0;flex-shrink:0}
+.bc-logo img{height:100%;width:auto;display:block;user-select:none}
+.bc-on-light{display:none !important}
+:root[data-theme="light"] .bc-on-dark{display:none !important}
+:root[data-theme="light"] .bc-on-light{display:block !important}
+
+/* Welcome animation: BRAND slides in, CONSOLE is written across, then "by All Way Creatives" fades up */
+.bc-splash{position:fixed;inset:0;z-index:9999;background:var(--bg-app);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;transition:opacity .45s ease;animation:splash-failsafe .4s ease 7s forwards}
+.bc-splash.exit{opacity:0;pointer-events:none}
+.bc-splash-mark{position:relative;width:min(78vw,520px);aspect-ratio:1052/324;animation:bcMarkIn 2.6s cubic-bezier(.2,.7,.2,1) both}
+.bc-splash-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none}
+.bc-s-brand{animation:bcBrandIn .9s cubic-bezier(.2,.8,.2,1) both}
+.bc-s-console{-webkit-mask-image:linear-gradient(90deg,#000 0%,#000 33.3%,transparent 66.6%,transparent 100%);mask-image:linear-gradient(90deg,#000 0%,#000 33.3%,transparent 66.6%,transparent 100%);-webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;animation:bcConsoleIn 1.5s cubic-bezier(.45,.05,.25,1) .55s both}
+.bc-s-light{display:none}
+:root[data-theme="light"] .bc-s-dark{display:none}
+:root[data-theme="light"] .bc-s-light{display:block}
+.bc-s-by{display:flex;align-items:center;gap:10px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--text-muted);animation:bcBy .7s ease 1.95s both}
+.bc-s-by img{height:30px;width:auto;opacity:.9}
+@keyframes bcBrandIn{from{opacity:0;transform:translateX(-4%) skewX(-6deg);clip-path:inset(0 100% 0 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
+@keyframes bcConsoleIn{from{-webkit-mask-position:100% 0;mask-position:100% 0}to{-webkit-mask-position:0% 0;mask-position:0% 0}}
+@keyframes bcMarkIn{from{transform:scale(.96)}to{transform:scale(1)}}
+@keyframes bcBy{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+html[data-intro="seen"] .bc-splash *{animation:none !important}
+@media (prefers-reduced-motion:reduce){.bc-splash *{animation:none !important}}
+
+/* Loader: the orange B breathes while the C is written, then everything starts again */
+@property --bc-a{syntax:'<angle>';inherits:false;initial-value:-30deg}
+.bc-loader{position:relative;display:inline-block;aspect-ratio:574/623}
+.bc-loader img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none}
+.bc-l-b{animation:bcLB 2.4s ease-in-out infinite}
+.bc-l-c{-webkit-mask-image:conic-gradient(from 66deg at 46% 48%,transparent 0deg,transparent calc(360deg - var(--bc-a) - 26deg),#000 calc(360deg - var(--bc-a)),#000 360deg);mask-image:conic-gradient(from 66deg at 46% 48%,transparent 0deg,transparent calc(360deg - var(--bc-a) - 26deg),#000 calc(360deg - var(--bc-a)),#000 360deg);animation:bcLC 2.4s cubic-bezier(.5,.05,.3,1) infinite}
+@keyframes bcLC{0%{--bc-a:-30deg;opacity:1}66%{--bc-a:392deg;opacity:1}88%{--bc-a:392deg;opacity:1}100%{--bc-a:392deg;opacity:0}}
+@keyframes bcLB{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@media (prefers-reduced-motion:reduce){.bc-l-b,.bc-l-c{animation:none}.bc-l-c{-webkit-mask-image:none;mask-image:none}}

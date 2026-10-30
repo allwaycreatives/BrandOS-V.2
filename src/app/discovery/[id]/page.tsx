@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/BrandLogo'
 import { db } from '@/lib/db'
 import DiscoveryForm from './DiscoveryForm'
 import LongFormDiscoveryForm from './LongFormDiscoveryForm'
@@ -17,7 +18,7 @@ export default async function DiscoveryPage({ params }: { params: { id: string }
   return (
     <main style={{ maxWidth: activeTemplate ? 640 : 480, margin: '0 auto', minHeight: '100vh', padding: '3rem 1rem', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ textAlign: 'center' }}>
-        <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 22, margin: '0 auto' }} />
+        <BrandLogo variant="full" height={52} style={{ margin: '0 auto' }} />
       </div>
       {activeTemplate && longformQuestions ? (
         <LongFormDiscoveryForm brandSpaceId={params.id} questions={longformQuestions} />

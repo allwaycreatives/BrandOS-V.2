@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/BrandLogo'
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -39,12 +40,12 @@ export default async function BoardCanvasPage({ params }: { params: { id: string
 
   return (
     // Focus mode: while you work on a board, the sidebar and top bar get out of the way.
-    // The BrandOS logo is the way back home.
+    // The Brand Console logo is the way back home.
     <div className="board-focus">
       <header className="board-focus-bar">
-        <Link href="/dashboard" className="board-focus-logo" aria-label="BrandOS home" title="Back to BrandOS">
+        <Link href="/dashboard" className="board-focus-logo" aria-label="Brand Console home" title="Back to Brand Console">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 18, display: 'block' }} />
+          <BrandLogo variant="full" height={38} />
         </Link>
         <nav className="board-focus-trail" aria-label="Where you are">
           <Link href={boardsHref}>All boards</Link>

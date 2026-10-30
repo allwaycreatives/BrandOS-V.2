@@ -5,18 +5,18 @@ Galleries live inside a brand (Brand → Galleries) and can be tied to a project
 
 ## Where the files are kept
 
-| | Google Drive (recommended while testing) | BrandOS storage (Vercel Blob) |
+| | Google Drive (recommended while testing) | Brand Console storage (Vercel Blob) |
 |---|---|---|
 | Space | The photographer's own Drive (15 GB free, more with Google One) | Vercel plan (Hobby: 1 GB, Pro: 5 GB included) |
 | Upload | Browser → Google Drive, in resumable chunks. Never touches Vercel. | Browser → Vercel Blob, multipart. |
-| Client downloads | Through BrandOS (`/api/gallery/<token>/file/<id>`). Drive files stay private. | Direct from Vercel Blob. |
+| Client downloads | Through Brand Console (`/api/gallery/<token>/file/<id>`). Drive files stay private. | Direct from Vercel Blob. |
 
-A gallery uses Drive if its creator had connected Google Drive when they created it, otherwise BrandOS storage.
+A gallery uses Drive if its creator had connected Google Drive when they created it, otherwise Brand Console storage.
 
 ## One-time Google setup (about 10 minutes)
 
 1. **Google Cloud Console** → pick or create a project → **APIs & Services → Library** → enable **Google Drive API**.
-2. **Google Auth Platform / OAuth consent screen**: User type **External**. App name "BrandOS", support email, developer email.
+2. **Google Auth Platform / OAuth consent screen**: User type **External**. App name "Brand Console", support email, developer email.
    Add the scope `https://www.googleapis.com/auth/drive.file` (plus `openid` and `email`).
 3. **Publish the app: set the status to "In production".** This is a one-click change and needs no Google review for `drive.file`.
    If you leave it on "Testing", Google expires the connection every 7 days.
@@ -28,8 +28,8 @@ A gallery uses Drive if its creator had connected Google Drive when they created
    - optional `GOOGLE_TOKEN_KEY`: any long random text used to encrypt the saved Google keys. If left out, `CLERK_SECRET_KEY` is used (rotating that key then means reconnecting Drive).
 6. Redeploy, open **Brand → Galleries → Connect Google Drive**.
 
-BrandOS only asks for the narrow `drive.file` permission: it can see only the files and folders it creates itself
-("BrandOS Galleries" → "<brand> · <gallery>" → "_previews"), never the rest of the Drive.
+Brand Console only asks for the narrow `drive.file` permission: it can see only the files and folders it creates itself
+("Brand Console Galleries" → "<brand> · <gallery>" → "_previews"), never the rest of the Drive.
 
 ## Consent screen fields (Google Auth Platform → Branding)
 
@@ -40,7 +40,7 @@ copy the `content` value into `GOOGLE_SITE_VERIFICATION` in Vercel, redeploy, th
 
 | Field | Value |
 |---|---|
-| App name | BrandOS |
+| App name | Brand Console |
 | Application home page | `https://YOUR-DOMAIN/` |
 | Application privacy policy link | `https://YOUR-DOMAIN/privacy` |
 | Application terms of service link | `https://YOUR-DOMAIN/terms` |

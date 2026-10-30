@@ -40,7 +40,7 @@ export default async function SharedBoardPage({ params }: { params: { token: str
         )}
       </div>
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand OS</Link>. Copy it to make it your own.
+        View only · Made with <Link href="/" style={{ color: 'var(--accent-text)' }}>Brand Console</Link>. Copy it to make it your own.
       </div>
       <BoardCanvas
         boardId={board.id}

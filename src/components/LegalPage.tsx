@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import BrandLogo from '@/components/BrandLogo'
 import type { ReactNode } from 'react'
 import { APP_NAME, COMPANY, EFFECTIVE_DATE } from '@/lib/legal'
 
@@ -22,7 +23,7 @@ export default function LegalPage({ title, intro, children }: { title: string; i
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '28px 22px 0' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/brandos-logo.png" alt={APP_NAME} style={{ height: 22, width: 'auto' }} />
+          <BrandLogo variant="full" height={46} alt={APP_NAME} />
         </Link>
         <Link href="/sign-in" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Sign in</Link>
       </header>

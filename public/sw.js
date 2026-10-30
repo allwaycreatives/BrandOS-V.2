@@ -1,4 +1,4 @@
-/* BrandOS service worker v2: works offline.
+/* Brand Console service worker v2: works offline.
  *  - App files (_next/static) are cached forever (cache-first).
  *  - Pages are network-first (falls back to the last copy you loaded). Pages are also
  *    pre-loaded in the background so they open even if you never visited them offline.
@@ -18,7 +18,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC).then(async (c) => {
       await c.add(OFFLINE_URL)
-      await Promise.all(['/manifest.json', '/aw-logo.png', '/brandos-logo.png', '/icon.png', '/icon-192.png', '/icon-512.png'].map((u) => c.add(u).catch(() => {})))
+      await Promise.all(['/manifest.json', '/aw-logo.png', '/icon.png', '/icon-192.png', '/icon-512.png', '/brand/full-onDark.png', '/brand/full-onLight.png', '/brand/icon-onDark.png', '/brand/icon-onLight.png', '/brand/icon-b.png', '/brand/icon-c-onDark.png', '/brand/icon-c-onLight.png', '/brand/full-b.png', '/brand/full-c-onDark.png', '/brand/full-c-onLight.png'].map((u) => c.add(u).catch(() => {})))
     }).then(() => self.skipWaiting())
   )
 })

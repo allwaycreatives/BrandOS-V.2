@@ -3,6 +3,7 @@ import BrandDot from '@/components/BrandDot'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import BrandLogo from '@/components/BrandLogo'
 import { useEffect, useState } from 'react'
 
 // The open brand's tools, grouped so eleven items read as three.
@@ -116,9 +117,9 @@ export default function Sidebar({ brands }: { brands: SidebarBrand[] }) {
     <aside className={`sidebar${open ? ' open' : ''}`} style={{ width: collapsed ? 64 : 220 }}>
       <div className="sidebar-brand" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
         {collapsed ? (
-          <div aria-label="BrandOS" style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', color: '#16110a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontStyle: 'italic', fontSize: 17 }}>B</div>
+          <BrandLogo variant="icon" height={30} alt="Brand Console" />
         ) : (
-          <img src="/brandos-logo.png" alt="BrandOS" style={{ height: 20, display: 'block' }} className="splash-fade splash-delay-1" />
+          <BrandLogo variant="full" height={52} className="splash-fade splash-delay-1" />
         )}
       </div>
 

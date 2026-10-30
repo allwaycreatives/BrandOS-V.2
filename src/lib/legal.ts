@@ -1,9 +1,9 @@
 // Facts that appear in the Privacy Policy, Terms of Service and public home page.
 // Change them here (or with the environment variables in Vercel) and every page updates.
 
-export const APP_NAME = 'BrandOS'
+export const APP_NAME = 'Brand Console'
 export const COMPANY = 'All Way Creatives'
-export const EFFECTIVE_DATE = '26 October 2026'
+export const EFFECTIVE_DATE = '28 October 2026'
 
 // The address people write to about privacy and anything else. Set NEXT_PUBLIC_CONTACT_EMAIL in Vercel.
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@allwaycreatives.com'

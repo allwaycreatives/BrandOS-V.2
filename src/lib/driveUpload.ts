@@ -17,7 +17,7 @@ export type DriveSession = {
   token: (forceNew?: boolean) => Promise<string>
 }
 
-// Asks BrandOS for a one-hour key to this gallery's Drive folder (and refreshes it when it runs out).
+// Asks Brand Console for a one-hour key to this gallery's Drive folder (and refreshes it when it runs out).
 export function createDriveSession(galleryId: string): DriveSession {
   type Info = { accessToken: string; folderId: string; previewsId: string; at: number }
   let info: Info | null = null
