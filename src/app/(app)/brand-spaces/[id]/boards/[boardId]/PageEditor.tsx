@@ -108,6 +108,12 @@ export default function PageEditor({ value, readOnly, saving, onEdit, onClose }:
     setPath(latest.current.path.slice(0, Math.max(0, toLength)))
     document.querySelector('.page-scroll')?.scrollTo?.({ top: 0 })
   }
+  // A brand-new document opens with the cursor already in its title, so you can start typing straight away.
+  useEffect(() => {
+    if (!readOnly && initial.title === '') titleField.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // A new page you just made opens with the cursor in its title.
   useLayoutEffect(() => {
     if (titleFocus.current) {
