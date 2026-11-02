@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { downloadUrlOf, formatBytes, isServedByBrandOS } from '@/lib/galleryFormat'
 import { canSaveToDisk, saveLargeFile } from '@/lib/rangedFetch'
 import { GALLERY_CSS, themeVars } from '@/lib/galleryTheme'
@@ -11,10 +11,23 @@ import type { ViewItem } from './GalleryView'
 
 const stripExt = (n: string) => n.replace(/\.[a-z0-9]{2,5}$/i, '')
 
+// The opening: the brand name and the title appear on a calm screen, then it fades away on its own (CSS only, so it can
+// never get stuck), or sooner if the client taps. It plays once per visit.
+const INTRO_CSS = `
+.vd-intro{position:fixed;inset:0;z-index:2000;background:var(--g-bg);color:var(--g-fg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;cursor:pointer;animation:vd-out .8s ease 3s forwards}
+.vd-brand{font-size:clamp(34px,8vw,78px);font-weight:500;letter-spacing:.02em;line-height:1.05;animation:vd-in 1.3s cubic-bezier(.2,.7,.2,1) .25s both}
+.vd-line{width:1px;height:56px;background:currentColor;opacity:.5;margin:24px auto;transform-origin:top;animation:vd-grow .9s ease .9s both}
+.vd-sub{font-size:clamp(17px,2.4vw,26px);font-style:italic;opacity:.9;max-width:640px;animation:vd-in 1s ease 1.5s both}
+@keyframes vd-in{from{opacity:0;transform:translateY(14px) scale(.98);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@keyframes vd-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes vd-out{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion:reduce){.vd-intro{display:none}}
+`
+
 type Note = { kind: 'progress'; name: string; bytes: number; total: number } | { kind: 'done'; text: string } | { kind: 'error'; text: string }
 
 export default function VideoDelivery({
-  title, brand, subtitle, preparedFor, description, dateLabel, allowDownload, theme, featuredId, items,
+  title, brand, subtitle, preparedFor, description, dateLabel, allowDownload, theme, featuredId, introKey, items,
 }: {
   title: string
   brand: string
@@ -25,6 +38,7 @@ export default function VideoDelivery({
   allowDownload: boolean
   theme: string
   featuredId: string | null
+  introKey: string
   items: ViewItem[]
 }) {
   // The main film is the one picked as the gallery's cover (if it is a video), otherwise the first by file name.
@@ -44,6 +58,14 @@ export default function VideoDelivery({
   const [currentId, setCurrentId] = useState<string | null>(videos[0]?.id ?? null)
   const [note, setNote] = useState<Note | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
+  const [introOff, setIntroOff] = useState(false)
+  // Someone who already saw the opening in this visit (a reload, or coming back) goes straight to the film.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(`vd_intro_${introKey}`)) setIntroOff(true)
+      else sessionStorage.setItem(`vd_intro_${introKey}`, '1')
+    } catch {}
+  }, [introKey])
   const cur = videos.find((v) => v.id === currentId) ?? videos[0] ?? null
   const vertical = !!cur && !!cur.w && !!cur.h && cur.h > cur.w * 1.05
   const forLine = [preparedFor ? `Prepared for ${preparedFor}` : '', dateLabel].filter(Boolean).join('   ·   ')
@@ -74,7 +96,17 @@ export default function VideoDelivery({
 
   return (
     <div className="g-root" style={themeVars(theme)}>
-      <style dangerouslySetInnerHTML={{ __html: GALLERY_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: GALLERY_CSS + INTRO_CSS }} />
+
+      {!introOff && (
+        <div className="vd-intro" onClick={() => setIntroOff(true)} aria-hidden="true">
+          <div>
+            <div className="g-serif vd-brand">{brand}</div>
+            <div className="vd-line" />
+            <div className="g-serif vd-sub">{title}</div>
+          </div>
+        </div>
+      )}
 
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: 'clamp(40px, 7vw, 88px) 20px 64px' }}>
         {/* ---------- Title ---------- */}

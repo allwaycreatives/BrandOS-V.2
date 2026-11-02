@@ -20,11 +20,29 @@ const lookup = async (key: string) => {
 export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
   const g = await lookup(params.token)
   if (!g || !g.published) return { title: 'Gallery' }
-  const cover = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.thumbUrl || i.driveThumbId)
+  const isVideo = g.layout === 'video'
+  // For a video delivery the picture is the film's own frame; for a gallery it is the cover photo.
+  const cover = (isVideo ? g.items.find((i) => i.id === g.coverItemId && i.kind === 'video' && (i.thumbUrl || i.driveThumbId)) ?? g.items.find((i) => i.kind === 'video' && (i.thumbUrl || i.driveThumbId)) : null) ?? g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.thumbUrl || i.driveThumbId)
   const site = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
   const image = cover?.driveThumbId ? (site ? `${site}/api/gallery/${g.shareToken}/file/${cover.id}?v=t` : undefined) : cover?.thumbUrl || undefined
-  // The title is shown when the link is shared; the pictures stay behind the passcode if there is one.
-  return { title: `${g.coverTitle || g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.coverTitle || g.title, description: `${g.layout === 'video' ? 'A film' : 'A gallery'} from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
+  // The preview picture is the small 720px copy made at upload; telling apps its real size helps WhatsApp and others show it as a big card.
+  const k = cover?.width && cover?.height ? Math.min(1, 720 / Math.max(cover.width, cover.height)) : 0
+  const size = k && cover?.width && cover?.height ? { width: Math.round(cover.width * k), height: Math.round(cover.height * k) } : {}
+  const name = g.coverTitle || g.title
+  // The title is shown when the link is shared; the picture stays hidden if there is a passcode.
+  const title = isVideo ? `▶ ${name}` : name
+  const description = g.passcodeHash
+    ? 'This delivery is private. Open the link and enter the passcode you were given.'
+    : isVideo
+      ? `Watch${g.allowDownload ? ' and download' : ''} your video from ${g.brandSpace.name}${g.preparedFor ? ` · Prepared for ${g.preparedFor}` : ''}`
+      : `A gallery from ${g.brandSpace.name}`
+  const images = g.passcodeHash || !image ? [] : [{ url: image, ...size }]
+  return {
+    title: `${name} · ${g.brandSpace.name}`,
+    robots: { index: false, follow: false },
+    openGraph: { type: isVideo ? 'video.other' : 'website', siteName: g.brandSpace.name, title, description, images },
+    twitter: { card: images.length ? 'summary_large_image' : 'summary', title, description, images: images.map((i) => i.url) },
+  }
 }
 
 function Centered({ theme, children }: { theme: string; children: React.ReactNode }) {
@@ -101,6 +119,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
         allowDownload={g.allowDownload}
         theme={g.theme}
         featuredId={g.coverItemId}
+        introKey={g.shareToken}
         items={items}
       />
     )
