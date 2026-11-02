@@ -500,6 +500,7 @@ model Gallery {
   mainSetName   String    @default("Photos") // the name of the first section (photos not put in a set)
   coverStyle    String    @default("full")  // full | split | classic
   theme         String    @default("light") // light | dark: how the client's page looks
+  layout        String    @default("gallery") // gallery (photos and videos in a grid) | video (one film shown like a premiere)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

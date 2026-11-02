@@ -6,6 +6,7 @@ import { unlockCookieName, unlockCookieValue } from '@/lib/gallery'
 import { GALLERY_CSS, themeVars } from '@/lib/galleryTheme'
 import PasscodeForm from './PasscodeForm'
 import GalleryView, { type ViewItem } from './GalleryView'
+import VideoDelivery from './VideoDelivery'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: { params: { token: string } }
   const site = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
   const image = cover?.driveThumbId ? (site ? `${site}/api/gallery/${g.shareToken}/file/${cover.id}?v=t` : undefined) : cover?.thumbUrl || undefined
   // The title is shown when the link is shared; the pictures stay behind the passcode if there is one.
-  return { title: `${g.coverTitle || g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.coverTitle || g.title, description: `A gallery from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
+  return { title: `${g.coverTitle || g.title} · ${g.brandSpace.name}`, robots: { index: false, follow: false }, openGraph: { title: g.coverTitle || g.title, description: `${g.layout === 'video' ? 'A film' : 'A gallery'} from ${g.brandSpace.name}`, images: g.passcodeHash ? [] : image ? [image] : [] } }
 }
 
 function Centered({ theme, children }: { theme: string; children: React.ReactNode }) {
@@ -85,6 +86,26 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     const hideOriginal = !g.allowDownload && i.kind === 'image' && u.hasWeb
     return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original, setId: i.setId, capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null }
   })
+  const dateLabel = g.eventDate ? g.eventDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''
+
+  // A single-video delivery gets its own page: the film, a download button, and the thank-you message.
+  if (g.layout === 'video') {
+    return (
+      <VideoDelivery
+        title={g.coverTitle || g.title}
+        brand={g.brandSpace.name}
+        subtitle={g.coverSubtitle}
+        preparedFor={g.preparedFor}
+        description={g.description}
+        dateLabel={dateLabel}
+        allowDownload={g.allowDownload}
+        theme={g.theme}
+        featuredId={g.coverItemId}
+        items={items}
+      />
+    )
+  }
+
   const coverItem = g.items.find((i) => i.id === g.coverItemId) ?? g.items.find((i) => i.kind === 'image')
   // Sharpest copy that is still light: the 2400px copy, else a small original, else the preview.
   const cu = coverItem ? urls(coverItem) : null
@@ -97,7 +118,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
       subtitle={g.coverSubtitle}
       preparedFor={g.preparedFor}
       description={g.description}
-      dateLabel={g.eventDate ? g.eventDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''}
+      dateLabel={dateLabel}
       cover={cover}
       allowDownload={g.allowDownload}
       theme={g.theme}

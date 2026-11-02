@@ -3,6 +3,17 @@
 Deliver full-quality photos and videos (gigabytes) to a client with one private link.
 Galleries live inside a brand (Brand → Galleries) and can be tied to a project.
 
+## Delivery types
+
+When you create a delivery you choose what you are sending (and you can switch later under **Cover & welcome message → Delivery type**):
+
+- **Photos & videos**: the gallery grid with sections, favourites, slideshow and "Download all".
+- **One video**: a premiere page for a single film. The client sees your name, the title, a large player, a **Download video** button and your thank-you message. Extra cuts (a vertical version, a teaser) appear underneath as "More from this delivery", and any other files (stills, a music licence) appear as downloads. If you upload several videos, the first by file name is the main one (or pick one as the cover). New video deliveries start with the dark "cinema" look.
+
+Both types share the same storage, passcode, expiry date, readable link and "Let the client download" switch. Type a client name in **Client name** when you create it and the page shows "Prepared for ...".
+
+Note: with downloads turned off the video can still be watched, and the browser's download option is hidden, but a determined person can always capture a video that is being streamed to them.
+
 ## Where the files are kept
 
 | | Google Drive (recommended while testing) | Brand Console storage (Vercel Blob) |

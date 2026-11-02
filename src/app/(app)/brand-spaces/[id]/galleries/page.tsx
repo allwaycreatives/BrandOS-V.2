@@ -36,7 +36,12 @@ export default async function GalleriesPage({ params, searchParams }: { params: 
 
       <form action={createGallery} className="card" style={{ display: 'flex', gap: 8, marginBottom: 22, flexWrap: 'wrap' }}>
         <input type="hidden" name="brandSpaceId" value={params.id} />
-        <input name="title" required placeholder="New gallery name, like “Launch shoot”" style={{ flex: 1, minWidth: 220 }} />
+        <input name="title" required placeholder="Name, like “Launch shoot” or “Dad’s film”" style={{ flex: 1, minWidth: 220 }} />
+        <input name="preparedFor" placeholder="Client name (optional)" style={{ minWidth: 160 }} />
+        <select name="layout" defaultValue="gallery" title="What are you delivering?">
+          <option value="gallery">Photos &amp; videos</option>
+          <option value="video">One video</option>
+        </select>
         <select name="projectId" defaultValue="" title="Optional: the project this delivery belongs to">
           <option value="">No project</option>
           {projects.map((p) => (
@@ -44,7 +49,7 @@ export default async function GalleriesPage({ params, searchParams }: { params: 
           ))}
         </select>
         <input type="date" name="eventDate" title="Date of the shoot or event" />
-        <button className="primary" type="submit">Create gallery</button>
+        <button className="primary" type="submit">Create delivery</button>
       </form>
 
       {galleries.length === 0 && <div style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>No galleries yet. Create one, upload your files, then publish it and send the link.</div>}
@@ -57,11 +62,12 @@ export default async function GalleriesPage({ params, searchParams }: { params: 
           return (
             <Link key={g.id} href={`/brand-spaces/${params.id}/galleries/${g.id}`} style={{ display: 'block' }}>
               <div style={{ aspectRatio: '4 / 3', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {cover ? <img src={cover} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No photos yet</span>}
+                {cover ? <img src={cover} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{g.layout === 'video' ? 'No video yet' : 'No photos yet'}</span>}
               </div>
               <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, marginTop: 8 }}>{g.title}</div>
               <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ color: g.published ? 'var(--accent-text)' : 'var(--text-muted)' }}>{g.published ? '● Published' : '○ Draft'}</span>
+                {g.layout === 'video' && <span style={{ border: '1px solid var(--border)', borderRadius: 999, padding: '0 8px', fontSize: 11.5 }}>▶ Video</span>}
                 <span>
                   {g.items.length} item{g.items.length === 1 ? '' : 's'} · {formatBytes(bytes)}
                 </span>

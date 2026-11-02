@@ -47,6 +47,7 @@ async function deleteBlobs(urls: (string | null | undefined)[]) {
 
 const COVER_STYLES = ['full', 'split', 'classic']
 const THEMES = ['light', 'dark']
+const LAYOUTS = ['gallery', 'video']
 
 // Only projects of the same brand can be linked.
 async function projectIdFor(brandSpaceId: string, raw: FormDataEntryValue | null): Promise<string | null> {
@@ -62,11 +63,13 @@ export async function createGallery(formData: FormData) {
   if (!brandSpaceId || !title) return
   await requireEdit(brandSpaceId)
   const projectId = await projectIdFor(brandSpaceId, formData.get('projectId'))
+  const layout = LAYOUTS.includes(String(formData.get('layout'))) ? String(formData.get('layout')) : 'gallery'
+  const preparedFor = String(formData.get('preparedFor') || '').trim().slice(0, 200) || null // the client's name
   // If this person connected Google Drive, the files live in their Drive (their space, their quota).
   const { user } = await getOrCreateCurrentUser()
   const conn = driveConfigured() ? await db.googleConnection.findUnique({ where: { userId: user.id } }).catch(() => null) : null
   const g = await db.gallery.create({
-    data: { brandSpaceId, projectId, title, eventDate: parseDate(formData.get('eventDate')), shareToken: newGalleryToken(), storage: conn ? 'drive' : 'blob', driveConnectionId: conn?.id ?? null },
+    data: { brandSpaceId, projectId, title, layout, preparedFor, theme: layout === 'video' ? 'dark' : 'light', eventDate: parseDate(formData.get('eventDate')), shareToken: newGalleryToken(), storage: conn ? 'drive' : 'blob', driveConnectionId: conn?.id ?? null },
   })
   refresh(brandSpaceId)
   if (projectId) revalidatePath(`/brand-spaces/${brandSpaceId}/projects/${projectId}`)
@@ -91,6 +94,7 @@ export async function updateGallery(galleryId: string, formData: FormData) {
       projectId: await projectIdFor(g.brandSpaceId, formData.get('projectId')),
       coverStyle: COVER_STYLES.includes(String(formData.get('coverStyle'))) ? String(formData.get('coverStyle')) : g.coverStyle,
       theme: THEMES.includes(String(formData.get('theme'))) ? String(formData.get('theme')) : g.theme,
+      layout: LAYOUTS.includes(String(formData.get('layout'))) ? String(formData.get('layout')) : g.layout,
     },
   })
   refresh(g.brandSpaceId, galleryId)

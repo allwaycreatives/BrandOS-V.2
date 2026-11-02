@@ -43,6 +43,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   const bytes = items.reduce((n, i) => n + i.size, 0)
   const photos = items.filter((i) => i.kind === 'image').length
   const videos = items.filter((i) => i.kind === 'video').length
+  const isVideo = gallery.layout === 'video'
 
   return (
     <div>
@@ -64,7 +65,12 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       <ShareBox galleryId={gallery.id} token={gallery.slug || gallery.shareToken} published={gallery.published} />
       <LinkEditor galleryId={gallery.id} slug={gallery.slug} suggestFrom={gallery.coverTitle || gallery.title} hasPasscode={!!gallery.passcodeHash} />
 
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Add files</div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{isVideo ? 'Add your video' : 'Add files'}</div>
+      {isVideo && (
+        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          Upload the film. It plays as the main video on your client’s page, and gets a download button. Extra cuts (a vertical version, a teaser) show underneath, and any other files, like stills or a licence, appear as downloads. If you upload several videos, the first by file name is the main one, so name it like “01 Final film”.
+        </div>
+      )}
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
         {gallery.storage === 'drive' ? (
           gallery.driveConnection ? (
@@ -109,7 +115,14 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
             <option value="dark">Dark, like a cinema</option>
           </select>
         </label>
-        <div style={{ gridColumn: '1 / -1' }}>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          Delivery type
+          <select name="layout" defaultValue={gallery.layout} style={{ width: '100%', marginTop: 4 }}>
+            <option value="gallery">Photos &amp; videos (a gallery)</option>
+            <option value="video">One video (a premiere page)</option>
+          </select>
+        </label>
+        {!isVideo && <div style={{ gridColumn: '1 / -1' }}>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Cover style</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {COVER_ART.map((c) => (
@@ -121,7 +134,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
             ))}
           </div>
           <style dangerouslySetInnerHTML={{ __html: '.cover-radio:checked + .cover-art { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-dim); }' }} />
-        </div>
+        </div>}
         {/* the details below belong to the same save button */}
         <input type="hidden" name="title" value={gallery.title} />
         <input type="hidden" name="projectId" value={gallery.projectId ?? ''} />
@@ -168,6 +181,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
         <input type="hidden" name="description" value={gallery.description ?? ''} />
         <input type="hidden" name="theme" value={gallery.theme} />
         <input type="hidden" name="coverStyle" value={gallery.coverStyle} />
+        <input type="hidden" name="layout" value={gallery.layout} />
         <button className="primary" type="submit">Save details</button>
       </form>
 
