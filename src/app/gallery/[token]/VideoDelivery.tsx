@@ -109,7 +109,15 @@ export default function VideoDelivery({
   const [light, setLight] = useState<Record<string, boolean>>({})
   const [rememberedLight, setRememberedLight] = useState(false) // already switched earlier in this visit
   const [autoSwitched, setAutoSwitched] = useState(false)
-  const hasLight = !!cur && !!cur.display && cur.display !== cur.full
+  // Which address to use: straight from Google Drive when the delivery allows it, or the route through Brand Console
+  // (the fallback, used after the direct one fails).
+  const [proxied, setProxied] = useState<Record<string, boolean>>({})
+  const pick = (it: ViewItem, key: 'full' | 'display' | 'thumb') => (proxied[it.id] && it.fallback ? it.fallback[key] : it[key])
+  const dlHref = (it: ViewItem) => {
+    const u = pick(it, 'full') as string
+    return isServedByBrandOS(u) ? downloadUrlOf(u) : u // a direct Google address already downloads by itself
+  }
+  const hasLight = !!cur && !!pick(cur, 'display') && pick(cur, 'display') !== pick(cur, 'full')
   const useLight = !!cur && hasLight && (light[cur.id] ?? rememberedLight)
   const clearStall = () => {
     if (stallTimer.current) clearTimeout(stallTimer.current)
@@ -140,12 +148,13 @@ export default function VideoDelivery({
 
   // Very large files are saved to disk in pieces (Chrome, Edge); everything else is a normal download.
   async function onDownloadClick(e: React.MouseEvent, it: ViewItem) {
-    if (!it.full || !isServedByBrandOS(it.full) || it.size < 100 * 1024 * 1024 || !canSaveToDisk()) return
+    const url = pick(it, 'full')
+    if (!url || !isServedByBrandOS(url) || it.size < 100 * 1024 * 1024 || !canSaveToDisk()) return
     e.preventDefault()
     let bytes = 0
     setNote({ kind: 'progress', name: it.name, bytes: 0, total: it.size })
     try {
-      const saved = await saveLargeFile(it.full, it.size, it.name, (b) => {
+      const saved = await saveLargeFile(url, it.size, it.name, (b) => {
         bytes += b
         setNote({ kind: 'progress', name: it.name, bytes, total: it.size })
       })
@@ -192,8 +201,8 @@ export default function VideoDelivery({
                 <video
                   key={`${cur.id}-${tries}`}
                   ref={videoRef}
-                  src={(useLight ? cur.display : cur.full) ?? undefined}
-                  poster={cur.thumb ?? undefined}
+                  src={(useLight ? pick(cur, 'display') : pick(cur, 'full')) ?? undefined}
+                  poster={pick(cur, 'thumb') ?? undefined}
                   controls
                   playsInline
                   preload="metadata"
@@ -217,6 +226,12 @@ export default function VideoDelivery({
                       dropRetries.current += 1
                       resume.current = { t: el.currentTime, play: true }
                       setTries((t) => t + 1)
+                      return
+                    }
+                    // loaded straight from Google and it failed: use the route through Brand Console instead, from the same moment
+                    if (!proxied[cur.id] && cur.fallback) {
+                      resume.current = { t: el.currentTime || 0, play: true }
+                      setProxied((p) => ({ ...p, [cur.id]: true }))
                       return
                     }
                     // the original cannot be loaded and there is a smooth version: use that instead
@@ -251,7 +266,7 @@ export default function VideoDelivery({
                     {failed.detail && <div style={{ fontSize: 11.5, opacity: 0.6, maxWidth: 380, wordBreak: 'break-word' }}>{failed.detail}</div>}
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                       <button type="button" className="g-btn" onClick={() => { setFailed(null); setTries((t) => t + 1) }}>Try again</button>
-                      {allowDownload && cur.full && !driveProblem && <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
+                      {allowDownload && cur.full && !driveProblem && <a className="g-btn" href={dlHref(cur)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
                     </div>
                   </div>
                 )}
@@ -264,7 +279,7 @@ export default function VideoDelivery({
                   {autoSwitched && useLight && <div style={{ fontSize: 12, color: 'var(--g-muted)', marginTop: 2 }}>Your connection looked slow, so we switched to a smoother version.</div>}
                 </div>
                 {allowDownload && cur.full && (
-                  <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} onClick={(e) => onDownloadClick(e, cur)} style={{ display: 'inline-block', textDecoration: 'none' }}>
+                  <a className="g-btn" href={dlHref(cur)} download={cur.name} onClick={(e) => onDownloadClick(e, cur)} style={{ display: 'inline-block', textDecoration: 'none' }}>
                     Download video
                   </a>
                 )}
@@ -315,7 +330,7 @@ export default function VideoDelivery({
                   {extras.map((f) => (
                     <div key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 0', borderTop: '1px solid var(--g-line)' }}>
                       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 14 }}>{f.name} <span style={{ color: 'var(--g-muted)', fontSize: 12, marginLeft: 6 }}>{formatBytes(f.size)}</span></span>
-                      <a className="g-link" href={downloadUrlOf(f.full!)} download={f.name} onClick={(e) => onDownloadClick(e, f)} style={{ flexShrink: 0 }}>Download</a>
+                      <a className="g-link" href={dlHref(f)} download={f.name} onClick={(e) => onDownloadClick(e, f)} style={{ flexShrink: 0 }}>Download</a>
                     </div>
                   ))}
                 </div>

@@ -8,6 +8,8 @@ import { updateGallery, setGalleryPasscode } from '../actions'
 import GalleryUploader from './GalleryUploader'
 import LinkEditor from './LinkEditor'
 import WatchVersion from './WatchVersion'
+import SaveForm from './SaveForm'
+import { ensureDirectViewing } from '@/lib/galleryShare'
 import { ShareBox, DeleteGalleryButton } from './GalleryControls'
 import FilesGrid, { type AdminItem } from './FilesGrid'
 
@@ -29,6 +31,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   if (!gallery || gallery.brandSpaceId !== params.id) notFound()
   // Is the Google Drive connection working? (only checked for deliveries kept in Drive)
   const health = gallery.storage === 'drive' && gallery.driveConnection ? await driveHealth(gallery.driveConnection) : null
+  if (health?.ok && gallery.layout === 'video' && gallery.published) await ensureDirectViewing(gallery.id)
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
   const items = gallery.items
@@ -69,6 +72,12 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       <ShareBox galleryId={gallery.id} token={gallery.slug || gallery.shareToken} published={gallery.published} />
       <LinkEditor galleryId={gallery.id} slug={gallery.slug} suggestFrom={gallery.coverTitle || gallery.title} hasPasscode={!!gallery.passcodeHash} />
 
+      {isVideo && (!gallery.coverSubtitle || !gallery.preparedFor || !gallery.description) && (
+        <div style={{ border: '1px solid var(--border)', background: 'var(--accent-dim)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13, lineHeight: 1.55 }}>
+          <b>Your client’s page is still missing:</b> {[!gallery.coverSubtitle && 'a subtitle', !gallery.preparedFor && 'who it is for (“Prepared for …”)', !gallery.description && 'your thank-you message'].filter(Boolean).join(', ')}.{' '}
+          <a href="#cover" style={{ textDecoration: 'underline', fontWeight: 600 }}>Add them now ↓</a>
+        </div>
+      )}
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{isVideo ? 'Add your video' : 'Add files'}</div>
       {isVideo && (
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -109,9 +118,9 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       <div style={{ fontWeight: 600, fontSize: 14, margin: '28px 0 10px' }}>Files</div>
       <FilesGrid galleryId={gallery.id} items={adminItems} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} coverItemId={gallery.coverItemId} sortMode={gallery.sortMode} canReadDates={gallery.storage === 'drive' && !!gallery.driveConnection} />
 
-      <div style={{ fontWeight: 600, fontSize: 14, margin: '32px 0 4px' }}>Cover & welcome message</div>
+      <div id="cover" style={{ fontWeight: 600, fontSize: 14, margin: '32px 0 4px', scrollMarginTop: 20 }}>Cover & welcome message</div>
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>This is the first thing your client sees, before the photos. Leave a line empty to hide it.</div>
-      <form action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12, alignItems: 'end', marginBottom: 14 }}>
+      <SaveForm action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12, alignItems: 'end', marginBottom: 14 }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
           Cover title
           <input name="coverTitle" defaultValue={gallery.coverTitle ?? ''} placeholder={gallery.title} style={{ width: '100%', marginTop: 4 }} />
@@ -167,10 +176,10 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
           <button className="primary" type="submit">Save cover</button>
           <a href={`/gallery/${gallery.slug || gallery.shareToken}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>See how it looks ↗</a>
         </div>
-      </form>
+      </SaveForm>
 
       <div style={{ fontWeight: 600, fontSize: 14, margin: '26px 0 8px' }}>Details</div>
-      <form action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10, alignItems: 'end', marginBottom: 14 }}>
+      <SaveForm action={updateGallery.bind(null, gallery.id)} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10, alignItems: 'end', marginBottom: 14 }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           Gallery name (only you see this)
           <input name="title" required defaultValue={gallery.title} style={{ width: '100%', marginTop: 4 }} />
@@ -205,7 +214,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
         <input type="hidden" name="coverStyle" value={gallery.coverStyle} />
         <input type="hidden" name="layout" value={gallery.layout} />
         <button className="primary" type="submit">Save details</button>
-      </form>
+      </SaveForm>
 
       <form action={setGalleryPasscode.bind(null, gallery.id)} className="card" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, minWidth: 200 }}>

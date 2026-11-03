@@ -7,6 +7,7 @@ import { GALLERY_CSS, themeVars } from '@/lib/galleryTheme'
 import PasscodeForm from './PasscodeForm'
 import GalleryView, { type ViewItem } from './GalleryView'
 import VideoDelivery from './VideoDelivery'
+import { directUrl } from '@/lib/googleDrive'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,7 +104,13 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     const display = i.kind === 'video' ? (g.layout === 'video' ? u.web : null) : u.web || u.small
     // When downloads are off we do not hand out the original of a picture that has a smaller copy to look at.
     const hideOriginal = !g.allowDownload && i.kind === 'image' && u.hasWeb
-    return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original, setId: i.setId, capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null }
+    const view: ViewItem = { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original, setId: i.setId, capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null }
+    // A video kept in Google Drive and shared by link is streamed by the viewer's browser straight from Google (faster, and it does not
+    // depend on Brand Console's own Google login). The route through Brand Console stays as the fallback. Not used with a passcode or expiry.
+    if (g.layout === 'video' && i.kind === 'video' && i.driveFileId && i.drivePublic && !g.passcodeHash && !g.expiresAt) {
+      return { ...view, thumb: i.driveThumbId ? directUrl(i.driveThumbId) : view.thumb, display: i.driveWebId ? directUrl(i.driveWebId) : null, full: directUrl(i.driveFileId), fallback: { thumb: view.thumb, display: view.display, full: view.full } }
+    }
+    return view
   })
   const dateLabel = g.eventDate ? g.eventDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''
 

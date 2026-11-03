@@ -19,6 +19,7 @@ export type ViewItem = {
   full: string | null // the untouched original, for downloads and video
   setId: string | null
   capturedAt: string | null
+  fallback?: { thumb: string | null; display: string | null; full: string | null } // the route through Brand Console, used if the direct one fails
 }
 
 const slug = (s: string) => s.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'gallery'

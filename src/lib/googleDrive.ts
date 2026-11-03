@@ -134,6 +134,29 @@ export async function driveHealth(conn: { id: string; refreshToken: string }): P
   }
 }
 
+// The address Google serves a link-shared file from. The viewer's browser fetches the film from Google itself, so the
+// picture does not depend on Brand Console holding a working Google login at that moment, and there is no extra hop.
+export const directUrl = (fileId: string) => `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`
+
+// Lets anyone who has the (unguessable) file link read it. Needs only the "drive.file" permission, because Brand Console made the files.
+export async function makeFilesPublic(conn: { id: string; refreshToken: string }, ids: string[]): Promise<boolean> {
+  let token = await accessTokenFor(conn)
+  let all = true
+  for (const id of ids) {
+    const post = (t: string) => drive(t, `/files/${encodeURIComponent(id)}/permissions`, { method: 'POST', body: JSON.stringify({ role: 'reader', type: 'anyone', allowFileDiscovery: false }) })
+    let res = await post(token)
+    if (res.status === 401) {
+      token = await accessTokenFor(conn, true)
+      res = await post(token)
+    }
+    if (!res.ok) {
+      console.error(`[drive-share] could not share a file (Google said ${res.status})`)
+      all = false
+    }
+  }
+  return all
+}
+
 export async function createFolder(token: string, name: string, parentId?: string): Promise<string> {
   const res = await drive(token, '/files?fields=id', { method: 'POST', body: JSON.stringify({ name: name.slice(0, 200), mimeType: 'application/vnd.google-apps.folder', ...(parentId ? { parents: [parentId] } : {}) }) })
   const j = await res.json().catch(() => ({}))

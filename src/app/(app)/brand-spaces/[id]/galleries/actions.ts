@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { del } from '@vercel/blob'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess, getOrCreateCurrentUser } from '@/lib/auth'
+import { ensureDirectViewing } from '@/lib/galleryShare'
 import { accessTokenFor, deleteDriveFiles, driveConfigured, fileInfo, revokeToken, decrypt, DRIVE_API } from '@/lib/googleDrive'
 import { newGalleryToken, hashPasscode, isGalleryBlobUrl } from '@/lib/gallery'
 import { kindOf, checkSlug } from '@/lib/galleryFormat'
@@ -104,6 +105,7 @@ export async function updateGallery(galleryId: string, formData: FormData) {
 export async function setGalleryPublished(galleryId: string, published: boolean) {
   const g = await galleryForEdit(galleryId)
   await db.gallery.update({ where: { id: galleryId }, data: { published } })
+  if (published) await ensureDirectViewing(galleryId)
   refresh(g.brandSpaceId, galleryId)
 }
 
@@ -201,7 +203,8 @@ export async function setWatchVersion(itemId: string, input: { url?: string; dri
     }
 
     const [oldDrive, oldBlob] = [item.driveWebId, item.webUrl]
-    await db.galleryItem.update({ where: { id: itemId }, data: { driveWebId, webUrl } })
+    await db.galleryItem.update({ where: { id: itemId }, data: { driveWebId, webUrl, ...(g.storage === 'drive' ? { drivePublic: false } : {}) } })
+    if (g.published) await ensureDirectViewing(g.id)
     // the copy it replaces is no longer needed
     if (g.driveConnection && oldDrive && oldDrive !== driveWebId) await deleteDriveFiles(g.driveConnection, [oldDrive])
     if (oldBlob && oldBlob !== webUrl) await deleteBlobs([oldBlob])

@@ -526,6 +526,7 @@ model GalleryItem {
   driveFileId  String?  // Google Drive: the original
   driveThumbId String?  // Google Drive: small preview
   driveWebId   String?  // Google Drive: 2400px viewing copy
+  drivePublic  Boolean  @default(false) // video deliveries: its Drive files can be streamed straight from Google (shared by link)
   contentType String   @default("application/octet-stream")
   kind        String   @default("file") // image | video | file
   size        Float    @default(0)      // bytes of the original
