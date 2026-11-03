@@ -30,7 +30,8 @@ export async function GET(request: Request, { params }: { params: { token: strin
   if (!fileId) return text(404, 'Not found')
   if (variant === 'o' && !gallery.allowDownload && (asDownload || item.kind !== 'video')) return text(403, 'Downloads are turned off for this gallery')
 
-  const cacheControl = variant === 'o' || item.kind === 'video' ? 'private, no-store' : gallery.passcodeHash ? 'private, max-age=3600' : 'public, max-age=3600, s-maxage=3600'
+  // Videos are cached only in the viewer's own browser (so playback can buffer and seek smoothly); other originals are not cached at all.
+  const cacheControl = item.kind === 'video' && variant !== 't' ? 'private, max-age=3600' : variant === 'o' ? 'private, no-store' : gallery.passcodeHash ? 'private, max-age=3600' : 'public, max-age=3600, s-maxage=3600'
   return streamDriveFile(gallery.driveConnection, fileId, request, {
     // previews keep Drive's own type (jpeg/webp); originals use the type we recorded when they were uploaded
     contentType: variant === 'o' ? item.contentType || 'application/octet-stream' : '',

@@ -29,6 +29,21 @@ const INTRO_CSS = `
 @media (prefers-reduced-motion:reduce){.vd-intro{display:none}}
 `
 
+// After a video fails, ask the server directly what it says, so the message can name the real cause.
+async function probe(src: string): Promise<string> {
+  try {
+    const res = await fetch(src, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' })
+    if (res.ok) {
+      const range = res.headers.get('content-range')
+      res.body?.cancel().catch(() => {})
+      return `Server replied ${res.status}, ${res.headers.get('content-type') || 'no type'}${range ? `, ${range}` : ''}`
+    }
+    return `Server replied ${res.status}: ${(await res.text()).replace(/\s+/g, ' ').slice(0, 160)}`
+  } catch {
+    return 'Could not reach the server.'
+  }
+}
+
 type Note = { kind: 'progress'; name: string; bytes: number; total: number } | { kind: 'done'; text: string } | { kind: 'error'; text: string }
 
 export default function VideoDelivery({
@@ -75,7 +90,8 @@ export default function VideoDelivery({
   // The player takes the film's own shape (9:16, 16:9, 4:5, 1:1, 4:3 ...). The real size is read from the video itself
   // once it loads; until then the size saved at upload is used.
   const [dims, setDims] = useState<Record<string, { w: number; h: number }>>({})
-  const [failed, setFailed] = useState<{ id: string; code: number | null } | null>(null)
+  const [failed, setFailed] = useState<{ id: string; code: number | null; detail?: string } | null>(null)
+  const dropRetries = useRef(0) // automatic retries after a dropped connection
   const [tries, setTries] = useState(0)
   const real = cur ? dims[cur.id] : undefined
   const ratio = real ? real.w / real.h : cur?.w && cur?.h ? cur.w / cur.h : 16 / 9
@@ -192,9 +208,20 @@ export default function VideoDelivery({
                   }}
                   onError={(e) => {
                     clearStall()
-                    // if the original cannot be loaded and there is a smooth version, use that instead
+                    const el = e.currentTarget
+                    const code = el.error?.code ?? null
+                    // a connection that dropped mid-film: quietly try again from the same moment (up to 3 times)
+                    if ((code === 2 || code === 3) && el.currentTime > 0 && dropRetries.current < 3) {
+                      dropRetries.current += 1
+                      resume.current = { t: el.currentTime, play: true }
+                      setTries((t) => t + 1)
+                      return
+                    }
+                    // the original cannot be loaded and there is a smooth version: use that instead
                     if (hasLight && !useLight) return switchTo(true, true)
-                    setFailed({ id: cur.id, code: e.currentTarget.error?.code ?? null })
+                    const id = cur.id
+                    setFailed({ id, code })
+                    probe(el.currentSrc).then((detail) => setFailed((f) => (f && f.id === id ? { ...f, detail } : f)))
                   }}
                   onWaiting={(e) => {
                     if (!hasLight || useLight || stallTimer.current || e.currentTarget.seeking) return
@@ -203,7 +230,10 @@ export default function VideoDelivery({
                       switchTo(true, true)
                     }, 3500)
                   }}
-                  onPlaying={clearStall}
+                  onPlaying={() => {
+                    clearStall()
+                    dropRetries.current = 0
+                  }}
                   onPause={clearStall}
                   onSeeking={clearStall}
                   onEnded={clearStall}
@@ -216,6 +246,7 @@ export default function VideoDelivery({
                     <div style={{ fontSize: 12.5, opacity: 0.75, maxWidth: 360 }}>
                       {failed.code === 2 ? 'The connection dropped while it was loading.' : failed.code === 4 ? 'The browser could not open this file. It may be slow to start, or in a format this browser cannot play.' : 'Something went wrong while loading it.'} (code {failed.code ?? '?'})
                     </div>
+                    {failed.detail && <div style={{ fontSize: 11.5, opacity: 0.6, maxWidth: 380, wordBreak: 'break-word' }}>{failed.detail}</div>}
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                       <button type="button" className="g-btn" onClick={() => { setFailed(null); setTries((t) => t + 1) }}>Try again</button>
                       {allowDownload && cur.full && <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
@@ -227,7 +258,7 @@ export default function VideoDelivery({
               <div style={{ width: barW, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="g-serif" style={{ fontSize: 22, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{videos.length > 1 ? stripExt(cur.name) : title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}{useLight ? ' · smooth version' : ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{useLight ? `Playing the smooth version${allowDownload ? ` · the download is the full-quality original (${formatBytes(cur.size)})` : ''}` : `${formatBytes(cur.size)}${allowDownload ? ' · full quality original' : ''}`}</div>
                   {autoSwitched && useLight && <div style={{ fontSize: 12, color: 'var(--g-muted)', marginTop: 2 }}>Your connection looked slow, so we switched to a smoother version.</div>}
                 </div>
                 {allowDownload && cur.full && (
