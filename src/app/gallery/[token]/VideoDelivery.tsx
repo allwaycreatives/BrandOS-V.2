@@ -11,15 +11,20 @@ import type { ViewItem } from './GalleryView'
 
 const stripExt = (n: string) => n.replace(/\.[a-z0-9]{2,5}$/i, '')
 
-// The opening: the brand name and the title appear on a calm screen, then it fades away on its own (CSS only, so it can
-// never get stuck), or sooner if the client taps. It plays once per visit.
+// The opening: the Brand Console logo animation (the orange B slides in, then the rest of the logo is written across),
+// then "Delivered by <brand>". Pure CSS with a fail-safe, so it can never get stuck: it fades away on its own after a few
+// seconds, or sooner if the client taps. It plays once per visit and is off for people who prefer reduced motion.
 const INTRO_CSS = `
-.vd-intro{position:fixed;inset:0;z-index:2000;background:var(--g-bg);color:var(--g-fg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;cursor:pointer;animation:vd-out .8s ease 3s forwards}
-.vd-brand{font-size:clamp(34px,8vw,78px);font-weight:500;letter-spacing:.02em;line-height:1.05;animation:vd-in 1.3s cubic-bezier(.2,.7,.2,1) .25s both}
-.vd-line{width:1px;height:56px;background:currentColor;opacity:.5;margin:24px auto;transform-origin:top;animation:vd-grow .9s ease .9s both}
-.vd-sub{font-size:clamp(17px,2.4vw,26px);font-style:italic;opacity:.9;max-width:640px;animation:vd-in 1s ease 1.5s both}
-@keyframes vd-in{from{opacity:0;transform:translateY(14px) scale(.98);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
-@keyframes vd-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.vd-intro{position:fixed;inset:0;z-index:2000;background:var(--g-bg);color:var(--g-fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;padding:24px;cursor:pointer;animation:vd-out .7s ease 3.4s forwards}
+.vd-mark{position:relative;width:min(78vw,520px);aspect-ratio:1052/324;animation:vd-markin 2.6s cubic-bezier(.2,.7,.2,1) both}
+.vd-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.vd-b{animation:vd-brandin .9s cubic-bezier(.2,.8,.2,1) both}
+.vd-c{-webkit-mask-image:linear-gradient(90deg,#000 0%,#000 33.3%,transparent 66.6%,transparent 100%);mask-image:linear-gradient(90deg,#000 0%,#000 33.3%,transparent 66.6%,transparent 100%);-webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;animation:vd-consolein 1.5s cubic-bezier(.45,.05,.25,1) .55s both}
+.vd-by{font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--g-muted);text-align:center;animation:vd-byin .7s ease 1.95s both}
+@keyframes vd-brandin{from{opacity:0;transform:translateX(-4%) skewX(-6deg);clip-path:inset(0 100% 0 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
+@keyframes vd-consolein{from{-webkit-mask-position:100% 0;mask-position:100% 0}to{-webkit-mask-position:0% 0;mask-position:0% 0}}
+@keyframes vd-markin{from{transform:scale(.96)}to{transform:scale(1)}}
+@keyframes vd-byin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes vd-out{to{opacity:0;visibility:hidden}}
 @media (prefers-reduced-motion:reduce){.vd-intro{display:none}}
 `
@@ -100,11 +105,11 @@ export default function VideoDelivery({
 
       {!introOff && (
         <div className="vd-intro" onClick={() => setIntroOff(true)} aria-hidden="true">
-          <div>
-            <div className="g-serif vd-brand">{brand}</div>
-            <div className="vd-line" />
-            <div className="g-serif vd-sub">{title}</div>
+          <div className="vd-mark">
+            <img className="vd-b" src="/brand/full-b.png" alt="" draggable={false} />
+            <img className="vd-c" src={theme === 'dark' ? '/brand/full-c-onDark.png' : '/brand/full-c-onLight.png'} alt="" draggable={false} />
           </div>
+          <div className="vd-by">Delivered by {brand}</div>
         </div>
       )}
 
