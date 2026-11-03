@@ -73,6 +73,40 @@ export default function VideoDelivery({
   }, [introKey])
   const cur = videos.find((v) => v.id === currentId) ?? videos[0] ?? null
   const vertical = !!cur && !!cur.w && !!cur.h && cur.h > cur.w * 1.05
+
+  // Original quality plays first. If a "smooth" (watch) version exists and the original stalls for a few seconds,
+  // we switch to the smooth one at the same moment of the film. The viewer can also switch by hand.
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const stallTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resume = useRef<{ t: number; play: boolean } | null>(null)
+  const [light, setLight] = useState<Record<string, boolean>>({})
+  const [rememberedLight, setRememberedLight] = useState(false) // already switched earlier in this visit
+  const [autoSwitched, setAutoSwitched] = useState(false)
+  const hasLight = !!cur && !!cur.display && cur.display !== cur.full
+  const useLight = !!cur && hasLight && (light[cur.id] ?? rememberedLight)
+  const clearStall = () => {
+    if (stallTimer.current) clearTimeout(stallTimer.current)
+    stallTimer.current = null
+  }
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(`vd_light_${introKey}`)) setRememberedLight(true)
+    } catch {}
+    return clearStall
+  }, [introKey])
+  function switchTo(toLight: boolean, auto: boolean) {
+    if (!cur) return
+    clearStall()
+    const el = videoRef.current
+    if (el) resume.current = { t: el.currentTime || 0, play: !el.paused }
+    setLight((p) => ({ ...p, [cur.id]: toLight }))
+    setAutoSwitched(auto && toLight)
+    if (auto && toLight) {
+      try {
+        sessionStorage.setItem(`vd_light_${introKey}`, '1')
+      } catch {}
+    }
+  }
   const forLine = [preparedFor ? `Prepared for ${preparedFor}` : '', dateLabel].filter(Boolean).join('   ·   ')
   const n = title.length
   const titleSize = n <= 18 ? 'clamp(38px, 6.4vw, 84px)' : n <= 36 ? 'clamp(32px, 5vw, 62px)' : 'clamp(27px, 4vw, 50px)'
@@ -130,11 +164,32 @@ export default function VideoDelivery({
               <div style={{ width: '100%', maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '0 auto', background: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}>
                 <video
                   key={cur.id}
-                  src={cur.display ?? cur.full ?? undefined}
+                  ref={videoRef}
+                  src={(useLight ? cur.display : cur.full) ?? undefined}
                   poster={cur.thumb ?? undefined}
                   controls
                   playsInline
                   preload="metadata"
+                  onLoadedMetadata={(e) => {
+                    // after a switch, carry on from the same moment
+                    const r = resume.current
+                    if (!r) return
+                    resume.current = null
+                    const el = e.currentTarget
+                    if (r.t > 0) el.currentTime = r.t
+                    if (r.play) el.play().catch(() => {})
+                  }}
+                  onWaiting={(e) => {
+                    if (!hasLight || useLight || stallTimer.current || e.currentTarget.seeking) return
+                    stallTimer.current = setTimeout(() => {
+                      stallTimer.current = null
+                      switchTo(true, true)
+                    }, 3500)
+                  }}
+                  onPlaying={clearStall}
+                  onPause={clearStall}
+                  onSeeking={clearStall}
+                  onEnded={clearStall}
                   controlsList={allowDownload ? undefined : 'nodownload'}
                   style={{ display: 'block', width: '100%', maxHeight: '78svh', aspectRatio: cur.w && cur.h ? `${cur.w} / ${cur.h}` : '16 / 9', objectFit: 'contain', background: '#000' }}
                 />
@@ -143,7 +198,8 @@ export default function VideoDelivery({
               <div style={{ maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="g-serif" style={{ fontSize: 22, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{videos.length > 1 ? stripExt(cur.name) : title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}{cur.display && cur.display !== cur.full ? ' · playing a lighter streaming version' : ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}{useLight ? ' · smooth version' : ''}</div>
+                  {autoSwitched && useLight && <div style={{ fontSize: 12, color: 'var(--g-muted)', marginTop: 2 }}>Your connection looked slow, so we switched to a smoother version.</div>}
                 </div>
                 {allowDownload && cur.full && (
                   <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} onClick={(e) => onDownloadClick(e, cur)} style={{ display: 'inline-block', textDecoration: 'none' }}>
@@ -151,6 +207,14 @@ export default function VideoDelivery({
                   </a>
                 )}
               </div>
+              {hasLight && (
+                <div style={{ maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '12px auto 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>
+                  <span>Quality</span>
+                  {[{ label: 'Original', to: false }, { label: 'Smooth', to: true }].map((o) => (
+                    <button key={o.label} type="button" onClick={() => !(o.to === useLight) && switchTo(o.to, false)} aria-pressed={o.to === useLight} style={{ border: '1px solid var(--g-line)', borderRadius: 999, padding: '3px 12px', background: o.to === useLight ? 'var(--g-fg)' : 'transparent', color: o.to === useLight ? 'var(--g-bg)' : 'inherit', cursor: 'pointer', font: 'inherit' }}>{o.label}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {description && (

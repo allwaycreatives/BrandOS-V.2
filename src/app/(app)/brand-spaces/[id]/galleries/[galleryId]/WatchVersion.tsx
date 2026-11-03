@@ -55,10 +55,10 @@ export default function WatchVersion({ galleryId, storage, videos }: { galleryId
 
   return (
     <div className="card" style={{ marginBottom: 22 }}>
-      <div style={{ fontWeight: 600, fontSize: 14 }}>Watch version (for smooth playback)</div>
+      <div style={{ fontWeight: 600, fontSize: 14 }}>Smooth version (a backup for slow connections)</div>
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '4px 0 12px', lineHeight: 1.55 }}>
-        Your original is what the client downloads. A big original (like 800 MB) can buffer on slow Wi-Fi, so add a lighter copy for watching: a <b>1080p MP4</b>, about <b>100 to 250 MB</b> (around 8 Mbps). The page plays the light copy and keeps the Download button on the full-quality original.
-        In HandBrake use “Fast 1080p30”, or in Premiere or DaVinci export H.264 at 1920×1080, 8 Mbps.
+        Clients watch your full-quality original first. If it keeps buffering on a slow connection, the page switches them, at the same spot, to this lighter copy (they can also switch by hand). Add a <b>1080p MP4</b>, about <b>150 to 250 MB</b>. The Download button always gives the original.
+        In DaVinci Resolve: Deliver → MP4, H.264, 1920×1080, Quality “Restrict to” (a 7-minute film: about 3500 Kb/s), audio AAC 192.
       </div>
 
       <input
@@ -74,7 +74,7 @@ export default function WatchVersion({ galleryId, storage, videos }: { galleryId
       />
 
       {videos.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Upload your video first, then add its watch version here.</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Upload your video first, then add its smooth version here.</div>
       ) : (
         videos.map((v) => {
           const working = busy?.id === v.id
@@ -83,7 +83,7 @@ export default function WatchVersion({ galleryId, storage, videos }: { galleryId
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name} <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>· original {formatBytes(v.size)}</span></div>
                 <div style={{ fontSize: 12, color: working ? 'var(--text-secondary)' : v.hasWatch ? 'var(--accent-text)' : 'var(--text-muted)' }}>
-                  {working ? `Uploading the watch version… ${busy!.pct}%` : v.hasWatch ? '✓ Watch version added. Clients stream it and download the original.' : 'No watch version yet: clients stream the original.'}
+                  {working ? `Uploading the smooth version… ${busy!.pct}%` : v.hasWatch ? '✓ Added. Used automatically if the original buffers.' : 'None yet: everyone streams the original.'}
                 </div>
                 {error?.id === v.id && <div style={{ fontSize: 12, color: '#c0392b', marginTop: 2 }}>{error.message}</div>}
               </div>
@@ -96,14 +96,14 @@ export default function WatchVersion({ galleryId, storage, videos }: { galleryId
                     pick.current?.click()
                   }}
                 >
-                  {v.hasWatch ? 'Replace' : 'Add watch version'}
+                  {v.hasWatch ? 'Replace' : 'Add smooth version'}
                 </button>
                 {v.hasWatch && !working && (
                   <button
                     type="button"
                     disabled={!!busy}
                     onClick={async () => {
-                      if (!confirm('Remove the watch version? Clients will stream the original again.')) return
+                      if (!confirm('Remove the smooth version? Everyone will stream the original.')) return
                       await removeWatchVersion(v.id)
                       router.refresh()
                     }}
