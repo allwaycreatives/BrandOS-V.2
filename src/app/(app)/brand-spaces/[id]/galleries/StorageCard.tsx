@@ -27,9 +27,12 @@ export default function StorageCard({ configured, email, returnTo, flag }: { con
           </div>
         </div>
         {email ? (
-          <button type="button" disabled={pending} onClick={() => { if (confirm('Disconnect Google Drive? Galleries kept in your Drive stop working until you connect it again. Your files stay in Drive.')) start(async () => { await disconnectGoogleDrive() }) }}>
-            {pending ? '…' : 'Disconnect'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <a href={`/api/google/connect?returnTo=${encodeURIComponent(returnTo)}`} style={{ fontSize: 13, textDecoration: 'underline' }} title="Sign in to Google again. Everything stays linked; use this if Drive stops working.">Reconnect</a>
+            <button type="button" disabled={pending} onClick={() => { if (confirm('Disconnect Google Drive? Galleries kept in your Drive stop working until you connect it again. Your files stay in Drive.')) start(async () => { await disconnectGoogleDrive() }) }}>
+              {pending ? '…' : 'Disconnect'}
+            </button>
+          </div>
         ) : configured ? (
           <a className="primary" href={`/api/google/connect?returnTo=${encodeURIComponent(returnTo)}`} style={{ padding: '8px 16px', borderRadius: 10, background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13 }}>Connect Google Drive</a>
         ) : null}

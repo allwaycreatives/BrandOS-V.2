@@ -98,6 +98,8 @@ export default function VideoDelivery({
   // as wide as the page allows, but never taller than about 78% of the screen
   const playerW = `min(100%, 1180px, calc(78svh * ${ratio.toFixed(4)}))`
   const barW = `max(min(100%, 420px), ${playerW})`
+  // the sender's Google Drive connection is the problem (not the viewer's browser): say so plainly, and do not offer a download that would fail too
+  const driveProblem = /reconnected|Google said (401|403)|does not accept/i.test(failed?.detail || '')
 
   // Original quality plays first. If a "smooth" (watch) version exists and the original stalls for a few seconds,
   // we switch to the smooth one at the same moment of the film. The viewer can also switch by hand.
@@ -242,14 +244,14 @@ export default function VideoDelivery({
                 />
                 {failed?.id === cur.id && (
                   <div role="alert" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center', background: 'rgba(0,0,0,.82)', color: '#fff', fontSize: 14, lineHeight: 1.5 }}>
-                    <div style={{ fontWeight: 600 }}>This video could not be played here.</div>
+                    <div style={{ fontWeight: 600 }}>{driveProblem ? 'This video is temporarily unavailable.' : 'This video could not be played here.'}</div>
                     <div style={{ fontSize: 12.5, opacity: 0.75, maxWidth: 360 }}>
-                      {failed.code === 2 ? 'The connection dropped while it was loading.' : failed.code === 4 ? 'The browser could not open this file. It may be slow to start, or in a format this browser cannot play.' : 'Something went wrong while loading it.'} (code {failed.code ?? '?'})
+                      {driveProblem ? 'The sender’s storage connection needs attention. Please let them know, and try again a little later.' : failed.code === 2 ? 'The connection dropped while it was loading.' : failed.code === 4 ? 'The browser could not open this file. It may be slow to start, or in a format this browser cannot play.' : 'Something went wrong while loading it.'} (code {failed.code ?? '?'})
                     </div>
                     {failed.detail && <div style={{ fontSize: 11.5, opacity: 0.6, maxWidth: 380, wordBreak: 'break-word' }}>{failed.detail}</div>}
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                       <button type="button" className="g-btn" onClick={() => { setFailed(null); setTries((t) => t + 1) }}>Try again</button>
-                      {allowDownload && cur.full && <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
+                      {allowDownload && cur.full && !driveProblem && <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
                     </div>
                   </div>
                 )}

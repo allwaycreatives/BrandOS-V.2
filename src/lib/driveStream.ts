@@ -1,4 +1,4 @@
-import { accessTokenFor, DRIVE_API } from '@/lib/googleDrive'
+import { accessTokenFor, DRIVE_API, DriveAuthError, tokenInfo } from '@/lib/googleDrive'
 
 // Streams one file from a person's Google Drive to the browser, passing along Range requests
 // (so videos can seek and big downloads can be fetched in pieces).
@@ -11,8 +11,11 @@ export async function streamDriveFile(
 ): Promise<Response> {
   const text = (status: number, message: string) => new Response(message, { status, headers: { 'content-type': 'text/plain', 'cache-control': 'no-store' } })
   const range = request.headers.get('range')
-  const ask = async (force: boolean) =>
-    fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { authorization: `Bearer ${await accessTokenFor(conn, force)}`, ...(range ? { range } : {}) } })
+  let lastToken = ''
+  const ask = async (force: boolean) => {
+    lastToken = await accessTokenFor(conn, force)
+    return fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { authorization: `Bearer ${lastToken}`, ...(range ? { range } : {}) } })
+  }
 
   // What Google said, in a few words (its error "reason", never ids or keys), so a failure can be understood and logged.
   const why = async (r: Response) => {
@@ -34,14 +37,17 @@ export async function streamDriveFile(
       up = await ask(false)
     }
   } catch (e) {
-    console.error('[drive-stream] could not reach Google Drive:', (e as Error).message)
+    console.error('[drive-stream] could not use the Google connection:', (e as Error).message)
+    if (e instanceof DriveAuthError) return text(502, 'Google Drive needs to be reconnected by its owner (Google no longer accepts the saved connection)')
     return text(502, 'Google Drive is not reachable right now (could not connect)')
   }
   if (up.status === 416) return new Response(null, { status: 416, headers: { 'content-range': up.headers.get('content-range') || '*/0', 'cache-control': 'no-store' } })
   if (!up.ok && up.status !== 206) {
     const reason = await why(up)
-    console.error(`[drive-stream] Google answered ${up.status} ${reason} (range: ${range || 'none'})`)
-    return text(up.status === 404 || up.status === 403 ? 404 : 502, `Google Drive could not provide this file (Google said ${up.status}${reason ? `: ${reason}` : ''})`)
+    // when Google keeps rejecting the key, say what Google thinks of it (valid? has the Drive permission?)
+    const extra = up.status === 401 ? `; ${await tokenInfo(lastToken)}` : ''
+    console.error(`[drive-stream] Google answered ${up.status} ${reason} (range: ${range || 'none'})${extra}`)
+    return text(up.status === 404 || up.status === 403 ? 404 : 502, `Google Drive could not provide this file (Google said ${up.status}${reason ? `: ${reason}` : ''}${extra})`)
   }
 
   const headers = new Headers()

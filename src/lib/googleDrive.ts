@@ -99,6 +99,41 @@ async function drive(token: string, path: string, init: RequestInit = {}) {
   return fetch(`${DRIVE_API}${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...(init.headers || {}) } })
 }
 
+// Asks Google what it thinks of an access key (is it valid, how long is left, does it include the Drive permission).
+// Used only to explain a failure; it never reveals the key itself.
+export async function tokenInfo(token: string): Promise<string> {
+  try {
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`)
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) return `Google does not accept the key itself (${j.error_description || j.error || res.status})`
+    const scopes = String(j.scope || '')
+    const hasDrive = scopes.includes('/auth/drive')
+    return `the key is valid for ${Math.round(Number(j.expires_in) || 0)}s and ${hasDrive ? 'includes' : 'is MISSING'} the Drive permission`
+  } catch {
+    return 'could not check the key'
+  }
+}
+
+// Is this Google Drive connection working right now? Mirrors what serving a file does: try the saved key, and on a
+// rejection ask for a fresh one and try again.
+export async function driveHealth(conn: { id: string; refreshToken: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    let token = await accessTokenFor(conn)
+    let res = await drive(token, '/about?fields=kind')
+    if (res.status === 401) {
+      token = await accessTokenFor(conn, true)
+      res = await drive(token, '/about?fields=kind')
+    }
+    if (res.ok) return { ok: true }
+    const j = await res.json().catch(() => ({}))
+    const reason = String(j?.error?.errors?.[0]?.reason || j?.error?.status || '').slice(0, 60)
+    return { ok: false, message: `Google answered ${res.status}${reason ? ` (${reason})` : ''}; ${await tokenInfo(token)}.` }
+  } catch (e) {
+    if (e instanceof DriveAuthError) return { ok: false, message: 'Google no longer accepts the saved connection (it expired or was withdrawn).' }
+    return { ok: false, message: 'Could not reach Google Drive just now.' }
+  }
+}
+
 export async function createFolder(token: string, name: string, parentId?: string): Promise<string> {
   const res = await drive(token, '/files?fields=id', { method: 'POST', body: JSON.stringify({ name: name.slice(0, 200), mimeType: 'application/vnd.google-apps.folder', ...(parentId ? { parents: [parentId] } : {}) }) })
   const j = await res.json().catch(() => ({}))
