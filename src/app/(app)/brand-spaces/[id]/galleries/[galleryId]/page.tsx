@@ -6,6 +6,7 @@ import { formatBytes } from '@/lib/galleryFormat'
 import { updateGallery, setGalleryPasscode } from '../actions'
 import GalleryUploader from './GalleryUploader'
 import LinkEditor from './LinkEditor'
+import WatchVersion from './WatchVersion'
 import { ShareBox, DeleteGalleryButton } from './GalleryControls'
 import FilesGrid, { type AdminItem } from './FilesGrid'
 
@@ -83,6 +84,16 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
         )}
       </div>
       <GalleryUploader galleryId={gallery.id} storage={gallery.storage === 'drive' ? 'drive' : 'blob'} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} />
+
+      {isVideo && (
+        <div style={{ marginTop: 24 }}>
+          <WatchVersion
+            galleryId={gallery.id}
+            storage={gallery.storage === 'drive' ? 'drive' : 'blob'}
+            videos={items.filter((i) => i.kind === 'video').map((i) => ({ id: i.id, name: i.name, size: i.size, hasWatch: !!(i.webUrl || i.driveWebId) }))}
+          />
+        </div>
+      )}
 
       <div style={{ fontWeight: 600, fontSize: 14, margin: '28px 0 10px' }}>Files</div>
       <FilesGrid galleryId={gallery.id} items={adminItems} sets={gallery.sets.map((x) => ({ id: x.id, name: x.name }))} mainSetName={gallery.mainSetName} coverItemId={gallery.coverItemId} sortMode={gallery.sortMode} canReadDates={gallery.storage === 'drive' && !!gallery.driveConnection} />

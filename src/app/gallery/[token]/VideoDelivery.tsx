@@ -130,7 +130,7 @@ export default function VideoDelivery({
               <div style={{ width: '100%', maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '0 auto', background: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}>
                 <video
                   key={cur.id}
-                  src={cur.full ?? undefined}
+                  src={cur.display ?? cur.full ?? undefined}
                   poster={cur.thumb ?? undefined}
                   controls
                   playsInline
@@ -143,7 +143,7 @@ export default function VideoDelivery({
               <div style={{ maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="g-serif" style={{ fontSize: 22, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{videos.length > 1 ? stripExt(cur.name) : title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}{cur.display && cur.display !== cur.full ? ' · playing a lighter streaming version' : ''}</div>
                 </div>
                 {allowDownload && cur.full && (
                   <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} onClick={(e) => onDownloadClick(e, cur)} style={{ display: 'inline-block', textDecoration: 'none' }}>

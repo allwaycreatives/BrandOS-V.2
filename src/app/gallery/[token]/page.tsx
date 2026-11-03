@@ -99,7 +99,8 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
 
   const items: ViewItem[] = g.items.map((i) => {
     const u = urls(i)
-    const display = u.web || u.small
+    // For a video the viewing copy is its lighter "watch version": the video page streams it, the original stays the download.
+    const display = i.kind === 'video' ? (g.layout === 'video' ? u.web : null) : u.web || u.small
     // When downloads are off we do not hand out the original of a picture that has a smaller copy to look at.
     const hideOriginal = !g.allowDownload && i.kind === 'image' && u.hasWeb
     return { id: i.id, name: i.name, kind: i.kind as ViewItem['kind'], size: i.size, w: i.width, h: i.height, thumb: u.thumb, display, full: hideOriginal ? null : u.original, setId: i.setId, capturedAt: i.capturedAt ? i.capturedAt.toISOString() : null }

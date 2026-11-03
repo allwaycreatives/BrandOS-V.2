@@ -175,6 +175,53 @@ export async function addGalleryItem(galleryId: string, input: NewGalleryItem): 
   }
 }
 
+// A "watch version" is a lighter copy of a video (say 1080p, 100 to 250 MB) that clients stream, so playback is smooth on a
+// slow connection. The untouched original stays what the Download button gives. It uses the same slot as the 2400px
+// viewing copy of a photo (webUrl / driveWebId), which videos never had.
+export async function setWatchVersion(itemId: string, input: { url?: string; drive?: { fileId: string } }): Promise<{ ok: true } | { error: string }> {
+  try {
+    const item = await db.galleryItem.findUnique({ where: { id: itemId }, include: { gallery: { include: { driveConnection: true } } } })
+    if (!item) return { error: 'File not found.' }
+    const g = item.gallery
+    await requireEdit(g.brandSpaceId)
+    if (item.kind !== 'video') return { error: 'A watch version can only be added to a video.' }
+
+    let driveWebId: string | null = null
+    let webUrl: string | null = null
+    if (g.storage === 'drive') {
+      const id = input.drive?.fileId
+      if (!id || !g.driveConnection || !g.drivePreviewsId) return { error: 'This delivery is stored in Google Drive.' }
+      // The copy must really sit in this delivery's folder in the owner's Drive.
+      const info = await fileInfo(await accessTokenFor(g.driveConnection), id)
+      if (!info?.parents?.includes(g.drivePreviewsId)) return { error: 'That file is not in this delivery.' }
+      driveWebId = id
+    } else {
+      if (!isGalleryBlobUrl(input.url, g.id)) return { error: 'That file is not in this delivery.' }
+      webUrl = input.url!
+    }
+
+    const [oldDrive, oldBlob] = [item.driveWebId, item.webUrl]
+    await db.galleryItem.update({ where: { id: itemId }, data: { driveWebId, webUrl } })
+    // the copy it replaces is no longer needed
+    if (g.driveConnection && oldDrive && oldDrive !== driveWebId) await deleteDriveFiles(g.driveConnection, [oldDrive])
+    if (oldBlob && oldBlob !== webUrl) await deleteBlobs([oldBlob])
+    refresh(g.brandSpaceId, g.id)
+    return { ok: true }
+  } catch (e) {
+    return { error: (e as Error).message || 'Could not save the watch version.' }
+  }
+}
+
+export async function removeWatchVersion(itemId: string) {
+  const item = await db.galleryItem.findUnique({ where: { id: itemId }, include: { gallery: { include: { driveConnection: true } } } })
+  if (!item || item.kind !== 'video') return
+  await requireEdit(item.gallery.brandSpaceId)
+  await db.galleryItem.update({ where: { id: itemId }, data: { driveWebId: null, webUrl: null } })
+  if (item.gallery.driveConnection) await deleteDriveFiles(item.gallery.driveConnection, [item.driveWebId])
+  await deleteBlobs([item.webUrl])
+  refresh(item.gallery.brandSpaceId, item.galleryId)
+}
+
 export async function deleteGalleryItem(itemId: string) {
   const item = await db.galleryItem.findUnique({ where: { id: itemId }, include: { gallery: { include: { driveConnection: true } } } })
   if (!item) return

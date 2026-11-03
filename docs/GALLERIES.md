@@ -10,6 +10,8 @@ When you create a delivery you choose what you are sending (and you can switch l
 - **Photos & videos**: the gallery grid with sections, favourites, slideshow and "Download all".
 - **One video**: a premiere page for a single film. The client sees your name, the title, a large player, a **Download video** button and your thank-you message. Extra cuts (a vertical version, a teaser) appear underneath as "More from this delivery", and any other files (stills, a music licence) appear as downloads. If you upload several videos, the first by file name is the main one (or pick one as the cover). New video deliveries start with the dark "cinema" look.
 
+**Watch version (video deliveries).** A big original (hundreds of MB) can buffer on slow Wi-Fi, because the page serves your file as it is and does not lower the quality by itself. On a video delivery, use **Watch version** to add a lighter 1080p MP4 (about 100 to 250 MB). Clients stream that copy, and the **Download video** button still gives the full-quality original. The watch copy is kept next to the original (in your Google Drive's previews folder, or in Brand Console storage). Removing it makes the page stream the original again.
+
 Both types share the same storage, passcode, expiry date, readable link and "Let the client download" switch. Type a client name in **Client name** when you create it and the page shows "Prepared for ...".
 
 Note: with downloads turned off the video can still be watched, and the browser's download option is hidden, but a determined person can always capture a video that is being streamed to them.
