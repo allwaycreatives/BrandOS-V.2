@@ -72,7 +72,16 @@ export default function VideoDelivery({
     } catch {}
   }, [introKey])
   const cur = videos.find((v) => v.id === currentId) ?? videos[0] ?? null
-  const vertical = !!cur && !!cur.w && !!cur.h && cur.h > cur.w * 1.05
+  // The player takes the film's own shape (9:16, 16:9, 4:5, 1:1, 4:3 ...). The real size is read from the video itself
+  // once it loads; until then the size saved at upload is used.
+  const [dims, setDims] = useState<Record<string, { w: number; h: number }>>({})
+  const [failed, setFailed] = useState<{ id: string; code: number | null } | null>(null)
+  const [tries, setTries] = useState(0)
+  const real = cur ? dims[cur.id] : undefined
+  const ratio = real ? real.w / real.h : cur?.w && cur?.h ? cur.w / cur.h : 16 / 9
+  // as wide as the page allows, but never taller than about 78% of the screen
+  const playerW = `min(100%, 1180px, calc(78svh * ${ratio.toFixed(4)}))`
+  const barW = `max(min(100%, 420px), ${playerW})`
 
   // Original quality plays first. If a "smooth" (watch) version exists and the original stalls for a few seconds,
   // we switch to the smooth one at the same moment of the film. The viewer can also switch by hand.
@@ -161,9 +170,9 @@ export default function VideoDelivery({
         {cur ? (
           <>
             <div ref={playerRef} className="g-rise d1" style={{ scrollMarginTop: 24 }}>
-              <div style={{ width: '100%', maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '0 auto', background: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}>
+              <div style={{ position: 'relative', width: playerW, aspectRatio: `${ratio}`, margin: '0 auto', background: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}>
                 <video
-                  key={cur.id}
+                  key={`${cur.id}-${tries}`}
                   ref={videoRef}
                   src={(useLight ? cur.display : cur.full) ?? undefined}
                   poster={cur.thumb ?? undefined}
@@ -171,13 +180,21 @@ export default function VideoDelivery({
                   playsInline
                   preload="metadata"
                   onLoadedMetadata={(e) => {
+                    const el = e.currentTarget
+                    if (el.videoWidth && el.videoHeight) setDims((p) => (p[cur.id]?.w === el.videoWidth && p[cur.id]?.h === el.videoHeight ? p : { ...p, [cur.id]: { w: el.videoWidth, h: el.videoHeight } }))
+                    setFailed(null)
                     // after a switch, carry on from the same moment
                     const r = resume.current
                     if (!r) return
                     resume.current = null
-                    const el = e.currentTarget
                     if (r.t > 0) el.currentTime = r.t
                     if (r.play) el.play().catch(() => {})
+                  }}
+                  onError={(e) => {
+                    clearStall()
+                    // if the original cannot be loaded and there is a smooth version, use that instead
+                    if (hasLight && !useLight) return switchTo(true, true)
+                    setFailed({ id: cur.id, code: e.currentTarget.error?.code ?? null })
                   }}
                   onWaiting={(e) => {
                     if (!hasLight || useLight || stallTimer.current || e.currentTarget.seeking) return
@@ -191,11 +208,23 @@ export default function VideoDelivery({
                   onSeeking={clearStall}
                   onEnded={clearStall}
                   controlsList={allowDownload ? undefined : 'nodownload'}
-                  style={{ display: 'block', width: '100%', maxHeight: '78svh', aspectRatio: cur.w && cur.h ? `${cur.w} / ${cur.h}` : '16 / 9', objectFit: 'contain', background: '#000' }}
+                  style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
                 />
+                {failed?.id === cur.id && (
+                  <div role="alert" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center', background: 'rgba(0,0,0,.82)', color: '#fff', fontSize: 14, lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 600 }}>This video could not be played here.</div>
+                    <div style={{ fontSize: 12.5, opacity: 0.75, maxWidth: 360 }}>
+                      {failed.code === 2 ? 'The connection dropped while it was loading.' : failed.code === 4 ? 'The browser could not open this file. It may be slow to start, or in a format this browser cannot play.' : 'Something went wrong while loading it.'} (code {failed.code ?? '?'})
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button type="button" className="g-btn" onClick={() => { setFailed(null); setTries((t) => t + 1) }}>Try again</button>
+                      {allowDownload && cur.full && <a className="g-btn" href={downloadUrlOf(cur.full)} download={cur.name} style={{ textDecoration: 'none' }}>Download instead</a>}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div style={{ maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ width: barW, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="g-serif" style={{ fontSize: 22, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{videos.length > 1 ? stripExt(cur.name) : title}</div>
                   <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{formatBytes(cur.size)}{allowDownload ? ' · full quality original' : ''}{useLight ? ' · smooth version' : ''}</div>
@@ -208,7 +237,7 @@ export default function VideoDelivery({
                 )}
               </div>
               {hasLight && (
-                <div style={{ maxWidth: vertical ? 'min(420px, 100%)' : 1180, margin: '12px auto 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>
+                <div style={{ width: barW, margin: '12px auto 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>
                   <span>Quality</span>
                   {[{ label: 'Original', to: false }, { label: 'Smooth', to: true }].map((o) => (
                     <button key={o.label} type="button" onClick={() => !(o.to === useLight) && switchTo(o.to, false)} aria-pressed={o.to === useLight} style={{ border: '1px solid var(--g-line)', borderRadius: 999, padding: '3px 12px', background: o.to === useLight ? 'var(--g-fg)' : 'transparent', color: o.to === useLight ? 'var(--g-bg)' : 'inherit', cursor: 'pointer', font: 'inherit' }}>{o.label}</button>
