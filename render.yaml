@@ -1,0 +1,53 @@
+# Free hosting on Render for Brand Console (a plain Node.js web service: the same code that runs anywhere, no rewrite).
+# In Render: New → Blueprint → pick this repo. Render asks for the values marked "sync: false" (copy them from your old host).
+services:
+  - type: web
+    name: brand-console
+    runtime: node
+    plan: free
+    region: frankfurt # the closest Render region to southern Africa
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/health
+    # No "prisma db push" here: the database already has its tables, and a push on every deploy can delete data.
+    buildCommand: npm ci && npx prisma generate && NODE_OPTIONS=--max-old-space-size=1536 npx next build
+    startCommand: npx next start -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=400 # the free plan has 512 MB of memory while running
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL # the public address of the site, like https://brand-console.onrender.com
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_KEY # copy it EXACTLY: it decrypts the saved Google Drive connection
+        sync: false
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_GOVERNING_LAW
+        sync: false
+      - key: AI_PROVIDER
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/terms(.*)',
   '/gallery/(.*)',
   '/api/gallery/(.*)',
+  '/api/health',
   '/brief/(.*)',
 ])
 
