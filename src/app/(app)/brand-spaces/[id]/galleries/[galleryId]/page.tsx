@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { assertBrandSpaceAccess } from '@/lib/auth'
 import { formatBytes } from '@/lib/galleryFormat'
-import { driveHealth } from '@/lib/googleDrive'
+import { driveDiagnose } from '@/lib/googleDrive'
 import { updateGallery, setGalleryPasscode } from '../actions'
 import GalleryUploader from './GalleryUploader'
 import LinkEditor from './LinkEditor'
@@ -30,8 +30,10 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, sets: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }, project: { select: { id: true, name: true } }, driveConnection: { select: { id: true, email: true, refreshToken: true } } } }).catch(() => null)
   if (!gallery || gallery.brandSpaceId !== params.id) notFound()
   // Is the Google Drive connection working? (only checked for deliveries kept in Drive)
-  const health = gallery.storage === 'drive' && gallery.driveConnection ? await driveHealth(gallery.driveConnection) : null
-  if (health?.ok && gallery.layout === 'video' && gallery.published) await ensureDirectViewing(gallery.id)
+  const probeFile = (gallery.items.find((i) => i.kind === 'video' && i.driveFileId) ?? gallery.items.find((i) => i.driveFileId))?.driveFileId
+  const diag = gallery.storage === 'drive' && gallery.driveConnection ? await driveDiagnose(gallery.driveConnection, probeFile) : null
+  if (diag?.ok && gallery.layout === 'video' && gallery.published) await ensureDirectViewing(gallery.id)
+  const failedStep = diag?.steps.find((s) => !s.ok)
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
   const items = gallery.items
@@ -84,12 +86,28 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
           Upload the film. It plays as the main video on your client’s page, and gets a download button. Extra cuts (a vertical version, a teaser) show underneath, and any other files, like stills or a licence, appear as downloads. If you upload several videos, the first by file name is the main one, so name it like “01 Final film”.
         </div>
       )}
-      {gallery.storage === 'drive' && gallery.driveConnection && health && !health.ok && (
-        <div role="alert" style={{ border: '1px solid #c0392b', background: 'rgba(192,57,43,.08)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
-          <b style={{ color: '#c0392b' }}>Your Google Drive connection is not working.</b> Your client cannot watch or download anything until it is fixed.
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12.5, margin: '2px 0 8px' }}>{health.message}</div>
-          <a className="primary" href={`/api/google/connect?returnTo=${encodeURIComponent(`/brand-spaces/${params.id}/galleries/${gallery.id}`)}`} style={{ display: 'inline-block', padding: '7px 14px', borderRadius: 10, background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>Reconnect Google Drive</a>
-          <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 10 }}>Your files and deliveries stay as they are.</span>
+      {gallery.storage === 'drive' && gallery.driveConnection && diag && (
+        <div role={diag.ok ? undefined : 'alert'} style={{ border: `1px solid ${diag.ok ? 'var(--border)' : '#c0392b'}`, background: diag.ok ? 'transparent' : 'rgba(192,57,43,.08)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
+          {diag.ok ? (
+            <b style={{ color: 'var(--accent-text)' }}>✓ Google Drive connection is working.</b>
+          ) : (
+            <>
+              <b style={{ color: '#c0392b' }}>Your Google Drive connection is not working.</b> Your client may not be able to watch or download until it is fixed.
+              <div style={{ color: 'var(--text-secondary)', fontSize: 12.5, margin: '2px 0 8px' }}>Stopped at: {failedStep?.label}. {failedStep?.detail}</div>
+              <a className="primary" href={`/api/google/connect?returnTo=${encodeURIComponent(`/brand-spaces/${params.id}/galleries/${gallery.id}`)}`} style={{ display: 'inline-block', padding: '7px 14px', borderRadius: 10, background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>Reconnect Google Drive</a>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 10 }}>Your files and deliveries stay as they are.</span>
+            </>
+          )}
+          <details open={!diag.ok} style={{ marginTop: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--text-secondary)' }}>Connection check, step by step</summary>
+            <div style={{ marginTop: 6, fontSize: 12.5 }}>
+              {diag.steps.map((st, i) => (
+                <div key={i} style={{ padding: '2px 0', color: st.ok ? 'var(--text-secondary)' : '#c0392b' }}>
+                  {st.ok ? '✓' : '✗'} {st.label}: <span style={{ opacity: 0.85 }}>{st.detail}</span>
+                </div>
+              ))}
+            </div>
+          </details>
         </div>
       )}
       <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>

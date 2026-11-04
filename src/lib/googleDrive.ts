@@ -157,6 +157,43 @@ export async function makeFilesPublic(conn: { id: string; refreshToken: string }
   return all
 }
 
+export type DriveStep = { label: string; ok: boolean; detail: string }
+
+// Does what serving the video does, step by step, and reports each step in plain words:
+// get a fresh key, does Google accept it, can Drive be reached, is the file found, can its bytes be read.
+export async function driveDiagnose(conn: { id: string; refreshToken: string }, fileId?: string | null): Promise<{ ok: boolean; steps: DriveStep[] }> {
+  const steps: DriveStep[] = []
+  const add = (label: string, ok: boolean, detail: string) => steps.push({ label, ok, detail })
+  const done = () => ({ ok: steps.every((s) => s.ok), steps })
+  let token = ''
+  try {
+    token = await accessTokenFor(conn, true)
+    add('Brand Console gets a fresh key from Google', true, 'Done.')
+  } catch (e) {
+    add('Brand Console gets a fresh key from Google', false, e instanceof DriveAuthError ? 'Google refused. The saved connection has expired or was withdrawn, so it must be reconnected.' : 'Google could not be reached just now.')
+    return done()
+  }
+  const info = await tokenInfo(token)
+  add('Google accepts that key', !/does not accept|could not check/.test(info), info.charAt(0).toUpperCase() + info.slice(1) + '.')
+  try {
+    const about = await drive(token, '/about?fields=kind')
+    add('Google Drive answers', about.ok, about.ok ? 'Done.' : `Google answered ${about.status}.`)
+    if (fileId) {
+      const meta = await drive(token, `/files/${encodeURIComponent(fileId)}?fields=name,size`)
+      const mj = await meta.json().catch(() => ({}))
+      const reason = String(mj?.error?.errors?.[0]?.reason || mj?.error?.status || '').slice(0, 60)
+      add('Your video file is found in Drive', meta.ok, meta.ok ? `${mj.name || 'Found'}${mj.size ? `, ${Math.round(Number(mj.size) / 1048576)} MB` : ''}.` : `Google answered ${meta.status}${reason ? ` (${reason})` : ''}.`)
+      const media = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { redirect: 'manual', headers: { authorization: `Bearer ${token}`, range: 'bytes=0-0' } })
+      media.body?.cancel().catch(() => {})
+      if (media.status >= 300 && media.status < 400) add('The video can be read', true, `Google hands the download to another address (${new URL(media.headers.get('location') || DRIVE_API, DRIVE_API).hostname}); Brand Console follows it.`)
+      else add('The video can be read', media.ok, media.ok ? 'Done.' : `Google answered ${media.status}.`)
+    }
+  } catch {
+    add('Google Drive answers', false, 'Google could not be reached just now.')
+  }
+  return done()
+}
+
 export async function createFolder(token: string, name: string, parentId?: string): Promise<string> {
   const res = await drive(token, '/files?fields=id', { method: 'POST', body: JSON.stringify({ name: name.slice(0, 200), mimeType: 'application/vnd.google-apps.folder', ...(parentId ? { parents: [parentId] } : {}) }) })
   const j = await res.json().catch(() => ({}))

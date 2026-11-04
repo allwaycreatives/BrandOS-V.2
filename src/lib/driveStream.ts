@@ -14,7 +14,19 @@ export async function streamDriveFile(
   let lastToken = ''
   const ask = async (force: boolean) => {
     lastToken = await accessTokenFor(conn, force)
-    return fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { authorization: `Bearer ${lastToken}`, ...(range ? { range } : {}) } })
+    const start = `${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`
+    const headers: Record<string, string> = { authorization: `Bearer ${lastToken}`, ...(range ? { range } : {}) }
+    let res = await fetch(start, { headers, redirect: 'manual' })
+    // For a big file Google may hand the download to another address. A plain redirect would silently drop our key on the way
+    // (which is how a perfectly good key ends up as "401 authError"), so follow it ourselves and keep the key for Google's API hosts.
+    for (let hops = 0; hops < 3 && res.status >= 300 && res.status < 400; hops++) {
+      const loc = res.headers.get('location')
+      if (!loc) break
+      res.body?.cancel().catch(() => {})
+      const next = new URL(loc, start)
+      res = await fetch(next, { headers: /(^|\.)googleapis\.com$/.test(next.hostname) ? headers : range ? { range } : {}, redirect: 'manual' })
+    }
+    return res
   }
 
   // What Google said, in a few words (its error "reason", never ids or keys), so a failure can be understood and logged.
