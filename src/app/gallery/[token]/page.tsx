@@ -108,7 +108,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     // A video kept in Google Drive and shared by link is streamed by the viewer's browser straight from Google (faster, and it does not
     // depend on Brand Console's own Google login). The route through Brand Console stays as the fallback. Not used with a passcode or expiry.
     if (g.layout === 'video' && i.kind === 'video' && i.driveFileId && i.drivePublic && !g.passcodeHash && !g.expiresAt) {
-      return { ...view, thumb: i.driveThumbId ? directUrl(i.driveThumbId) : view.thumb, display: i.driveWebId ? directUrl(i.driveWebId) : null, full: directUrl(i.driveFileId), embed: `https://drive.google.com/file/d/${encodeURIComponent(i.driveFileId)}/preview`, fallback: { thumb: view.thumb, display: view.display, full: view.full } }
+      return { ...view, thumb: i.driveThumbId ? directUrl(i.driveThumbId) : view.thumb, display: i.driveWebId ? directUrl(i.driveWebId) : null, full: directUrl(i.driveFileId), embed: `https://drive.google.com/file/d/${encodeURIComponent(i.driveWebId || i.driveFileId)}/preview`, fallback: { thumb: view.thumb, display: view.display, full: view.full } }
     }
     return view
   })

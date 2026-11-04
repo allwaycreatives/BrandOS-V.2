@@ -30,10 +30,12 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { items: true, sets: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }, project: { select: { id: true, name: true } }, driveConnection: { select: { id: true, email: true, refreshToken: true } } } }).catch(() => null)
   if (!gallery || gallery.brandSpaceId !== params.id) notFound()
   // Is the Google Drive connection working? (only checked for deliveries kept in Drive)
-  const probeFile = (gallery.items.find((i) => i.kind === 'video' && i.driveFileId) ?? gallery.items.find((i) => i.driveFileId))?.driveFileId
-  const diag = gallery.storage === 'drive' && gallery.driveConnection ? await driveDiagnose(gallery.driveConnection, probeFile) : null
+  const probeItem = gallery.items.find((i) => i.kind === 'video' && i.driveFileId) ?? gallery.items.find((i) => i.driveFileId)
+  const diag = gallery.storage === 'drive' && gallery.driveConnection
+    ? await driveDiagnose(gallery.driveConnection, [{ name: 'Original', id: probeItem?.driveFileId, expectedSize: probeItem?.size }, { name: 'Smooth version', id: probeItem?.driveWebId }])
+    : null
   const share = diag?.ok && gallery.layout === 'video' ? await ensureDirectViewing(gallery.id) : null
-  const failedStep = diag?.steps.find((s) => !s.ok)
+  const failedStep = diag?.steps.find((s) => !s.ok && !s.warn)
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
   const items = gallery.items
@@ -89,7 +91,10 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
       {gallery.storage === 'drive' && gallery.driveConnection && diag && (
         <div role={diag.ok ? undefined : 'alert'} style={{ border: `1px solid ${diag.ok ? 'var(--border)' : '#c0392b'}`, background: diag.ok ? 'transparent' : 'rgba(192,57,43,.08)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
           {diag.ok ? (
-            <b style={{ color: 'var(--accent-text)' }}>✓ Google Drive connection is working.</b>
+            <>
+              <b style={{ color: 'var(--accent-text)' }}>✓ Google Drive connection is working.</b>
+              {diag.steps.some((s) => s.warn && !s.ok) && <div style={{ color: '#b7791f', fontSize: 12.5, marginTop: 2 }}>⚠ But Google has not finished preparing the video for playback, or the file has a problem. Open the step-by-step list below.</div>}
+            </>
           ) : (
             <>
               <b style={{ color: '#c0392b' }}>Your Google Drive connection is not working.</b> Your client may not be able to watch or download until it is fixed.
@@ -107,8 +112,8 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
             <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--text-secondary)' }}>Connection check, step by step</summary>
             <div style={{ marginTop: 6, fontSize: 12.5 }}>
               {diag.steps.map((st, i) => (
-                <div key={i} style={{ padding: '2px 0', color: st.ok ? 'var(--text-secondary)' : '#c0392b' }}>
-                  {st.ok ? '✓' : '✗'} {st.label}: <span style={{ opacity: 0.85 }}>{st.detail}</span>
+                <div key={i} style={{ padding: '2px 0', color: st.ok ? 'var(--text-secondary)' : st.warn ? '#b7791f' : '#c0392b', wordBreak: 'break-word' }}>
+                  {st.ok ? '✓' : st.warn ? '⚠' : '✗'} {st.label}: <span style={{ opacity: 0.85 }}>{st.detail}</span>
                 </div>
               ))}
             </div>

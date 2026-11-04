@@ -159,14 +159,16 @@ export async function makeFilesPublic(conn: { id: string; refreshToken: string }
   return { ok: problems.length === 0, problems }
 }
 
-export type DriveStep = { label: string; ok: boolean; detail: string }
+export type DriveStep = { label: string; ok: boolean; detail: string; warn?: boolean }
+export type DriveTarget = { name: string; id: string | null | undefined; expectedSize?: number }
 
-// Does what serving the video does, step by step, and reports each step in plain words:
-// get a fresh key, does Google accept it, can Drive be reached, is the file found, can its bytes be read.
-export async function driveDiagnose(conn: { id: string; refreshToken: string }, fileId?: string | null): Promise<{ ok: boolean; steps: DriveStep[] }> {
+// Does what serving the video does, step by step, and reports each step in plain words: get a fresh key, does Google accept it,
+// can Drive be reached; then for each video file: is it found, is it complete, has Google prepared it for playback, can its bytes be read.
+// A "warn" step is something worth knowing that does not mean the connection is broken.
+export async function driveDiagnose(conn: { id: string; refreshToken: string }, targets: DriveTarget[] = []): Promise<{ ok: boolean; steps: DriveStep[] }> {
   const steps: DriveStep[] = []
-  const add = (label: string, ok: boolean, detail: string) => steps.push({ label, ok, detail })
-  const done = () => ({ ok: steps.every((s) => s.ok), steps })
+  const add = (label: string, ok: boolean, detail: string, warn = false) => steps.push({ label, ok, detail, warn })
+  const done = () => ({ ok: steps.every((s) => s.ok || s.warn), steps })
   let token = ''
   try {
     token = await accessTokenFor(conn, true)
@@ -180,15 +182,30 @@ export async function driveDiagnose(conn: { id: string; refreshToken: string }, 
   try {
     const about = await drive(token, '/about?fields=kind')
     add('Google Drive answers', about.ok, about.ok ? 'Done.' : `Google answered ${about.status}.`)
-    if (fileId) {
-      const meta = await drive(token, `/files/${encodeURIComponent(fileId)}?fields=name,size`)
+    for (const t of targets) {
+      if (!t.id) continue
+      const meta = await drive(token, `/files/${encodeURIComponent(t.id)}?fields=name,size,md5Checksum,trashed,videoMediaMetadata(width,height,durationMillis)`)
       const mj = await meta.json().catch(() => ({}))
       const reason = String(mj?.error?.errors?.[0]?.reason || mj?.error?.status || '').slice(0, 60)
-      add('Your video file is found in Drive', meta.ok, meta.ok ? `${mj.name || 'Found'}${mj.size ? `, ${Math.round(Number(mj.size) / 1048576)} MB` : ''}.` : `Google answered ${meta.status}${reason ? ` (${reason})` : ''}.`)
-      const media = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, { redirect: 'manual', headers: { authorization: `Bearer ${token}`, range: 'bytes=0-0' } })
+      if (!meta.ok) {
+        add(`${t.name}: found in Drive`, false, `Google answered ${meta.status}${reason ? ` (${reason})` : ''}.`)
+        continue
+      }
+      const bytes = Number(mj.size) || 0
+      add(`${t.name}: found in Drive`, !mj.trashed, mj.trashed ? 'It is in the Drive bin.' : `${mj.name || 'Found'}, ${Math.round(bytes / 1048576)} MB.`)
+      if (t.expectedSize && bytes && bytes !== t.expectedSize) add(`${t.name}: the upload is complete`, false, `Drive holds ${bytes.toLocaleString('en')} bytes, but ${t.expectedSize.toLocaleString('en')} were uploaded. The file is incomplete: upload it again.`, true)
+      const v = mj.videoMediaMetadata
+      if (v && v.durationMillis) {
+        const secs = Math.round(Number(v.durationMillis) / 1000)
+        add(`${t.name}: Google has prepared it for playback`, true, `${v.width}×${v.height}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}.`)
+      } else {
+        add(`${t.name}: Google has prepared it for playback`, false, 'Not yet. Until Google has processed the video, its own player shows "There was a problem playing this video". Large files can take a while; if it stays like this for hours, Google cannot read the file, and exporting it again as an H.264 MP4 usually fixes that.', true)
+      }
+      if (mj.md5Checksum) add(`${t.name}: fingerprint (MD5)`, true, `${mj.md5Checksum}. To check the upload is not damaged, compare it with the same file on your computer (Windows: certutil -hashfile "file.mp4" MD5).`)
+      const media = await fetch(`${DRIVE_API}/files/${encodeURIComponent(t.id)}?alt=media`, { redirect: 'manual', headers: { authorization: `Bearer ${token}`, range: 'bytes=0-0' } })
       media.body?.cancel().catch(() => {})
-      if (media.status >= 300 && media.status < 400) add('The video can be read', true, `Google hands the download to another address (${new URL(media.headers.get('location') || DRIVE_API, DRIVE_API).hostname}); Brand Console follows it.`)
-      else add('The video can be read', media.ok, media.ok ? 'Done.' : `Google answered ${media.status}.`)
+      if (media.status >= 300 && media.status < 400) add(`${t.name}: can be read`, true, `Google hands the download to another address (${new URL(media.headers.get('location') || DRIVE_API, DRIVE_API).hostname}); Brand Console follows it.`)
+      else add(`${t.name}: can be read`, media.ok, media.ok ? 'Done.' : `Google answered ${media.status}.`)
     }
   } catch {
     add('Google Drive answers', false, 'Google could not be reached just now.')
