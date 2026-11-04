@@ -32,7 +32,7 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
   // Is the Google Drive connection working? (only checked for deliveries kept in Drive)
   const probeFile = (gallery.items.find((i) => i.kind === 'video' && i.driveFileId) ?? gallery.items.find((i) => i.driveFileId))?.driveFileId
   const diag = gallery.storage === 'drive' && gallery.driveConnection ? await driveDiagnose(gallery.driveConnection, probeFile) : null
-  if (diag?.ok && gallery.layout === 'video' && gallery.published) await ensureDirectViewing(gallery.id)
+  const share = diag?.ok && gallery.layout === 'video' ? await ensureDirectViewing(gallery.id) : null
   const failedStep = diag?.steps.find((s) => !s.ok)
 
   const projects = await db.project.findMany({ where: { brandSpaceId: params.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true } }).catch(() => [])
@@ -97,6 +97,11 @@ export default async function GalleryManagePage({ params }: { params: { id: stri
               <a className="primary" href={`/api/google/connect?returnTo=${encodeURIComponent(`/brand-spaces/${params.id}/galleries/${gallery.id}`)}`} style={{ display: 'inline-block', padding: '7px 14px', borderRadius: 10, background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>Reconnect Google Drive</a>
               <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 10 }}>Your files and deliveries stay as they are.</span>
             </>
+          )}
+          {share && (
+            <div style={{ marginTop: 6, fontSize: 12.5, color: share.state === 'off' ? '#c0392b' : 'var(--text-secondary)' }}>
+              {share.state === 'on' ? '✓' : share.state === 'off' ? '✗' : '•'} Direct viewing: <span style={{ opacity: 0.85 }}>{share.detail}</span>
+            </div>
           )}
           <details open={!diag.ok} style={{ marginTop: 8 }}>
             <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--text-secondary)' }}>Connection check, step by step</summary>

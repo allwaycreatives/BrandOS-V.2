@@ -12,6 +12,7 @@ export async function streamDriveFile(
   const text = (status: number, message: string) => new Response(message, { status, headers: { 'content-type': 'text/plain', 'cache-control': 'no-store' } })
   const range = request.headers.get('range')
   let lastToken = ''
+  const trail: string[] = [] // what each attempt got, to make a failure understandable
   const ask = async (force: boolean) => {
     lastToken = await accessTokenFor(conn, force)
     const start = `${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`
@@ -26,6 +27,7 @@ export async function streamDriveFile(
       const next = new URL(loc, start)
       res = await fetch(next, { headers: /(^|\.)googleapis\.com$/.test(next.hostname) ? headers : range ? { range } : {}, redirect: 'manual' })
     }
+    trail.push(`${force ? 'fresh' : 'saved'} key: ${res.status}`)
     return res
   }
 
@@ -59,7 +61,7 @@ export async function streamDriveFile(
     // when Google keeps rejecting the key, say what Google thinks of it (valid? has the Drive permission?)
     const extra = up.status === 401 ? `; ${await tokenInfo(lastToken)}` : ''
     console.error(`[drive-stream] Google answered ${up.status} ${reason} (range: ${range || 'none'})${extra}`)
-    return text(up.status === 404 || up.status === 403 ? 404 : 502, `Google Drive could not provide this file (Google said ${up.status}${reason ? `: ${reason}` : ''}${extra})`)
+    return text(up.status === 404 || up.status === 403 ? 404 : 502, `Google Drive could not provide this file (Google said ${up.status}${reason ? `: ${reason}` : ''}${extra}) [${trail.join(', ')}]`)
   }
 
   const headers = new Headers()

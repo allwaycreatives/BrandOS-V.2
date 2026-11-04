@@ -139,9 +139,9 @@ export async function driveHealth(conn: { id: string; refreshToken: string }): P
 export const directUrl = (fileId: string) => `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`
 
 // Lets anyone who has the (unguessable) file link read it. Needs only the "drive.file" permission, because Brand Console made the files.
-export async function makeFilesPublic(conn: { id: string; refreshToken: string }, ids: string[]): Promise<boolean> {
+export async function makeFilesPublic(conn: { id: string; refreshToken: string }, ids: string[]): Promise<{ ok: boolean; problems: string[] }> {
   let token = await accessTokenFor(conn)
-  let all = true
+  const problems: string[] = []
   for (const id of ids) {
     const post = (t: string) => drive(t, `/files/${encodeURIComponent(id)}/permissions`, { method: 'POST', body: JSON.stringify({ role: 'reader', type: 'anyone', allowFileDiscovery: false }) })
     let res = await post(token)
@@ -150,11 +150,13 @@ export async function makeFilesPublic(conn: { id: string; refreshToken: string }
       res = await post(token)
     }
     if (!res.ok) {
-      console.error(`[drive-share] could not share a file (Google said ${res.status})`)
-      all = false
+      const j = await res.json().catch(() => ({}))
+      const reason = String(j?.error?.errors?.[0]?.reason || j?.error?.status || '').slice(0, 60)
+      console.error(`[drive-share] could not share a file (Google said ${res.status} ${reason})`)
+      problems.push(`Google said ${res.status}${reason ? ` (${reason})` : ''}`)
     }
   }
-  return all
+  return { ok: problems.length === 0, problems }
 }
 
 export type DriveStep = { label: string; ok: boolean; detail: string }

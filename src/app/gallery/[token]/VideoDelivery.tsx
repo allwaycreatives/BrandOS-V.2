@@ -112,6 +112,9 @@ export default function VideoDelivery({
   // Which address to use: straight from Google Drive when the delivery allows it, or the route through Brand Console
   // (the fallback, used after the direct one fails).
   const [proxied, setProxied] = useState<Record<string, boolean>>({})
+  // Last resort: Google's own player, shown inside this page. It plays whatever Google can play, with its own quality switching.
+  const [embedded, setEmbedded] = useState<Record<string, boolean>>({})
+  const useEmbed = !!cur && !!cur.embed && !!embedded[cur.id]
   const pick = (it: ViewItem, key: 'full' | 'display' | 'thumb') => (proxied[it.id] && it.fallback ? it.fallback[key] : it[key])
   const dlHref = (it: ViewItem) => {
     const u = pick(it, 'full') as string
@@ -198,6 +201,9 @@ export default function VideoDelivery({
           <>
             <div ref={playerRef} className="g-rise d1" style={{ scrollMarginTop: 24 }}>
               <div style={{ position: 'relative', width: playerW, aspectRatio: `${ratio}`, margin: '0 auto', background: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}>
+                {useEmbed ? (
+                  <iframe key={`${cur.id}-embed`} src={cur.embed} title={title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#000' }} />
+                ) : (
                 <video
                   key={`${cur.id}-${tries}`}
                   ref={videoRef}
@@ -226,6 +232,12 @@ export default function VideoDelivery({
                       dropRetries.current += 1
                       resume.current = { t: el.currentTime, play: true }
                       setTries((t) => t + 1)
+                      return
+                    }
+                    // streaming the file failed: show Google's own player instead (when this delivery's files are shared)
+                    if (!embedded[cur.id] && cur.embed) {
+                      setEmbedded((p) => ({ ...p, [cur.id]: true }))
+                      setFailed(null)
                       return
                     }
                     // loaded straight from Google and it failed: use the route through Brand Console instead, from the same moment
@@ -257,6 +269,7 @@ export default function VideoDelivery({
                   controlsList={allowDownload ? undefined : 'nodownload'}
                   style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
                 />
+                )}
                 {failed?.id === cur.id && (
                   <div role="alert" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center', background: 'rgba(0,0,0,.82)', color: '#fff', fontSize: 14, lineHeight: 1.5 }}>
                     <div style={{ fontWeight: 600 }}>{driveProblem ? 'This video is temporarily unavailable.' : 'This video could not be played here.'}</div>
@@ -275,7 +288,7 @@ export default function VideoDelivery({
               <div style={{ width: barW, margin: '18px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="g-serif" style={{ fontSize: 22, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{videos.length > 1 ? stripExt(cur.name) : title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{useLight ? `Playing the smooth version${allowDownload ? ` · the download is the full-quality original (${formatBytes(cur.size)})` : ''}` : `${formatBytes(cur.size)}${allowDownload ? ' · full quality original' : ''}`}</div>
+                  <div style={{ fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>{useEmbed ? `Playing in Google’s player${allowDownload ? ` · the download is the full-quality original (${formatBytes(cur.size)})` : ''}` : useLight ? `Playing the smooth version${allowDownload ? ` · the download is the full-quality original (${formatBytes(cur.size)})` : ''}` : `${formatBytes(cur.size)}${allowDownload ? ' · full quality original' : ''}`}</div>
                   {autoSwitched && useLight && <div style={{ fontSize: 12, color: 'var(--g-muted)', marginTop: 2 }}>Your connection looked slow, so we switched to a smoother version.</div>}
                 </div>
                 {allowDownload && cur.full && (
@@ -284,7 +297,7 @@ export default function VideoDelivery({
                   </a>
                 )}
               </div>
-              {hasLight && (
+              {hasLight && !useEmbed && (
                 <div style={{ width: barW, margin: '12px auto 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--g-muted)', letterSpacing: '.06em' }}>
                   <span>Quality</span>
                   {[{ label: 'Original', to: false }, { label: 'Smooth', to: true }].map((o) => (

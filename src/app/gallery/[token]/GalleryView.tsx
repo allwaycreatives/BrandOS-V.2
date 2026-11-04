@@ -19,6 +19,7 @@ export type ViewItem = {
   full: string | null // the untouched original, for downloads and video
   setId: string | null
   capturedAt: string | null
+  embed?: string // Google's own player for this file (used if streaming the file itself fails)
   fallback?: { thumb: string | null; display: string | null; full: string | null } // the route through Brand Console, used if the direct one fails
 }
 
