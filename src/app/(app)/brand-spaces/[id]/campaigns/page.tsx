@@ -7,7 +7,8 @@ import { getCampaignProgress } from '@/lib/campaigns'
 import { createCampaign } from './actions'
 import CampaignCard from '@/components/CampaignCard'
 
-export default async function BrandCampaignsPage({ params }: { params: { id: string } }) {
+export default async function BrandCampaignsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
   const { brandSpace } = access

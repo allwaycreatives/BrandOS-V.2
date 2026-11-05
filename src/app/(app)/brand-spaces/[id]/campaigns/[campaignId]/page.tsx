@@ -19,7 +19,8 @@ const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 const SERIF = "Georgia, 'Times New Roman', serif"
 const smallBtn: React.CSSProperties = { padding: '1px 7px', fontSize: 11 }
 
-export default async function CampaignPage({ params }: { params: { id: string; campaignId: string } }) {
+export default async function CampaignPage(props: { params: Promise<{ id: string; campaignId: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 

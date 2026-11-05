@@ -18,7 +18,8 @@ const lookup = async (key: string) => {
   return byCode ?? (await db.gallery.findUnique({ where: { slug: key }, include }).catch(() => null))
 }
 
-export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const g = await lookup(params.token)
   if (!g || !g.published) return { title: 'Gallery' }
   const isVideo = g.layout === 'video'
@@ -55,7 +56,8 @@ function Centered({ theme, children }: { theme: string; children: React.ReactNod
   )
 }
 
-export default async function PublicGalleryPage({ params }: { params: { token: string } }) {
+export default async function PublicGalleryPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const g = await lookup(params.token)
   if (!g || !g.published) notFound()
 
@@ -68,7 +70,7 @@ export default async function PublicGalleryPage({ params }: { params: { token: s
     )
   }
 
-  if (g.passcodeHash && cookies().get(unlockCookieName(g.shareToken))?.value !== unlockCookieValue(g.shareToken, g.passcodeHash)) {
+  if (g.passcodeHash && (await cookies()).get(unlockCookieName(g.shareToken))?.value !== unlockCookieValue(g.shareToken, g.passcodeHash)) {
     return (
       <Centered theme={g.theme}>
         <div className="g-eyebrow" style={{ color: 'var(--g-muted)' }}>{g.brandSpace.name}</div>

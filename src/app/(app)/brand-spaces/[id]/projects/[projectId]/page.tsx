@@ -14,7 +14,8 @@ import { formatBytes } from '@/lib/galleryFormat'
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 const SERIF = "Georgia, 'Times New Roman', serif"
 
-export default async function ProjectPage({ params }: { params: { id: string; projectId: string } }) {
+export default async function ProjectPage(props: { params: Promise<{ id: string; projectId: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 

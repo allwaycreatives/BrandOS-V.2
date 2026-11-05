@@ -14,7 +14,8 @@ const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date) => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 const small: React.CSSProperties = { padding: '2px 9px', fontSize: 11.5 }
 
-export default async function DeliverablePage({ params }: { params: { id: string; deliverableId: string } }) {
+export default async function DeliverablePage(props: { params: Promise<{ id: string; deliverableId: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 

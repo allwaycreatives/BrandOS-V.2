@@ -33,7 +33,7 @@ function previewLine(b: Block, n: number, key: number) {
 export default function DocumentCard({ content, readOnly, open, onOpen, onClose, onChange }: { content: string; readOnly: boolean; open: boolean; onOpen: () => void; onClose: () => void; onChange: (text: string) => void }) {
   const [text, setText] = useState(content)
   const [saving, setSaving] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dirty = useRef(false)
   const latest = useRef(text)
   const send = useRef(onChange)

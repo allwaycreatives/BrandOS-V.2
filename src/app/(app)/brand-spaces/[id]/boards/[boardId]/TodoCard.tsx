@@ -34,7 +34,7 @@ export default function TodoCard({ content, readOnly, onChange }: { content: str
   const [items, setItems] = useState<Item[]>(start.items.length || readOnly ? start.items : [{ done: false, text: '' }])
   const [focusIdx, setFocusIdx] = useState<number | null>(start.items.length === 0 && !readOnly ? 0 : null)
   const inputs = useRef<(HTMLInputElement | null)[]>([])
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dirty = useRef(false)
   const latest = useRef({ title, items })
   const send = useRef(onChange)

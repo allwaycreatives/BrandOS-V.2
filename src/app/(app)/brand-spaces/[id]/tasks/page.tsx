@@ -5,7 +5,8 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import NewTaskForm from './NewTaskForm'
 import TaskCard from './TaskCard'
 
-export default async function TasksPage({ params }: { params: { id: string } }) {
+export default async function TasksPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access

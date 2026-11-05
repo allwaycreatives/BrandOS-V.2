@@ -10,7 +10,11 @@ const text = (status: number, message: string) => new Response(message, { status
 
 // Serves a gallery file from the owner's Google Drive, but only under the gallery's own rules:
 // published, not expired, passcode entered, downloads allowed. The Drive files themselves stay private.
-export async function GET(request: Request, { params }: { params: { token: string; itemId: string } }) {
+export async function GET(
+  request: Request,
+  props: { params: Promise<{ token: string; itemId: string }> }
+) {
+  const params = await props.params;
   const url = new URL(request.url)
   const variant = url.searchParams.get('v') || 'o' // o = original, w = viewing copy, t = small preview
   const asDownload = url.searchParams.get('dl') === '1'

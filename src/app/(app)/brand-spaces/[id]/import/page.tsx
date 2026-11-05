@@ -5,7 +5,11 @@ import { parseStrategy } from '@/lib/strategy'
 import { postFormatSheet, strategyFormatSheet } from '@/lib/importSheets'
 import ImportClient from './ImportClient'
 
-export default async function ImportPage({ params, searchParams }: { params: { id: string }; searchParams: { kind?: string } }) {
+export default async function ImportPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ kind?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   if (access.role === 'client') {

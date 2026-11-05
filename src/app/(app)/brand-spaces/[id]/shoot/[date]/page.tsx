@@ -8,7 +8,8 @@ import { typeOf } from '@/lib/contentOptions'
 const SERIF = "Georgia, 'Times New Roman', serif"
 
 // Everything to film on one production day: what to shoot, grouped by kind, with each post's notes and script.
-export default async function ShootSheetPage({ params }: { params: { id: string; date: string } }) {
+export default async function ShootSheetPage(props: { params: Promise<{ id: string; date: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const day = parseDay(params.date)

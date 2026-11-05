@@ -1,7 +1,8 @@
 import { db } from '@/lib/db'
 import AcceptInviteButton from './AcceptInviteButton'
 
-export default async function InvitePage({ params }: { params: { token: string } }) {
+export default async function InvitePage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const invite = await db.brandSpaceInvite
     .findUnique({ where: { token: params.token }, include: { brandSpace: true } })
     .catch(() => null)

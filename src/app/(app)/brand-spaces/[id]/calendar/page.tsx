@@ -21,7 +21,11 @@ const COLUMNS = [
 
 type View = 'publish' | 'production' | 'platform' | 'board'
 
-export default async function CalendarPage({ params, searchParams }: { params: { id: string }; searchParams: { view?: string; m?: string } }) {
+export default async function CalendarPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string; m?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access

@@ -9,7 +9,8 @@ import { MAX_BOARD_DEPTH } from '../constants'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
 
-export default async function BoardCanvasPage({ params }: { params: { id: string; boardId: string } }) {
+export default async function BoardCanvasPage(props: { params: Promise<{ id: string; boardId: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const readOnly = access.role === 'client'

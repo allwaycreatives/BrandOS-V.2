@@ -11,7 +11,8 @@ const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date) => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // One post, the way the client should judge it: the video as it will really look, the thumbnail and caption beside it.
-export default async function PlanPostPage({ params }: { params: { token: string; itemId: string } }) {
+export default async function PlanPostPage(props: { params: Promise<{ token: string; itemId: string }> }) {
+  const params = await props.params;
   const brand = await db.brandSpace.findUnique({ where: { planToken: params.token }, select: { id: true, name: true } }).catch(() => null)
   if (!brand) notFound()
 

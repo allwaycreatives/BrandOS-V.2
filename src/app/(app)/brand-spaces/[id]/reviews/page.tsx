@@ -10,7 +10,8 @@ import DeliverableUrlField from './DeliverableUrlField'
 const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
-export default async function ReviewsPage({ params }: { params: { id: string } }) {
+export default async function ReviewsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
   const { brandSpace } = access

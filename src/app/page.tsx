@@ -23,7 +23,7 @@ const FEATURES = [
   { icon: '▤', title: 'Boards', text: 'Mood boards and shot lists to get everyone on the same page before the work begins.' },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
   // People who are signed in go straight to their dashboard; everyone else sees this page.
   const { userId } = await auth()
   if (userId) redirect('/dashboard')

@@ -16,7 +16,8 @@ function kitContent(json: unknown) {
 }
 
 // Public, view-only brand guide for a brand whose owner chose to share it.
-export default async function SharedBrandPage({ params }: { params: { token: string } }) {
+export default async function SharedBrandPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const brand = await db.brandSpace
     .findUnique({
       where: { shareToken: params.token },

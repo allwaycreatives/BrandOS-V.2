@@ -32,7 +32,7 @@ export default function TableCard({ content, readOnly, selected, onChange }: { c
   const [active, setActive] = useState(false)
   const cells = useRef(new Map<string, HTMLInputElement>())
   const pendingFocus = useRef<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dirty = useRef(false)
   const latest = useRef(rows)
   const send = useRef(onChange)

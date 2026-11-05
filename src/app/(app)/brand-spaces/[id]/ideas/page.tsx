@@ -5,7 +5,8 @@ import { assertBrandSpaceAccess } from '@/lib/auth'
 import { brandColor } from '@/lib/brandColor'
 import IdeaList from '@/components/IdeaList'
 
-export default async function BrandIdeasPage({ params }: { params: { id: string } }) {
+export default async function BrandIdeasPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
   const { brandSpace } = access

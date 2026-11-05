@@ -5,7 +5,8 @@ import { getOrCreateCurrentUser } from '@/lib/auth'
 import { getUserBrands } from '@/lib/brands'
 import TaskRow from '@/components/TaskRow'
 
-export default async function MyTasksPage({ searchParams }: { searchParams: { brand?: string } }) {
+export default async function MyTasksPage(props: { searchParams: Promise<{ brand?: string }> }) {
+  const searchParams = await props.searchParams;
   const { user, organizationId } = await getOrCreateCurrentUser()
   // Clients only view and approve, so they have no task list here.
   const brands = (await getUserBrands(user.id, organizationId)).filter((b) => b.role !== 'client')

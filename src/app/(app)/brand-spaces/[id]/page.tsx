@@ -40,7 +40,8 @@ function Tile({ href, label, value, caption, hot }: { href: string; label: strin
   )
 }
 
-export default async function BrandSpacePage({ params }: { params: { id: string } }) {
+export default async function BrandSpacePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace, role, canInvite } = access

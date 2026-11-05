@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic'
 const SERIF = "Georgia, 'Times New Roman', serif"
 
 // Public content plan. Clients open it from a link (often on WhatsApp), scroll week by week, and open any post to comment or approve.
-export default async function PlanPage({ params }: { params: { token: string } }) {
+export default async function PlanPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const brand = await db.brandSpace.findUnique({ where: { planToken: params.token }, select: { id: true, name: true, planNote: true } }).catch(() => null)
   if (!brand) notFound()
 

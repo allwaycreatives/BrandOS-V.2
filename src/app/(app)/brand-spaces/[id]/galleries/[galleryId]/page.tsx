@@ -23,7 +23,8 @@ const COVER_ART = [
 ]
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 
-export default async function GalleryManagePage({ params }: { params: { id: string; galleryId: string } }) {
+export default async function GalleryManagePage(props: { params: Promise<{ id: string; galleryId: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 

@@ -19,7 +19,8 @@ const CameraIcon = () => (
 )
 
 // Every brand's calendar in one place: who goes out when, and who is filming when. Colour shows the brand.
-export default async function AllCalendarsPage({ searchParams }: { searchParams: { m?: string; brand?: string } }) {
+export default async function AllCalendarsPage(props: { searchParams: Promise<{ m?: string; brand?: string }> }) {
+  const searchParams = await props.searchParams;
   const { user, organizationId } = await getOrCreateCurrentUser()
   const brands = (await getUserBrands(user.id, organizationId)).filter((b) => b.role !== 'client')
 

@@ -6,7 +6,8 @@ import DeleteBrandForm from './DeleteBrandForm'
 
 const SERIF = "Georgia, 'Times New Roman', serif"
 
-export default async function DeleteBrandPage({ params }: { params: { id: string } }) {
+export default async function DeleteBrandPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const back = `/brand-spaces/${params.id}`

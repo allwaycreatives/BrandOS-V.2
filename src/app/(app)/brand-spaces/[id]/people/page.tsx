@@ -8,7 +8,8 @@ import InviteLink from '../InviteLink'
 const SERIF = "Georgia, 'Times New Roman', serif"
 const small: React.CSSProperties = { padding: '3px 10px', fontSize: 12 }
 
-export default async function PeoplePage({ params }: { params: { id: string } }) {
+export default async function PeoplePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role !== 'agency') notFound()
   const { brandSpace } = access

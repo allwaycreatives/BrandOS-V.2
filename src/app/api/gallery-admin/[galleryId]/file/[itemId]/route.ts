@@ -10,7 +10,11 @@ const text = (status: number, message: string) => new Response(message, { status
 
 // Lets the people who manage a brand see the gallery's files from Google Drive while they work on it,
 // even before the gallery is published. Only for signed-in team members of this brand.
-export async function GET(request: Request, { params }: { params: { galleryId: string; itemId: string } }) {
+export async function GET(
+  request: Request,
+  props: { params: Promise<{ galleryId: string; itemId: string }> }
+) {
+  const params = await props.params;
   const variant = new URL(request.url).searchParams.get('v') || 't' // t = small preview, w = viewing copy, o = original
   const gallery = await db.gallery.findUnique({ where: { id: params.galleryId }, include: { driveConnection: true } }).catch(() => null)
   if (!gallery || gallery.storage !== 'drive' || !gallery.driveConnection) return text(404, 'Not found')

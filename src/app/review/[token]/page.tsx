@@ -10,7 +10,8 @@ const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date) => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // Public review page. Clients open this from a link (often sent on WhatsApp). No account needed.
-export default async function ReviewPage({ params }: { params: { token: string } }) {
+export default async function ReviewPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const d = await db.deliverable
     .findUnique({ where: { reviewToken: params.token }, include: { feedback: { orderBy: { createdAt: 'asc' } }, brandSpace: { select: { name: true } } } })
     .catch(() => null)

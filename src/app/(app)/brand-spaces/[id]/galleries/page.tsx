@@ -10,7 +10,11 @@ import { createGallery } from './actions'
 const SERIF = "Georgia, 'Times New Roman', serif"
 const when = (d: Date | null) => (d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
-export default async function GalleriesPage({ params, searchParams }: { params: { id: string }; searchParams: { drive?: string } }) {
+export default async function GalleriesPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ drive?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
   const { brandSpace } = access

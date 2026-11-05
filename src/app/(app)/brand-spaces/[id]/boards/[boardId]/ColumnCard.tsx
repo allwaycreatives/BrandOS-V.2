@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 // A column is a labelled lane you place cards on (Shot list, To shoot, Done…). Moving the column moves the cards on top of it.
 export default function ColumnCard({ content, readOnly, onChange }: { content: string; readOnly: boolean; onChange: (text: string) => void }) {
   const [title, setTitle] = useState(content)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dirty = useRef(false)
   const latest = useRef(title)
   const send = useRef(onChange)

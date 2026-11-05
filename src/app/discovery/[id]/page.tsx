@@ -3,7 +3,8 @@ import { db } from '@/lib/db'
 import DiscoveryForm from './DiscoveryForm'
 import LongFormDiscoveryForm from './LongFormDiscoveryForm'
 
-export default async function DiscoveryPage({ params }: { params: { id: string } }) {
+export default async function DiscoveryPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const activeTemplate = await db.discoveryTemplate
     .findFirst({
       where: { brandSpaceId: params.id, isActive: true, format: 'longform' },

@@ -7,7 +7,8 @@ import { TEMPLATE_LIST } from './templates'
 import DeleteBoardButton from './DeleteBoardButton'
 import TemplatePicker from './TemplatePicker'
 
-export default async function BoardsListPage({ params }: { params: { id: string } }) {
+export default async function BoardsListPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access

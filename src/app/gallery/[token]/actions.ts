@@ -12,7 +12,7 @@ export async function unlockGallery(token: string, passcode: string): Promise<{ 
     await new Promise((r) => setTimeout(r, 600)) // slows down guessing
     return { ok: false }
   }
-  cookies().set(unlockCookieName(token), unlockCookieValue(token, g.passcodeHash), {
+  (await cookies()).set(unlockCookieName(token), unlockCookieValue(token, g.passcodeHash), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',

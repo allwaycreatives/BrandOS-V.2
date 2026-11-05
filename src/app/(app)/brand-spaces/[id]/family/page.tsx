@@ -9,7 +9,8 @@ import { STAGES, PLATFORMS } from '../campaigns/constants'
 const SERIF = "Georgia, 'Times New Roman', serif"
 
 // Who is posting what, where: the shared brand and its founders side by side.
-export default async function FamilyPage({ params }: { params: { id: string } }) {
+export default async function FamilyPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role === 'client') notFound()
 

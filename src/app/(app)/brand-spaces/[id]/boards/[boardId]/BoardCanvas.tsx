@@ -202,7 +202,7 @@ export default function BoardCanvas({
   const [dialog, setDialog] = useState<{ kind: 'link' | 'board' | 'map' | 'video' | 'rename' | 'editlink' | 'editmap'; cardId?: string; initial: string; point?: { x: number; y: number } } | null>(null)
   const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [barPos, setBarPos] = useState<{ x: number; y: number } | null>(null)
-  const noticeTimer = useRef<ReturnType<typeof setTimeout>>()
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const selRef = useRef(selected)
   const dragRef = useRef<Drag | null>(null)
@@ -514,7 +514,7 @@ export default function BoardCanvas({
   }
 
   // A native listener is needed so zooming doesn't also scroll the page.
-  const wheelRef = useRef<(e: WheelEvent) => void>()
+  const wheelRef = useRef<(e: WheelEvent) => void | undefined>(undefined)
   wheelRef.current = (e) => {
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd + scroll, and a pinch on a trackpad (which arrives as Ctrl + scroll)
@@ -570,7 +570,7 @@ export default function BoardCanvas({
 
   // ---------- keyboard ----------
 
-  const deleteRef = useRef<() => void>()
+  const deleteRef = useRef<() => void | undefined>(undefined)
   deleteRef.current = deleteSelected
   useEffect(() => {
     const typingIn = (t: EventTarget | null) => {

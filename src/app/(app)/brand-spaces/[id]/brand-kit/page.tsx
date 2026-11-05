@@ -16,7 +16,8 @@ function safeContent(contentJson: unknown): { bio: string; tagline: string; prof
   }
 }
 
-export default async function BrandKitPage({ params }: { params: { id: string } }) {
+export default async function BrandKitPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access || access.role !== 'agency') notFound()
   const { brandSpace } = access

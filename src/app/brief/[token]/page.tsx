@@ -6,7 +6,8 @@ import BriefForm from './BriefForm'
 const SERIF = "Georgia, 'Times New Roman', serif"
 
 // Public brief form. A client opens the link (often sent on WhatsApp), fills it in, and the team gets a project.
-export default async function BriefPage({ params }: { params: { token: string } }) {
+export default async function BriefPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const brand = await db.brandSpace.findUnique({ where: { intakeToken: params.token }, select: { name: true } }).catch(() => null)
   if (!brand) notFound()
 

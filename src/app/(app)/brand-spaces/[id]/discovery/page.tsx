@@ -8,7 +8,8 @@ type QuestionLike = { id: string; prompt: string; section?: string }
 
 const when = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export default async function DiscoverySummaryPage({ params }: { params: { id: string } }) {
+export default async function DiscoverySummaryPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const access = await assertBrandSpaceAccess(params.id)
   if (!access) notFound()
   const { brandSpace } = access

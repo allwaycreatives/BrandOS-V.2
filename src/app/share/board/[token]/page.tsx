@@ -11,7 +11,8 @@ import CopyBoardButton from './CopyBoardButton'
 const SERIF = "Georgia, 'Times New Roman', serif"
 
 // Public, view-only page for a board someone chose to share. Anyone can copy it into their own workspace.
-export default async function SharedBoardPage({ params }: { params: { token: string } }) {
+export default async function SharedBoardPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const board = await db.board
     .findUnique({ where: { shareToken: params.token }, include: { cards: true } })
     .catch(() => null)

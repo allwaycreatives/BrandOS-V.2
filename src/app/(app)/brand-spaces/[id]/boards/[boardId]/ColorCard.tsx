@@ -37,7 +37,7 @@ export default function ColorCard({ content, readOnly, selected, autoFocus, onCh
   const [active, setActive] = useState(false)
   const hexInput = useRef<HTMLInputElement>(null)
   const picker = useRef<HTMLInputElement>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dirty = useRef(false)
   const latest = useRef({ hex, role, use, name })
   const send = useRef(onChange)
