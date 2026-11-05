@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brand-console",
+  "name": "brandos-v-2",
   "main": ".open-next/worker.js",
   "minify": true,
   "compatibility_date": "2025-09-01",
