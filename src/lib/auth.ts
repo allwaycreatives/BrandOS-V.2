@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from './db'
 
 export async function getOrCreateCurrentUser() {
-  const { userId } = auth()
+  const { userId } = await auth()
   if (!userId) throw new Error('Not authenticated')
 
   let user = await db.user.findUnique({ where: { authProviderId: userId } })

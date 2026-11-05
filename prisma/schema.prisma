@@ -7,7 +7,9 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // No Rust engine: the client talks to the database through a driver adapter (needed for Cloudflare Workers, and much smaller).
+  engineType = "client"
 }
 
 enum OrgType {

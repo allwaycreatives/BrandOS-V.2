@@ -17,7 +17,7 @@ export default async function SharedBoardPage({ params }: { params: { token: str
     .catch(() => null)
   if (!board) notFound()
 
-  const { userId } = auth()
+  const { userId } = await auth()
   let brands: { id: string; name: string }[] = []
   if (userId) {
     const { user, organizationId } = await getOrCreateCurrentUser()

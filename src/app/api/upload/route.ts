@@ -15,7 +15,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       onBeforeGenerateToken: async () => {
         // Only signed-in users can upload. (Vercel's own "upload finished"
         // callback doesn't go through this check; it is verified by signature.)
-        const { userId } = auth()
+        const { userId } = await auth()
         if (!userId) throw new Error('UNAUTHENTICATED')
 
         return {

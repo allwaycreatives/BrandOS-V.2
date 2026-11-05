@@ -25,7 +25,7 @@ const FEATURES = [
 
 export default function HomePage() {
   // People who are signed in go straight to their dashboard; everyone else sees this page.
-  const { userId } = auth()
+  const { userId } = await auth()
   if (userId) redirect('/dashboard')
 
   return (
